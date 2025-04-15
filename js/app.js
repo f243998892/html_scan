@@ -1276,43 +1276,311 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
 
 // 处理删除记录
 async function handleDeleteRecords() {
-    // 显示确认对话框
-    if (!confirm('确定要删除记录吗？此操作不可恢复！')) {
-        return;
-    }
-    
     try {
-        // 显示加载中
-        showToast('正在删除记录...', 'info');
+        // 获取本月范围
+        await getMonthRange();
         
-        // 获取当前用户的所有记录
-        const { data: records, error: queryError } = await supabase
+        // 显示加载中
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 查询用户本月完成的产品
+        const products = await getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        );
+        
+        if (!products || products.length === 0) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+            return;
+        }
+        
+        // 将产品数据处理成带有工序信息的列表
+        const processRecords = [];
+        
+        products.forEach(product => {
+            const productCode = product['产品编码'];
+            const productModel = product['产品型号'];
+            
+            // 检查各个工序
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '绕线',
+                    '时间': product['绕线时间']
+                });
+            }
+            
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '嵌线',
+                    '时间': product['嵌线时间']
+                });
+            }
+            
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '接线',
+                    '时间': product['接线时间']
+                });
+            }
+            
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '压装',
+                    '时间': product['压装时间']
+                });
+            }
+            
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '车止口',
+                    '时间': product['车止口时间']
+                });
+            }
+            
+            // 浸漆工序特殊处理（没有员工字段）
+            if (isDateInRange(product['浸漆时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '浸漆',
+                    '时间': product['浸漆时间']
+                });
+            }
+        });
+        
+        // 按时间倒序排序
+        processRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
+        
+        // 生成记录列表
+        let recordsHTML = '';
+        
+        processRecords.forEach((record, index) => {
+            recordsHTML += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="record-${index}">
+                            <label class="form-check-label" for="record-${index}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>产品编码: ${record['产品编码']}</strong><br>
+                                        <small class="text-muted">产品型号: ${record['产品型号']}</small><br>
+                                        <small class="text-muted">工序: ${record['工序']}</small><br>
+                                        <small class="text-muted">时间: ${formatDate(record['时间'])}</small>
+                                    </div>
+                                    <div class="process-icon">
+                                        ${getProcessIcon(record['工序'])}
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // 添加删除按钮
+        recordsHTML += `
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-danger" id="delete-selected-records" disabled>
+                    删除选中记录
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('process-list').innerHTML = recordsHTML;
+        
+        // 添加复选框事件监听
+        const checkboxes = document.querySelectorAll('.form-check-input');
+        const deleteButton = document.getElementById('delete-selected-records');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const checkedCount = document.querySelectorAll('.form-check-input:checked').length;
+                deleteButton.disabled = checkedCount === 0;
+            });
+        });
+        
+        // 添加删除按钮事件监听
+        deleteButton.addEventListener('click', async function() {
+            const selectedRecords = [];
+            checkboxes.forEach((checkbox, index) => {
+                if (checkbox.checked) {
+                    selectedRecords.push(processRecords[index]);
+                }
+            });
+            
+            if (selectedRecords.length === 0) {
+                showToast('请选择要删除的记录', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
+                return;
+            }
+            
+            try {
+                let successCount = 0;
+                let failureCount = 0;
+                
+                for (const record of selectedRecords) {
+                    const success = await deleteProductProcess(
+                        record['产品编码'],
+                        record['工序'],
+                        userState.fullName
+                    );
+                    
+                    if (success) {
+                        successCount++;
+                    } else {
+                        failureCount++;
+                    }
+                }
+                
+                showToast(`删除完成: 成功 ${successCount} 条, 失败 ${failureCount} 条`, 'info');
+                
+                // 重新加载记录
+                handleDeleteRecords();
+            } catch (error) {
+                console.error('删除记录失败:', error);
+                showToast('删除记录失败，请重试', 'error');
+            }
+        });
+        
+    } catch (error) {
+        console.error('加载删除记录失败:', error);
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 删除产品工序信息
+async function deleteProductProcess(productCode, processType, employeeName) {
+    try {
+        // 确定字段名称
+        let employeeField = '';
+        let timeField = '';
+        
+        switch (processType) {
+            case '绕线':
+                employeeField = '绕线员工';
+                timeField = '绕线时间';
+                break;
+            case '嵌线':
+                employeeField = '嵌线员工';
+                timeField = '嵌线时间';
+                break;
+            case '接线':
+                employeeField = '接线员工';
+                timeField = '接线时间';
+                break;
+            case '压装':
+                employeeField = '压装员工';
+                timeField = '压装时间';
+                break;
+            case '车止口':
+                employeeField = '车止口员工';
+                timeField = '车止口时间';
+                break;
+            case '浸漆':
+                timeField = '浸漆时间';
+                employeeField = ''; // 浸漆没有对应的员工字段
+                break;
+            default:
+                return false;
+        }
+        
+        // 检查是否是当前用户的工序
+        const { data: product, error: queryError } = await supabase
             .from('products')
-            .select('*')
-            .or(`绕线员工.eq.${userState.fullName},嵌线员工.eq.${userState.fullName},接线员工.eq.${userState.fullName},压装员工.eq.${userState.fullName},车止口员工.eq.${userState.fullName}`);
+            .select()
+            .eq('产品编码', productCode)
+            .maybeSingle();
         
         if (queryError) {
             throw queryError;
         }
         
-        if (!records || records.length === 0) {
-            showToast('没有找到可删除的记录', 'warning');
-            return;
+        if (!product) {
+            console.error('产品不存在');
+            return false;
         }
         
-        // 批量删除记录
-        const { error: deleteError } = await supabase
+        // 检查是否是当前用户的工序
+        if (employeeField && product[employeeField] !== employeeName) {
+            console.error('不是当前用户的工序');
+            return false;
+        }
+        
+        // 清除工序信息
+        const updateData = {};
+        updateData[timeField] = null;
+        
+        // 只有在员工字段存在的情况下才更新
+        if (employeeField) {
+            updateData[employeeField] = null;
+        }
+        
+        const { error: updateError } = await supabase
             .from('products')
-            .delete()
-            .or(`绕线员工.eq.${userState.fullName},嵌线员工.eq.${userState.fullName},接线员工.eq.${userState.fullName},压装员工.eq.${userState.fullName},车止口员工.eq.${userState.fullName}`);
+            .update(updateData)
+            .eq('产品编码', productCode);
         
-        if (deleteError) {
-            throw deleteError;
+        if (updateError) {
+            throw updateError;
         }
         
-        showToast('记录删除成功', 'success');
+        return true;
     } catch (error) {
-        console.error('删除记录失败:', error);
-        showToast('删除记录失败，请重试', 'error');
+        console.error('删除产品工序信息失败:', error);
+        return false;
     }
+}
+
+// 获取工序图标
+function getProcessIcon(process) {
+    let iconClass = '';
+    let iconColor = '';
+    
+    switch (process) {
+        case '绕线':
+            iconClass = 'bi-rotate-right';
+            iconColor = 'text-primary';
+            break;
+        case '嵌线':
+            iconClass = 'bi-cable';
+            iconColor = 'text-success';
+            break;
+        case '接线':
+            iconClass = 'bi-power';
+            iconColor = 'text-warning';
+            break;
+        case '压装':
+            iconClass = 'bi-compress';
+            iconColor = 'text-danger';
+            break;
+        case '车止口':
+            iconClass = 'bi-scissors';
+            iconColor = 'text-info';
+            break;
+        case '浸漆':
+            iconClass = 'bi-droplet';
+            iconColor = 'text-secondary';
+            break;
+        default:
+            iconClass = 'bi-gear';
+            iconColor = 'text-muted';
+    }
+    
+    return `<i class="bi ${iconClass} ${iconColor}" style="font-size: 1.5rem;"></i>`;
 } 
