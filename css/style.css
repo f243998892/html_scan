@@ -1,0 +1,139 @@
+body {
+    font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    background-color: #f8f9fa;
+    padding-bottom: 60px;
+}
+
+.card {
+    border-radius: 10px;
+    border: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+#home-screen .card {
+    cursor: pointer;
+}
+
+.process-btn, .process-btn-continuous {
+    min-width: 100px;
+    margin: 5px;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.scanner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.scanner-container {
+    width: 100%;
+    max-width: 500px;
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+
+.custom-toast {
+    margin-bottom: 10px;
+    min-width: 250px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pending-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pending-item .badge {
+    font-size: 0.8rem;
+}
+
+/* 产品详情样式 */
+.product-detail-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.product-detail-item:last-child {
+    border-bottom: none;
+}
+
+.product-detail-label {
+    font-weight: bold;
+    color: #555;
+}
+
+/* 查询结果项样式 */
+.process-item, .model-item, .product-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s;
+}
+
+.process-item:hover, .model-item:hover, .product-item:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+
+.process-item .badge, .model-item .badge {
+    font-size: 0.9rem;
+    padding: 5px 10px;
+}
+
+/* 响应式调整 */
+@media (max-width: 576px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .process-btn, .process-btn-continuous {
+        min-width: auto;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+} 
