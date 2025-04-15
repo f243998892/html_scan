@@ -41,8 +41,8 @@ const SCREENS = {
 
 // 初始化应用
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化Supabase
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 初始化Supabase - 使用完全限定的访问方式
+    supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
     initApp();
 });
 
