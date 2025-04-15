@@ -42,7 +42,7 @@ const SCREENS = {
 // 初始化应用
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化Supabase
-    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     initApp();
 });
 
