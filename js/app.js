@@ -1277,6 +1277,9 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
 // 处理删除记录
 async function handleDeleteRecords() {
     try {
+        // 显示查询屏幕
+        showScreen(SCREENS.QUERY);
+        
         // 获取本月范围
         await getMonthRange();
         
