@@ -73,7 +73,7 @@ function addEventListeners() {
     document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
     document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
     document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
-    document.getElementById('card-delete-records').addEventListener('click', () => showFeatureNotAvailable('删除记录功能暂未开放'));
+    document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
     
     // 设置开关
     document.getElementById('exit-after-scan').addEventListener('change', function(e) {
@@ -939,7 +939,8 @@ async function loadUserMonthlyProcesses() {
             '嵌线': 0,
             '接线': 0,
             '压装': 0,
-            '车止口': 0
+            '车止口': 0,
+            '浸漆': 0
         };
         
         // 统计各工序和型号
@@ -948,7 +949,8 @@ async function loadUserMonthlyProcesses() {
             '嵌线': {},
             '接线': {},
             '压装': {},
-            '车止口': {}
+            '车止口': {},
+            '浸漆': {}
         };
         
         // 统计工序和产品编码
@@ -957,7 +959,8 @@ async function loadUserMonthlyProcesses() {
             '嵌线': {},
             '接线': {},
             '压装': {},
-            '车止口': {}
+            '车止口': {},
+            '浸漆': {}
         };
         
         // 处理产品数据
@@ -1055,6 +1058,25 @@ async function loadUserMonthlyProcesses() {
                 processProducts['车止口'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['车止口时间']
+                });
+            }
+            
+            if (isDateInRange(product['浸漆时间'])) {
+                processCounts['浸漆']++;
+                
+                // 按型号统计
+                if (!processModels['浸漆'][product['产品型号']]) {
+                    processModels['浸漆'][product['产品型号']] = 0;
+                }
+                processModels['浸漆'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['浸漆'][product['产品型号']]) {
+                    processProducts['浸漆'][product['产品型号']] = [];
+                }
+                processProducts['浸漆'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['浸漆时间']
                 });
             }
         });
@@ -1249,5 +1271,48 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
     } catch (error) {
         console.error('获取用户本月产品失败:', error);
         return [];
+    }
+}
+
+// 处理删除记录
+async function handleDeleteRecords() {
+    // 显示确认对话框
+    if (!confirm('确定要删除记录吗？此操作不可恢复！')) {
+        return;
+    }
+    
+    try {
+        // 显示加载中
+        showToast('正在删除记录...', 'info');
+        
+        // 获取当前用户的所有记录
+        const { data: records, error: queryError } = await supabase
+            .from('products')
+            .select('*')
+            .or(`绕线员工.eq.${userState.fullName},嵌线员工.eq.${userState.fullName},接线员工.eq.${userState.fullName},压装员工.eq.${userState.fullName},车止口员工.eq.${userState.fullName}`);
+        
+        if (queryError) {
+            throw queryError;
+        }
+        
+        if (!records || records.length === 0) {
+            showToast('没有找到可删除的记录', 'warning');
+            return;
+        }
+        
+        // 批量删除记录
+        const { error: deleteError } = await supabase
+            .from('products')
+            .delete()
+            .or(`绕线员工.eq.${userState.fullName},嵌线员工.eq.${userState.fullName},接线员工.eq.${userState.fullName},压装员工.eq.${userState.fullName},车止口员工.eq.${userState.fullName}`);
+        
+        if (deleteError) {
+            throw deleteError;
+        }
+        
+        showToast('记录删除成功', 'success');
+    } catch (error) {
+        console.error('删除记录失败:', error);
+        showToast('删除记录失败，请重试', 'error');
     }
 } 
