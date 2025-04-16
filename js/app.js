@@ -1411,7 +1411,7 @@ async function handleDeleteRecords() {
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="" id="record-${index}">
+                            <input class="form-check-input record-checkbox" type="checkbox" value="${index}" id="record-${index}">
                             <label class="form-check-label" for="record-${index}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -1443,12 +1443,12 @@ async function handleDeleteRecords() {
         document.getElementById('process-list').innerHTML = recordsHTML;
         
         // 添加复选框事件监听
-        const checkboxes = document.querySelectorAll('.form-check-input');
+        const checkboxes = document.querySelectorAll('.record-checkbox');
         const deleteButton = document.getElementById('delete-selected-records');
         
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                const checkedCount = document.querySelectorAll('.form-check-input:checked').length;
+                const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
                 deleteButton.disabled = checkedCount === 0;
             });
         });
@@ -1456,8 +1456,11 @@ async function handleDeleteRecords() {
         // 添加删除按钮事件监听
         deleteButton.addEventListener('click', async function() {
             const selectedRecords = [];
-            checkboxes.forEach((checkbox, index) => {
-                if (checkbox.checked) {
+            
+            // 获取所有选中的记录索引
+            document.querySelectorAll('.record-checkbox:checked').forEach(checkbox => {
+                const index = parseInt(checkbox.value, 10);
+                if (!isNaN(index) && index >= 0 && index < processRecords.length) {
                     selectedRecords.push(processRecords[index]);
                 }
             });
