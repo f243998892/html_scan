@@ -1,24 +1,3 @@
-// HTML5 QR Code 支持的格式
-const Html5QrcodeSupportedFormats = {
-    QR_CODE: 0,
-    AZTEC: 1,
-    CODABAR: 2,
-    CODE_39: 3,
-    CODE_93: 4,
-    CODE_128: 5,
-    DATA_MATRIX: 6,
-    MAXICODE: 7,
-    ITF: 8,
-    EAN_13: 9,
-    EAN_8: 10,
-    PDF_417: 11,
-    RSS_14: 12,
-    RSS_EXPANDED: 13,
-    UPC_A: 14,
-    UPC_E: 15,
-    UPC_EAN_EXTENSION: 16
-};
-
 // 全局变量
 const SUPABASE_URL = 'https://mirilhunybcsydhtowqo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcmlsaHVueWJjc3lkaHRvd3FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNjk3MzEsImV4cCI6MjA1Njg0NTczMX0.fQCOraXJXQFshRXxHf2N-VIwTSbEc1hrxXzHP4sIIAw';
@@ -33,9 +12,6 @@ const SCAN_CONFIG = {
     SINGLE_SCAN_DELAY: 500,    // 单次扫码延迟时间(ms)
     DUPLICATE_CODE_INTERVAL: 1500 // 认为是重复扫码的时间间隔(ms)
 };
-
-// 音频上下文
-let audioContext = null;
 
 // 存储当前用户信息
 const userState = {
@@ -99,37 +75,15 @@ async function tryAutoLogin() {
 // 添加事件监听
 function addEventListeners() {
     // 登录事件
-    document.getElementById('login-btn').addEventListener('click', function() {
-        // 初始化音频上下文
-        initAudioContext();
-        handleLogin();
-    });
+    document.getElementById('login-btn').addEventListener('click', handleLogin);
     
     // 首页功能卡片点击事件
-    document.getElementById('card-single-scan').addEventListener('click', () => {
-        initAudioContext();
-        showScreen(SCREENS.SINGLE_SCAN);
-    });
-    document.getElementById('card-continuous-scan').addEventListener('click', () => {
-        initAudioContext();
-        showScreen(SCREENS.CONTINUOUS_SCAN);
-    });
-    document.getElementById('card-product-query').addEventListener('click', () => {
-        initAudioContext();
-        handleProductQuery();
-    });
-    document.getElementById('card-product-scan-query').addEventListener('click', () => {
-        initAudioContext();
-        handleProductScanQuery();
-    });
-    document.getElementById('card-inventory').addEventListener('click', () => {
-        initAudioContext();
-        showFeatureNotAvailable('该功能暂未开放，敬请期待');
-    });
-    document.getElementById('card-delete-records').addEventListener('click', () => {
-        initAudioContext();
-        handleDeleteRecords();
-    });
+    document.getElementById('card-single-scan').addEventListener('click', () => showScreen(SCREENS.SINGLE_SCAN));
+    document.getElementById('card-continuous-scan').addEventListener('click', () => showScreen(SCREENS.CONTINUOUS_SCAN));
+    document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
+    document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
+    document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
+    document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
     
     // 设置开关
     document.getElementById('exit-after-scan').addEventListener('change', function(e) {
@@ -329,8 +283,7 @@ function initializeScanner() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
-        // 只扫描二维码格式
-        formatsToSupport: [0], // 0 = QR_CODE
+        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
@@ -447,16 +400,7 @@ function stopScan() {
         }
     } else {
         stopScanner();
-        
-        // 隐藏手动输入框
-        document.getElementById('manual-input-container').classList.add('d-none');
-        
-        // 判断当前扫码类型，如果是产品查询则返回首页
-        if (scanState.processType === 'query') {
-            showScreen(SCREENS.HOME);
-        } else {
-            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-        }
+        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
     }
 }
 
@@ -569,89 +513,23 @@ function getChineseProcessName(processType) {
     }
 }
 
-// 初始化音频上下文（需要用户交互后调用）
-function initAudioContext() {
-    if (!audioContext) {
-        try {
-            // 创建AudioContext
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioContext = new AudioContext();
-            console.log('音频上下文已初始化');
-        } catch (e) {
-            console.error('初始化音频上下文失败:', e);
-        }
-    }
-    return audioContext;
-}
-
 // 播放成功提示音
 function playSuccessSound() {
     try {
-        // 确保已初始化音频上下文
-        if (!audioContext) {
-            initAudioContext();
-        }
-        
-        // 如果初始化失败，使用备用方式
-        if (!audioContext) {
-            const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
-            audio.play().catch(e => console.error('播放音频失败:', e));
-            return;
-        }
-        
-        // 生成音频缓冲区
-        const buffer = audioContext.createBuffer(1, 44100 * 0.5, 44100);
-        const channel = buffer.getChannelData(0);
-        
-        // 创建简单的成功音效
-        for (let i = 0; i < buffer.length; i++) {
-            // 生成一个简单的短音效
-            channel[i] = Math.sin(i * 0.05) * Math.exp(-4 * i / buffer.length);
-        }
-        
-        // 创建音频源并播放
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start();
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
+        audio.play();
     } catch (e) {
-        console.error('播放成功音效失败:', e);
+        console.error('无法播放音频', e);
     }
 }
 
 // 播放错误提示音
 function playErrorSound() {
     try {
-        // 确保已初始化音频上下文
-        if (!audioContext) {
-            initAudioContext();
-        }
-        
-        // 如果初始化失败，使用备用方式
-        if (!audioContext) {
-            const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
-            audio.play().catch(e => console.error('播放音频失败:', e));
-            return;
-        }
-        
-        // 生成音频缓冲区
-        const buffer = audioContext.createBuffer(1, 44100 * 0.5, 44100);
-        const channel = buffer.getChannelData(0);
-        
-        // 创建简单的错误音效
-        for (let i = 0; i < buffer.length; i++) {
-            // 频率变化，低-高-低形成错误提示音
-            const freq = 0.1 - 0.05 * Math.sin(i * 0.001);
-            channel[i] = Math.sin(i * freq) * Math.exp(-3 * i / buffer.length);
-        }
-        
-        // 创建音频源并播放
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start();
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
+        audio.play();
     } catch (e) {
-        console.error('播放错误音效失败:', e);
+        console.error('无法播放音频', e);
     }
 }
 
@@ -832,17 +710,6 @@ function startProductScanQuery() {
     document.getElementById('scan-upload').classList.add('d-none');
     document.getElementById('scan-pending-list').classList.add('d-none');
     
-    // 显示手动输入框
-    document.getElementById('manual-input-container').classList.remove('d-none');
-    
-    // 添加手动查询按钮事件
-    document.getElementById('manual-query-btn').addEventListener('click', handleManualProductQuery);
-    document.getElementById('manual-product-code').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleManualProductQuery();
-        }
-    });
-    
     // 显示扫码界面
     showScreen(SCREENS.SCAN);
     
@@ -853,30 +720,13 @@ function startProductScanQuery() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 获取屏幕尺寸
-    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const isSmallScreen = screenWidth < 600;
-    
-    // 计算二维码扫描框大小 - The QR box and UI settings
-    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
-    
-    // 获取视频约束参数
-    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
-    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
-    
-    // 使用与普通扫码相同的优化配置
     const config = {
-        fps: SCAN_CONFIG.DEFAULT_FPS,
-        qrbox: { width: qrboxSize, height: qrboxSize },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-        // 只扫描二维码格式
-        formatsToSupport: [0], // 0 = QR_CODE
         videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: videoConstraintsWidth },
-            height: { ideal: videoConstraintsHeight },
-            focusMode: "continuous" // 尝试启用持续对焦
+            facingMode: "environment"
         }
     };
     
@@ -891,55 +741,16 @@ function startProductScanQuery() {
     });
 }
 
-// 处理手动输入产品编码查询
-async function handleManualProductQuery() {
-    const productCode = document.getElementById('manual-product-code').value.trim();
-    
-    if (!productCode) {
-        showToast('请输入产品编码', 'warning');
-        return;
-    }
-    
-    try {
-        // 查询产品详情
-        const productData = await getProductDetails(productCode);
-        
-        if (productData) {
-            // 播放成功提示音
-            playSuccessSound();
-            
-            // 显示产品详情
-            showProductDetail(productData);
-            
-            // 清空输入框
-            document.getElementById('manual-product-code').value = '';
-        } else {
-            // 播放错误提示音
-            playErrorSound();
-            
-            showToast('未找到该产品信息', 'error');
-        }
-    } catch (error) {
-        console.error('查询产品信息失败:', error);
-        showToast('查询失败，请重试', 'error');
-        playErrorSound();
-    }
-}
-
 // 产品查询扫码成功回调
 async function onProductQueryScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
-    const now = Date.now();
-    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
-        return; // 如果在设定时间内扫描了相同的码，则忽略
-    }
+    // 忽略重复扫码
+    if (decodedText === scanState.lastScannedCode) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
-    scanState.lastScanTime = now; // 记录本次扫码时间
     
     try {
         // 查询产品详情
@@ -965,7 +776,8 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
         // 延迟重置处理状态
         setTimeout(() => {
             scanState.isProcessing = false;
-        }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
+            scanState.lastScannedCode = '';
+        }, 1000);
     }
 }
 
@@ -1574,10 +1386,11 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
         console.log('查询时间范围:', startDateStr, '至', endDateStr);
         console.log('查询员工:', employeeName);
         
-        // 获取全部产品数据
+        // 查询员工完成的产品
         const { data, error } = await supabase
             .from('products')
             .select('*')
+            .or(`绕线员工.eq.${employeeName},嵌线员工.eq.${employeeName},接线员工.eq.${employeeName},压装员工.eq.${employeeName},车止口员工.eq.${employeeName}`)
             .order('产品编码');
         
         if (error) {
@@ -1585,7 +1398,7 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
             return [];
         }
         
-        // 在前端过滤员工和日期范围
+        // 在前端过滤日期范围
         return (data || []).filter(product => {
             // 检查该员工是否参与了这些工序，并且是在指定日期范围内
             if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) {
@@ -1601,10 +1414,6 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
                 return true;
             }
             if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) {
-                return true;
-            }
-            // 浸漆工序特殊处理（没有员工字段），如果浸漆时间存在且在范围内则显示
-            if (isDateInRange(product['浸漆时间'])) {
                 return true;
             }
             return false;
