@@ -58,11 +58,11 @@ body {
 }
 
 .custom-toast {
-    position: relative;
+    margin-bottom: 10px;
+    min-width: 250px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    opacity: 1;
-    transition: opacity 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: fadeInUp 0.3s ease-out;
 }
 
 @keyframes fadeInUp {
@@ -88,10 +88,8 @@ body {
 
 /* 产品详情样式 */
 .product-detail-item {
-    display: flex;
-    margin-bottom: 12px;
+    padding: 8px 0;
     border-bottom: 1px solid #eee;
-    padding-bottom: 12px;
 }
 
 .product-detail-item:last-child {
@@ -100,8 +98,7 @@ body {
 
 .product-detail-label {
     font-weight: bold;
-    min-width: 100px;
-    margin-right: 10px;
+    color: #555;
 }
 
 /* 查询结果项样式 */
@@ -139,53 +136,4 @@ body {
         padding: 8px 12px;
         font-size: 0.9rem;
     }
-}
-
-/* 产品列表样式 */
-.all-products-list {
-    max-height: 500px;
-    overflow-y: auto;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.product-record {
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.product-record:hover {
-    background-color: #f8f9fa;
-    transform: translateY(-2px);
-}
-
-.product-record .process-icon i {
-    font-size: 1.2rem !important;
-}
-
-/* 工序项目样式 */
-.process-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    margin-bottom: 8px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.process-item:hover {
-    background-color: #e9ecef;
-    transform: translateY(-2px);
-}
-
-/* 自定义吐司提示样式 */
-.custom-toast {
-    position: relative;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    opacity: 1;
-    transition: opacity 0.3s ease;
 } 
