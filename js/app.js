@@ -353,6 +353,8 @@ function onScanFailure(error) {
 
 // 停止扫码并返回
 function stopScan() {
+    console.log("停止扫码，当前扫码类型:", scanState.processType);
+    
     // 如果是连续扫码模式且有待上传的数据，询问是否放弃上传
     if (scanState.isContinuous && scanState.pendingCodes.length > 0) {
         if (confirm('是否放弃上传？')) {
@@ -365,9 +367,11 @@ function stopScan() {
         
         // 根据当前扫码类型决定返回的页面
         if (scanState.processType === 'query') {
+            console.log("产品扫码查询 - 返回主页");
             // 产品扫码查询 - 返回主页
             showScreen(SCREENS.HOME);
         } else {
+            console.log("其他扫码 - 返回选择页面");
             // 其他扫码 - 返回对应的扫码选择页面
             showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
         }
@@ -610,8 +614,8 @@ function getProcessFields(processType) {
             timeField = '车止口时间';
             break;
         case '浸漆':
-            employeeField = '';  // 浸漆没有对应的员工字段
             timeField = '浸漆时间';
+            employeeField = ''; // 浸漆没有对应的员工字段
             break;
         default:
             break;
@@ -1124,18 +1128,34 @@ async function loadUserMonthlyProcesses() {
             });
         });
         
+        // 加载月度流水账
+        loadMonthlyTransactionList();
     } catch (error) {
         console.error('加载用户本月工序统计失败:', error);
         document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
     }
 }
 
-// 判断日期是否在查询范围内
-function isDateInRange(dateString) {
+// 检查日期是否在当前月份范围内
+function isDateInRange(dateString, startDate, endDate) {
     if (!dateString) return false;
     
     const date = new Date(dateString);
-    return date >= queryState.monthRange.startDate && date <= queryState.monthRange.endDate;
+    
+    // 如果没有提供开始和结束日期，使用queryState中的日期范围
+    if (!startDate || !endDate) {
+        startDate = queryState.monthRange.startDate;
+        endDate = queryState.monthRange.endDate;
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // 移除时间部分进行纯日期比较
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    return date >= start && date <= end;
 }
 
 // 显示型号列表
@@ -1262,19 +1282,19 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
         // 在前端过滤日期范围
         return (data || []).filter(product => {
             // 检查该员工是否参与了这些工序，并且是在指定日期范围内
-            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) {
+            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'], startDate, endDate)) {
                 return true;
             }
-            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'])) {
+            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'], startDate, endDate)) {
                 return true;
             }
-            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'])) {
+            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'], startDate, endDate)) {
                 return true;
             }
-            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'])) {
+            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'], startDate, endDate)) {
                 return true;
             }
-            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) {
+            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'], startDate, endDate)) {
                 return true;
             }
             return false;
@@ -1602,115 +1622,157 @@ function getProcessIcon(process) {
 // 加载本月流水账
 async function loadMonthlyTransactionList() {
     try {
-        // 显示加载中
-        document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
-        
-        // 查询用户本月完成的产品
-        const products = await getUserMonthlyProducts(
-            userState.fullName,
-            queryState.monthRange.startDate,
-            queryState.monthRange.endDate
-        );
-        
-        if (!products || products.length === 0) {
-            document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+        // 获取当前用户信息
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser || !currentUser.name) {
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息</div>';
             return;
         }
-        
-        // 将产品数据处理成带有工序信息的列表
-        const transactionRecords = [];
-        
+
+        // 获取当月日期范围
+        const { startDate, endDate } = await getMonthDateRange();
+        if (!startDate || !endDate) {
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取日期范围</div>';
+            return;
+        }
+
+        // 显示加载提示
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
+
+        // 查询数据库获取产品记录
+        const { data: products, error } = await supabase
+            .from('products')
+            .select('*')
+            .gte('created_at', startDate)
+            .lte('created_at', endDate);
+
+        if (error) {
+            console.error('加载产品记录失败:', error);
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败</div>';
+            return;
+        }
+
+        // 筛选当前用户处理的记录
+        const userRecords = [];
+        const employeeName = currentUser.name;
+
         products.forEach(product => {
-            const productCode = product['产品编码'];
-            const productModel = product['产品型号'];
-            
-            // 检查各个工序
-            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '绕线',
-                    '时间': product['绕线时间']
+            // 检查每个工序，如果该用户参与了处理，则添加记录
+            if (product.绕线员工 === employeeName && product.绕线时间) {
+                userRecords.push({
+                    process: '绕线',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.绕线时间
                 });
             }
             
-            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '嵌线',
-                    '时间': product['嵌线时间']
+            if (product.嵌线员工 === employeeName && product.嵌线时间) {
+                userRecords.push({
+                    process: '嵌线',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.嵌线时间
                 });
             }
             
-            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '接线',
-                    '时间': product['接线时间']
+            if (product.接线员工 === employeeName && product.接线时间) {
+                userRecords.push({
+                    process: '接线',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.接线时间
                 });
             }
             
-            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '压装',
-                    '时间': product['压装时间']
+            if (product.压装员工 === employeeName && product.压装时间) {
+                userRecords.push({
+                    process: '压装',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.压装时间
                 });
             }
             
-            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '车止口',
-                    '时间': product['车止口时间']
+            if (product.车止口员工 === employeeName && product.车止口时间) {
+                userRecords.push({
+                    process: '车止口',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.车止口时间
                 });
             }
             
-            // 浸漆工序特殊处理（没有员工字段）
-            if (isDateInRange(product['浸漆时间'])) {
-                transactionRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '浸漆',
-                    '时间': product['浸漆时间']
+            if (product.浸漆员工 === employeeName && product.浸漆时间) {
+                userRecords.push({
+                    process: '浸漆',
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    time: product.浸漆时间
                 });
             }
         });
-        
-        // 按时间倒序排序
-        transactionRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
-        
-        // 生成流水账列表
-        let transactionListHTML = '<h4 class="text-center mt-4 mb-3">本月流水账</h4>';
-        
-        transactionRecords.forEach((record, index) => {
-            transactionListHTML += `
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>产品编码: ${record['产品编码']}</strong><br>
-                                <small class="text-muted">产品型号: ${record['产品型号']}</small><br>
-                                <small class="text-muted">工序: ${record['工序']}</small><br>
-                                <small class="text-muted">时间: ${formatDate(record['时间'])}</small>
-                            </div>
-                            <div class="process-icon">
-                                ${getProcessIcon(record['工序'])}
-                            </div>
-                        </div>
-                    </div>
+
+        // 按时间排序（最新的在前）
+        userRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        // 构建HTML表格
+        let html = '';
+        if (userRecords.length === 0) {
+            html = '<div class="alert alert-info">本月无记录</div>';
+        } else {
+            // 创建一个响应式表格
+            html = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">工序</th>
+                                <th scope="col">产品编码</th>
+                                <th scope="col">型号</th>
+                                <th scope="col">时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            userRecords.forEach(record => {
+                // 格式化时间
+                const recordDate = new Date(record.time);
+                const formattedDate = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordDate.getHours()).padStart(2, '0')}:${String(recordDate.getMinutes()).padStart(2, '0')}`;
+                
+                html += `
+                    <tr>
+                        <td>${record.process}</td>
+                        <td>${record.productCode}</td>
+                        <td>${record.model}</td>
+                        <td>${formattedDate}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
                 </div>
             `;
-        });
-        
-        document.getElementById('transaction-list-container').innerHTML = transactionListHTML;
-        
+        }
+
+        // 更新DOM
+        document.getElementById('monthly-transactions-container').innerHTML = html;
+
     } catch (error) {
-        console.error('加载本月流水账失败:', error);
-        document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+        console.error('加载流水账失败:', error);
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败</div>';
     }
+}
+
+// 在showMonthlyQuery函数中添加对loadMonthlyTransactionList的调用
+function showMonthlyQuery() {
+    showScreen(SCREENS.MONTHLY_QUERY);
+    loadCurrentMonthRange();
+    displayMonthRange();
+    loadUserMonthlyProcesses();
+    // 加载本月流水账
+    loadMonthlyTransactionList();
 } 
