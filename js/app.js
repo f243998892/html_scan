@@ -1311,6 +1311,12 @@ async function handleDeleteRecords() {
         // 显示查询屏幕
         showScreen(SCREENS.QUERY);
         
+        // 隐藏本月流水账容器（避免显示在删除记录页面）
+        const transactionContainer = document.getElementById('monthly-transactions-container');
+        if (transactionContainer) {
+            transactionContainer.style.display = 'none';
+        }
+        
         // 获取本月范围
         await getMonthRange();
         
