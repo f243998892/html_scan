@@ -398,10 +398,10 @@ async function onScanSuccess(decodedText, decodedResult) {
             playErrorSound();
             
             showToast('该产品的该工序已存在，请勿重复扫码', 'error');
-            
+    
             // 减少错误提示后的处理延迟
-            setTimeout(() => {
-                scanState.isProcessing = false;
+    setTimeout(() => {
+        scanState.isProcessing = false;
             }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
         }
     }
@@ -467,4 +467,1203 @@ function updatePendingList() {
     
     // 更新计数
     countElement.textContent = scanState.pendingCodes.length.toString();
+}
+
+// 上传所有待处理的产品编码
+async function uploadPendingCodes() {
+    if (scanState.pendingCodes.length === 0) {
+        showToast('没有待上传的数据', 'warning');
+        return;
+    }
+    
+    // 禁用上传按钮
+    const uploadButton = document.getElementById('scan-upload');
+    uploadButton.disabled = true;
+    uploadButton.textContent = '上传中...';
+    
+    // 显示上传中提示
+    showToast('上传中，请稍候...', 'info');
+    
+    try {
+        // 批量更新产品信息
+        const results = await batchUpdateProductProcess(
+            scanState.pendingCodes,
+            scanState.processType,
+            userState.fullName
+        );
+        
+        // 统计成功和失败的数量
+        const successCount = results.filter(r => r.success).length;
+        const failureCount = results.filter(r => !r.success).length;
+        
+        // 显示结果
+        if (successCount > 0 && failureCount === 0) {
+            showToast(`所有${successCount}个产品更新成功`, 'success');
+        } else if (successCount > 0 && failureCount > 0) {
+            showToast(`${successCount}个产品更新成功，${failureCount}个产品更新失败`, 'warning');
+        } else {
+            showToast('所有产品更新失败', 'error');
+        }
+        
+        // 清空待上传列表
+        scanState.pendingCodes = [];
+        updatePendingList();
+        
+        // 延迟返回
+        setTimeout(() => {
+            stopScanner();
+            showScreen(SCREENS.CONTINUOUS_SCAN);
+        }, 2000);
+    } catch (error) {
+        console.error('上传失败:', error);
+        showToast('上传失败，请重试', 'error');
+    } finally {
+        // 恢复上传按钮
+        uploadButton.disabled = false;
+        uploadButton.textContent = '上传';
+    }
+}
+
+// 将英文工序名转换为中文
+function getChineseProcessName(processType) {
+    switch (processType) {
+        case 'wiring': return '绕线';
+        case 'embedding': return '嵌线';
+        case 'wiring_connect': return '接线';
+        case 'pressing': return '压装';
+        case 'stopper': return '车止口';
+        case 'immersion': return '浸漆';
+        default: return processType;
+    }
+}
+
+// 播放成功提示音
+function playSuccessSound() {
+    try {
+        // 只在用户交互后创建AudioContext
+        function createAndPlayAudio() {
+            try {
+                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
+                audio.play();
+            } catch (e) {
+                console.error('无法播放音频', e);
+            }
+        }
+        
+        // 如果已经有用户交互，直接播放
+        if (document.body.classList.contains('user-interaction')) {
+            createAndPlayAudio();
+        } else {
+            // 延迟到下一个用户交互播放
+            const playOnInteraction = function() {
+                document.body.classList.add('user-interaction');
+                createAndPlayAudio();
+                document.removeEventListener('click', playOnInteraction);
+                document.removeEventListener('touchstart', playOnInteraction);
+            };
+            
+            document.addEventListener('click', playOnInteraction, { once: true });
+            document.addEventListener('touchstart', playOnInteraction, { once: true });
+        }
+    } catch (e) {
+        console.error('无法播放音频', e);
+    }
+}
+
+// 播放错误提示音
+function playErrorSound() {
+    try {
+        // 只在用户交互后创建AudioContext
+        function createAndPlayAudio() {
+            try {
+                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
+                audio.play();
+            } catch (e) {
+                console.error('无法播放音频', e);
+            }
+        }
+        
+        // 如果已经有用户交互，直接播放
+        if (document.body.classList.contains('user-interaction')) {
+            createAndPlayAudio();
+        } else {
+            // 延迟到下一个用户交互播放
+            const playOnInteraction = function() {
+                document.body.classList.add('user-interaction');
+                createAndPlayAudio();
+                document.removeEventListener('click', playOnInteraction);
+                document.removeEventListener('touchstart', playOnInteraction);
+            };
+            
+            document.addEventListener('click', playOnInteraction, { once: true });
+            document.addEventListener('touchstart', playOnInteraction, { once: true });
+        }
+    } catch (e) {
+        console.error('无法播放音频', e);
+    }
+}
+
+// ------ Supabase数据操作 ------
+
+// 更新产品信息
+async function updateProductProcess(productCode, processType, employeeName) {
+    try {
+        // 确定字段名称
+        const { employeeField, timeField } = getProcessFields(processType);
+        
+        // 先查询产品信息，检查工序字段是否已有数据
+        const { data: productData, error: queryError } = await supabase
+            .from('products')
+            .select()
+            .eq('产品编码', productCode)
+            .maybeSingle();
+        
+        if (queryError) {
+            console.error('查询产品信息失败:', queryError);
+            return false;
+        }
+        
+        // 如果找不到产品，返回失败
+        if (!productData) {
+            console.error('产品不存在:', productCode);
+            return false;
+        }
+        
+        // 检查工序字段是否已有数据
+        if (productData[timeField]) {
+            console.error('该产品的该工序已存在数据，不能覆盖:', productCode, timeField);
+            return false;
+        }
+        
+        // 准备更新数据
+        const updateData = {};
+        
+        // 设置当前时间
+        updateData[timeField] = getCurrentISOTimeString();
+        
+        // 只有在员工字段存在的情况下才更新
+        if (employeeField) {
+            updateData[employeeField] = employeeName;
+        }
+        
+        // 执行更新
+        const { error: updateError } = await supabase
+            .from('products')
+            .update(updateData)
+            .eq('产品编码', productCode);
+        
+        if (updateError) {
+            console.error('更新产品信息失败:', updateError);
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('更新产品信息失败:', error);
+        return false;
+    }
+}
+
+// 批量更新产品信息
+async function batchUpdateProductProcess(productCodes, processType, employeeName) {
+    const results = [];
+    
+    for (const code of productCodes) {
+        try {
+            const success = await updateProductProcess(code, processType, employeeName);
+            results.push({ code, success });
+        } catch (error) {
+            console.error(`批量更新产品 ${code} 失败:`, error);
+            results.push({ code, success: false });
+        }
+    }
+    
+    return results;
+}
+
+// 获取工序对应的字段名
+function getProcessFields(processType) {
+    let employeeField = '';
+    let timeField = '';
+    
+    const processName = getChineseProcessName(processType);
+    
+    switch (processName) {
+        case '绕线':
+            employeeField = '绕线员工';
+            timeField = '绕线时间';
+            break;
+        case '嵌线':
+            employeeField = '嵌线员工';
+            timeField = '嵌线时间';
+            break;
+        case '接线':
+            employeeField = '接线员工';
+            timeField = '接线时间';
+            break;
+        case '压装':
+            employeeField = '压装员工';
+            timeField = '压装时间';
+            break;
+        case '车止口':
+            employeeField = '车止口员工';
+            timeField = '车止口时间';
+            break;
+        case '浸漆':
+            employeeField = ''; // 浸漆没有对应的员工字段
+            timeField = '浸漆时间';
+            break;
+        default:
+            break;
+    }
+    
+    return { employeeField, timeField };
+}
+
+// 查询产品详情
+async function getProductDetails(productCode) {
+    try {
+        const { data, error } = await supabase
+            .from('products')
+            .select()
+            .eq('产品编码', productCode)
+            .maybeSingle();
+        
+        if (error) {
+            console.error('查询产品详情失败:', error);
+            return null;
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('查询产品详情失败:', error);
+        return null;
+    }
+}
+
+// ------ 查询相关功能 ------
+
+// 处理产品查询
+async function handleProductQuery() {
+    try {
+        // 获取本月范围
+        await getMonthRange();
+        
+        // 显示查询屏幕
+        showScreen(SCREENS.QUERY);
+        
+        // 查询并显示用户本月完成的产品工序统计
+        await loadUserMonthlyProcesses();
+    } catch (error) {
+        console.error('获取产品查询数据失败:', error);
+        showToast('获取数据失败，请重试', 'error');
+    }
+}
+
+// 处理产品扫码查询
+async function handleProductScanQuery() {
+    // 启动扫码查询
+    startProductScanQuery();
+}
+
+// 启动产品扫码查询
+function startProductScanQuery() {
+    // 清空当前状态
+    scanState.processType = 'query';
+    scanState.isContinuous = false;
+    scanState.pendingCodes = [];
+    scanState.lastScannedCode = '';
+    scanState.isProcessing = false;
+    
+    // 更新UI
+    document.getElementById('scan-title').textContent = '产品扫码查询';
+    document.getElementById('scan-upload').classList.add('d-none');
+    document.getElementById('scan-pending-list').classList.add('d-none');
+    
+    // 显示扫码界面
+    showScreen(SCREENS.SCAN);
+    
+    // 初始化扫码器
+    const scannerContainer = document.getElementById('scanner-container');
+    scannerContainer.innerHTML = '';
+    
+    const html5QrCode = new Html5Qrcode("scanner-container");
+    scanState.currentHtml5QrScanner = html5QrCode;
+    
+    // 获取屏幕尺寸
+    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    const isSmallScreen = screenWidth < 600;
+    
+    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
+    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
+    
+    // 获取视频约束参数
+    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
+    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
+    
+    const config = {
+        fps: SCAN_CONFIG.DEFAULT_FPS,
+        qrbox: { width: qrboxSize, height: qrboxSize },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        formats: ['qr_code'], // 仅支持QR码，减少判断时间
+        videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: videoConstraintsWidth },
+            height: { ideal: videoConstraintsHeight },
+            focusMode: "continuous"
+        }
+    };
+    
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onProductQueryScanSuccess,
+        onScanFailure
+    ).catch(err => {
+        console.error(`无法启动相机: ${err}`);
+        showToast('无法启动相机，请检查权限设置', 'error');
+    });
+}
+
+// 产品查询扫码成功回调
+async function onProductQueryScanSuccess(decodedText, decodedResult) {
+    // 如果正在处理，忽略新的扫码结果
+    if (scanState.isProcessing) return;
+    
+    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
+    const now = Date.now();
+    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
+        return; // 如果在设定时间内扫描了相同的码，则忽略
+    }
+    
+    scanState.isProcessing = true;
+    scanState.lastScannedCode = decodedText;
+    scanState.lastScanTime = now; // 记录本次扫码时间
+    
+    try {
+        // 查询产品详情
+        const productData = await getProductDetails(decodedText);
+        
+        if (productData) {
+            // 播放成功提示音
+            playSuccessSound();
+            
+            // 显示产品详情
+            showProductDetail(productData);
+        } else {
+            // 播放错误提示音
+            playErrorSound();
+            
+            showToast('未找到该产品信息', 'error');
+        }
+    } catch (error) {
+        console.error('查询产品信息失败:', error);
+        showToast('查询失败，请重试', 'error');
+        playErrorSound();
+    } finally {
+        // 延迟重置处理状态
+        setTimeout(() => {
+            scanState.isProcessing = false;
+        }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
+    }
+}
+
+// 显示产品详情
+function showProductDetail(product) {
+    // 创建产品详情内容
+    const productDetailContent = document.getElementById('product-detail-content');
+    productDetailContent.innerHTML = '';
+    
+    // 产品编码
+    if (product['产品编码']) {
+        const codeDiv = document.createElement('div');
+        codeDiv.className = 'product-detail-item';
+        codeDiv.innerHTML = `<div class="product-detail-label">产品编码:</div><div>${product['产品编码']}</div>`;
+        productDetailContent.appendChild(codeDiv);
+    }
+    
+    // 产品型号
+    if (product['产品型号']) {
+        const modelDiv = document.createElement('div');
+        modelDiv.className = 'product-detail-item';
+        modelDiv.innerHTML = `<div class="product-detail-label">产品型号:</div><div>${product['产品型号']}</div>`;
+        productDetailContent.appendChild(modelDiv);
+    }
+    
+    // 绕线信息
+    if (product['绕线员工'] || product['绕线时间']) {
+        const wiringDiv = document.createElement('div');
+        wiringDiv.className = 'product-detail-item';
+        wiringDiv.innerHTML = `
+            <div class="product-detail-label">绕线:</div>
+            <div>
+                ${product['绕线员工'] ? '员工: ' + product['绕线员工'] : ''}
+                ${product['绕线时间'] ? '<br>时间: ' + formatDate(product['绕线时间']) : ''}
+            </div>
+        `;
+        productDetailContent.appendChild(wiringDiv);
+    }
+    
+    // 嵌线信息
+    if (product['嵌线员工'] || product['嵌线时间']) {
+        const embeddingDiv = document.createElement('div');
+        embeddingDiv.className = 'product-detail-item';
+        embeddingDiv.innerHTML = `
+            <div class="product-detail-label">嵌线:</div>
+            <div>
+                ${product['嵌线员工'] ? '员工: ' + product['嵌线员工'] : ''}
+                ${product['嵌线时间'] ? '<br>时间: ' + formatDate(product['嵌线时间']) : ''}
+            </div>
+        `;
+        productDetailContent.appendChild(embeddingDiv);
+    }
+    
+    // 接线信息
+    if (product['接线员工'] || product['接线时间']) {
+        const wiringConnectDiv = document.createElement('div');
+        wiringConnectDiv.className = 'product-detail-item';
+        wiringConnectDiv.innerHTML = `
+            <div class="product-detail-label">接线:</div>
+            <div>
+                ${product['接线员工'] ? '员工: ' + product['接线员工'] : ''}
+                ${product['接线时间'] ? '<br>时间: ' + formatDate(product['接线时间']) : ''}
+            </div>
+        `;
+        productDetailContent.appendChild(wiringConnectDiv);
+    }
+    
+    // 压装信息
+    if (product['压装员工'] || product['压装时间']) {
+        const pressingDiv = document.createElement('div');
+        pressingDiv.className = 'product-detail-item';
+        pressingDiv.innerHTML = `
+            <div class="product-detail-label">压装:</div>
+            <div>
+                ${product['压装员工'] ? '员工: ' + product['压装员工'] : ''}
+                ${product['压装时间'] ? '<br>时间: ' + formatDate(product['压装时间']) : ''}
+            </div>
+        `;
+        productDetailContent.appendChild(pressingDiv);
+    }
+    
+    // 车止口信息
+    if (product['车止口员工'] || product['车止口时间']) {
+        const stopperDiv = document.createElement('div');
+        stopperDiv.className = 'product-detail-item';
+        stopperDiv.innerHTML = `
+            <div class="product-detail-label">车止口:</div>
+            <div>
+                ${product['车止口员工'] ? '员工: ' + product['车止口员工'] : ''}
+                ${product['车止口时间'] ? '<br>时间: ' + formatDate(product['车止口时间']) : ''}
+            </div>
+        `;
+        productDetailContent.appendChild(stopperDiv);
+    }
+    
+    // 浸漆信息
+    if (product['浸漆时间']) {
+        const immersionDiv = document.createElement('div');
+        immersionDiv.className = 'product-detail-item';
+        immersionDiv.innerHTML = `
+            <div class="product-detail-label">浸漆:</div>
+            <div>
+                时间: ${formatDate(product['浸漆时间'])}
+            </div>
+        `;
+        productDetailContent.appendChild(immersionDiv);
+    }
+    
+    // 显示弹窗
+    const productDetailModal = new bootstrap.Modal(document.getElementById('product-detail-modal'));
+    productDetailModal.show();
+}
+
+// 获取本月日期范围
+async function getMonthRange() {
+    // 如果已经有日期范围，则使用已有的
+    if (queryState.monthRange.startDate && queryState.monthRange.endDate) {
+        return;
+    }
+    
+    // 否则，设置默认为本月
+    setDefaultMonthRange();
+}
+
+// 设置默认月份范围为本月
+function setDefaultMonthRange() {
+    const now = new Date();
+    
+    // 本月第一天
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // 下月第一天 - 1 (本月最后一天)
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    // 设置时间为当天的开始和结束
+    firstDay.setHours(0, 0, 0, 0);
+    lastDay.setHours(23, 59, 59, 999);
+    
+    // 存储时间范围
+    queryState.monthRange.startDate = firstDay.toISOString();
+    queryState.monthRange.endDate = lastDay.toISOString();
+}
+
+// 加载用户本月完成的工序统计
+async function loadUserMonthlyProcesses() {
+    try {
+        // 显示加载中
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 查询用户本月完成的产品
+        const products = await getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        );
+        
+        if (!products || products.length === 0) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+            return;
+        }
+        
+        // 统计各个工序的产品数量
+        const processCounts = {
+            '绕线': 0,
+            '嵌线': 0,
+            '接线': 0,
+            '压装': 0,
+            '车止口': 0,
+            '浸漆': 0
+        };
+        
+        // 统计各个型号的产品数量
+        const modelCounts = {};
+        
+        // 统计已完成的产品
+        products.forEach(product => {
+            // 统计型号
+            const model = product['产品型号'];
+            if (model) {
+                modelCounts[model] = (modelCounts[model] || 0) + 1;
+            }
+            
+            // 统计各个工序
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+                processCounts['绕线']++;
+            }
+            
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+                processCounts['嵌线']++;
+            }
+            
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+                processCounts['接线']++;
+            }
+            
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+                processCounts['压装']++;
+            }
+            
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+                processCounts['车止口']++;
+            }
+            
+            if (isDateInRange(product['浸漆时间'])) {
+                processCounts['浸漆']++;
+            }
+        });
+        
+        // 生成统计结果HTML
+        let statisticsHTML = '<div class="mb-4">';
+        statisticsHTML += `<h4 class="mb-3">本月工序汇总</h4>`;
+        
+        // 总计
+        const totalCount = products.length;
+        statisticsHTML += `<div class="alert alert-info">共完成 ${totalCount} 个产品</div>`;
+        
+        // 工序统计
+        for (const [process, count] of Object.entries(processCounts)) {
+            if (count > 0) {
+                statisticsHTML += `
+                    <div class="card mb-2 process-card" data-process="${process}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-0">${process}</h5>
+                                    <span>${count} 个产品</span>
+                                </div>
+                                <div class="process-icon">
+                                    ${getProcessIcon(process)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        statisticsHTML += '</div>';
+        
+        document.getElementById('process-list').innerHTML = statisticsHTML;
+        
+        // 添加工序卡片点击事件
+        document.querySelectorAll('.process-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const process = this.getAttribute('data-process');
+                queryState.currentProcess = process;
+                showModelList(process);
+            });
+        });
+        
+    } catch (error) {
+        console.error('加载用户本月完成的工序统计失败:', error);
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 检查日期是否在查询范围内
+function isDateInRange(dateString) {
+    if (!dateString) return false;
+    
+    const date = new Date(dateString);
+    const start = new Date(queryState.monthRange.startDate);
+    const end = new Date(queryState.monthRange.endDate);
+    
+    return date >= start && date <= end;
+}
+
+// 显示工序对应的型号列表
+function showModelList(process) {
+    try {
+        // 记录当前工序
+        queryState.currentProcess = process;
+        
+        // 更新标题
+        document.getElementById('models-title').textContent = `${process}工序 - 型号列表`;
+        
+        // 显示加载中
+        document.getElementById('model-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 显示型号列表屏幕
+        showScreen(SCREENS.MODELS);
+        
+        // 查询用户本月完成的产品
+        getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        ).then(products => {
+            if (!products || products.length === 0) {
+                document.getElementById('model-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
+                return;
+            }
+            
+            // 筛选出对应工序的产品
+            const filteredProducts = products.filter(product => {
+                switch (process) {
+                    case '绕线':
+                        return product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间']);
+                    case '嵌线':
+                        return product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间']);
+                    case '接线':
+                        return product['接线员工'] === userState.fullName && isDateInRange(product['接线时间']);
+                    case '压装':
+                        return product['压装员工'] === userState.fullName && isDateInRange(product['压装时间']);
+                    case '车止口':
+                        return product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间']);
+                    case '浸漆':
+                        return isDateInRange(product['浸漆时间']);
+                    default:
+                        return false;
+                }
+            });
+            
+            if (filteredProducts.length === 0) {
+                document.getElementById('model-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
+                return;
+            }
+            
+            // 统计各个型号的产品数量
+            const modelCounts = {};
+            
+            filteredProducts.forEach(product => {
+                const model = product['产品型号'] || '未知型号';
+                modelCounts[model] = (modelCounts[model] || 0) + 1;
+            });
+            
+            // 生成型号列表HTML
+            let modelsHTML = '';
+            
+            for (const [model, count] of Object.entries(modelCounts)) {
+                modelsHTML += `
+                    <div class="card mb-2 model-card" data-model="${model}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-0">${model}</h5>
+                                    <span>${count} 个产品</span>
+                                </div>
+                                <i class="bi bi-chevron-right text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('model-list').innerHTML = modelsHTML;
+            
+            // 添加型号卡片点击事件
+            document.querySelectorAll('.model-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const model = this.getAttribute('data-model');
+                    queryState.currentModel = model;
+                    showProductList(process, model);
+                });
+            });
+            
+        }).catch(error => {
+            console.error('加载型号列表失败:', error);
+            document.getElementById('model-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+        });
+        
+    } catch (error) {
+        console.error('显示型号列表失败:', error);
+        document.getElementById('model-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 显示产品列表
+function showProductList(process, model) {
+    try {
+        // 记录当前型号
+        queryState.currentModel = model;
+        
+        // 更新标题
+        document.getElementById('products-title').textContent = `${process} - ${model}`;
+        
+        // 显示加载中
+        document.getElementById('product-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 显示产品列表屏幕
+        showScreen(SCREENS.PRODUCTS);
+        
+        // 查询用户本月完成的产品
+        getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        ).then(products => {
+            if (!products || products.length === 0) {
+                document.getElementById('product-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
+                return;
+            }
+            
+            // 筛选出对应工序和型号的产品
+            const filteredProducts = products.filter(product => {
+                if (product['产品型号'] !== model) {
+                    return false;
+                }
+                
+                switch (process) {
+                    case '绕线':
+                        return product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间']);
+                    case '嵌线':
+                        return product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间']);
+                    case '接线':
+                        return product['接线员工'] === userState.fullName && isDateInRange(product['接线时间']);
+                    case '压装':
+                        return product['压装员工'] === userState.fullName && isDateInRange(product['压装时间']);
+                    case '车止口':
+                        return product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间']);
+                    case '浸漆':
+                        return isDateInRange(product['浸漆时间']);
+                    default:
+                        return false;
+                }
+            });
+            
+            if (filteredProducts.length === 0) {
+                document.getElementById('product-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
+                return;
+            }
+            
+            // 按时间排序 (新的在前面)
+            filteredProducts.sort((a, b) => {
+                const getTime = (product) => {
+                    switch (process) {
+                        case '绕线': return new Date(product['绕线时间']).getTime();
+                        case '嵌线': return new Date(product['嵌线时间']).getTime();
+                        case '接线': return new Date(product['接线时间']).getTime();
+                        case '压装': return new Date(product['压装时间']).getTime();
+                        case '车止口': return new Date(product['车止口时间']).getTime();
+                        case '浸漆': return new Date(product['浸漆时间']).getTime();
+                        default: return 0;
+                    }
+                };
+                
+                return getTime(b) - getTime(a);
+            });
+            
+            // 生成产品列表HTML
+            let productsHTML = '';
+            
+            filteredProducts.forEach(product => {
+                const code = product['产品编码'];
+                
+                // 获取对应工序的时间
+                let time = '';
+                switch (process) {
+                    case '绕线': time = formatDate(product['绕线时间']); break;
+                    case '嵌线': time = formatDate(product['嵌线时间']); break;
+                    case '接线': time = formatDate(product['接线时间']); break;
+                    case '压装': time = formatDate(product['压装时间']); break;
+                    case '车止口': time = formatDate(product['车止口时间']); break;
+                    case '浸漆': time = formatDate(product['浸漆时间']); break;
+                }
+                
+                productsHTML += `
+                    <div class="card mb-2 product-card" data-code="${code}">
+                        <div class="card-body">
+                            <h5 class="mb-1">${code}</h5>
+                            <div class="text-muted small">${time}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('product-list').innerHTML = productsHTML;
+            
+            // 添加产品卡片点击事件
+            document.querySelectorAll('.product-card').forEach(card => {
+                card.addEventListener('click', async function() {
+                    const code = this.getAttribute('data-code');
+                    try {
+                        const productData = await getProductDetails(code);
+                        if (productData) {
+                            showProductDetail(productData);
+                        } else {
+                            showToast('无法获取产品详情', 'error');
+                        }
+                    } catch (error) {
+                        console.error('获取产品详情失败:', error);
+                        showToast('获取产品详情失败', 'error');
+                    }
+                });
+            });
+            
+        }).catch(error => {
+            console.error('加载产品列表失败:', error);
+            document.getElementById('product-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+        });
+        
+    } catch (error) {
+        console.error('显示产品列表失败:', error);
+        document.getElementById('product-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 查询用户本月完成的产品
+async function getUserMonthlyProducts(employeeName, startDate, endDate) {
+    try {
+        // 员工有可能没有完成任何工序，所以不能直接过滤员工字段
+        const { data, error } = await supabase
+            .from('products')
+            .select();
+        
+        if (error) {
+            console.error('查询产品信息失败:', error);
+            return [];
+        }
+        
+        // 筛选出用户任意一个工序中作为员工的产品
+        const userProducts = data.filter(product => 
+            (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) ||
+            (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'])) ||
+            (product['接线员工'] === employeeName && isDateInRange(product['接线时间'])) ||
+            (product['压装员工'] === employeeName && isDateInRange(product['压装时间'])) ||
+            (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) ||
+            (employeeName === '' && isDateInRange(product['浸漆时间'])) // 浸漆特殊处理
+        );
+        
+        return userProducts;
+    } catch (error) {
+        console.error('查询用户本月完成的产品失败:', error);
+        return [];
+    }
+}
+
+// 处理删除记录
+async function handleDeleteRecords() {
+    try {
+        // 显示查询屏幕
+        showScreen(SCREENS.QUERY);
+        
+        // 获取本月范围
+        await getMonthRange();
+        
+        // 显示加载中
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 查询用户本月完成的产品
+        const products = await getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        );
+        
+        if (!products || products.length === 0) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+            return;
+        }
+        
+        // 将产品数据处理成带有工序信息的列表
+        const processRecords = [];
+        
+        products.forEach(product => {
+            const productCode = product['产品编码'];
+            const productModel = product['产品型号'];
+            
+            // 检查各个工序
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '绕线',
+                    '时间': product['绕线时间']
+                });
+            }
+            
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '嵌线',
+                    '时间': product['嵌线时间']
+                });
+            }
+            
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '接线',
+                    '时间': product['接线时间']
+                });
+            }
+            
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '压装',
+                    '时间': product['压装时间']
+                });
+            }
+            
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '车止口',
+                    '时间': product['车止口时间']
+                });
+            }
+            
+            // 浸漆工序特殊处理（没有员工字段）
+            if (isDateInRange(product['浸漆时间'])) {
+                processRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '浸漆',
+                    '时间': product['浸漆时间']
+                });
+            }
+        });
+        
+        // 按时间倒序排序
+        processRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
+        
+        // 生成记录列表
+        let recordsHTML = '';
+        
+        processRecords.forEach((record, index) => {
+            recordsHTML += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input record-checkbox" type="checkbox" value="${index}" id="record-${index}">
+                            <label class="form-check-label" for="record-${index}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>产品编码: ${record['产品编码']}</strong><br>
+                                        <small class="text-muted">产品型号: ${record['产品型号']}</small><br>
+                                        <small class="text-muted">工序: ${record['工序']}</small><br>
+                                        <small class="text-muted">时间: ${formatDate(record['时间'])}</small>
+                                    </div>
+                                    <div class="process-icon">
+                                        ${getProcessIcon(record['工序'])}
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // 添加删除按钮
+        recordsHTML += `
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-danger" id="delete-selected-records" disabled>
+                    删除选中记录
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('process-list').innerHTML = recordsHTML;
+        
+        // 添加复选框事件监听
+        const checkboxes = document.querySelectorAll('.record-checkbox');
+        const deleteButton = document.getElementById('delete-selected-records');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+                deleteButton.disabled = checkedCount === 0;
+            });
+        });
+        
+        // 添加删除按钮事件监听
+        deleteButton.addEventListener('click', async function() {
+            const selectedRecords = [];
+            
+            // 获取所有选中的记录索引
+            document.querySelectorAll('.record-checkbox:checked').forEach(checkbox => {
+                const index = parseInt(checkbox.value, 10);
+                if (!isNaN(index) && index >= 0 && index < processRecords.length) {
+                    selectedRecords.push(processRecords[index]);
+                }
+            });
+            
+            if (selectedRecords.length === 0) {
+                showToast('请选择要删除的记录', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
+                return;
+            }
+            
+            try {
+                let successCount = 0;
+                let failureCount = 0;
+                
+                for (const record of selectedRecords) {
+                    const success = await deleteProductProcess(
+                        record['产品编码'],
+                        record['工序'],
+                        userState.fullName
+                    );
+                    
+                    if (success) {
+                        successCount++;
+                    } else {
+                        failureCount++;
+                    }
+                }
+                
+                showToast(`删除完成: 成功 ${successCount} 条, 失败 ${failureCount} 条`, 'info');
+                
+                // 重新加载记录
+                handleDeleteRecords();
+            } catch (error) {
+                console.error('删除记录失败:', error);
+                showToast('删除记录失败，请重试', 'error');
+            }
+        });
+        
+    } catch (error) {
+        console.error('加载删除记录失败:', error);
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 删除产品工序记录
+async function deleteProductProcess(productCode, processType, employeeName) {
+    try {
+        // 确定字段名称
+        const { employeeField, timeField } = getProcessFields(processType);
+        
+        // 先查询产品信息，检查工序字段是否已有数据
+        const { data: productData, error: queryError } = await supabase
+            .from('products')
+            .select()
+            .eq('产品编码', productCode)
+            .maybeSingle();
+        
+        if (queryError) {
+            console.error('查询产品信息失败:', queryError);
+            return false;
+        }
+        
+        // 如果找不到产品，返回失败
+        if (!productData) {
+            console.error('产品不存在:', productCode);
+            return false;
+        }
+        
+        // 检查是否是本人操作的工序
+        if (employeeField && productData[employeeField] !== employeeName) {
+            console.error('非本人操作的工序，无权删除:', productCode, processType);
+            return false;
+        }
+        
+        // 准备更新数据（清空字段）
+        const updateData = {};
+        
+        // 清空时间字段
+        updateData[timeField] = null;
+        
+        // 清空员工字段（如果有）
+        if (employeeField) {
+            updateData[employeeField] = null;
+        }
+        
+        // 执行更新
+        const { error: updateError } = await supabase
+            .from('products')
+            .update(updateData)
+            .eq('产品编码', productCode);
+        
+        if (updateError) {
+            console.error('删除产品工序记录失败:', updateError);
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('删除产品工序记录失败:', error);
+        return false;
+    }
+}
+
+// 获取工序对应的图标
+function getProcessIcon(process) {
+    switch (process) {
+        case '绕线':
+            return '<i class="bi bi-arrow-repeat text-primary" style="font-size: 1.5rem;"></i>';
+        case '嵌线':
+            return '<i class="bi bi-layers text-success" style="font-size: 1.5rem;"></i>';
+        case '接线':
+            return '<i class="bi bi-link text-warning" style="font-size: 1.5rem;"></i>';
+        case '压装':
+            return '<i class="bi bi-arrow-down-circle text-info" style="font-size: 1.5rem;"></i>';
+        case '车止口':
+            return '<i class="bi bi-tools text-secondary" style="font-size: 1.5rem;"></i>';
+        case '浸漆':
+            return '<i class="bi bi-droplet text-danger" style="font-size: 1.5rem;"></i>';
+        default:
+            return '<i class="bi bi-question-circle" style="font-size: 1.5rem;"></i>';
+    }
 } 
