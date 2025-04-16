@@ -4,6 +4,15 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // 初始化Supabase客户端
 let supabase;
 
+// 设置扫码配置的常量
+const SCAN_CONFIG = {
+    DEFAULT_FPS: 25,          // 默认帧率
+    HIGH_QUALITY_SCAN: true,  // 高质量扫描模式
+    CONTINUOUS_SCAN_DELAY: 200, // 连续扫码延迟时间(ms)
+    SINGLE_SCAN_DELAY: 500,    // 单次扫码延迟时间(ms)
+    DUPLICATE_CODE_INTERVAL: 1500 // 认为是重复扫码的时间间隔(ms)
+};
+
 // 存储当前用户信息
 const userState = {
     fullName: '',
@@ -17,7 +26,8 @@ const scanState = {
     pendingCodes: [],
     lastScannedCode: '',
     isProcessing: false,
-    currentHtml5QrScanner: null
+    currentHtml5QrScanner: null,
+    lastScanTime: 0
 };
 
 // 存储当前查询状态
@@ -256,14 +266,29 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 扫码配置
+    // 获取屏幕尺寸
+    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    const isSmallScreen = screenWidth < 600;
+    
+    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
+    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
+    
+    // 获取视频约束参数
+    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
+    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
+    
+    // 扫码配置 - 使用常量配置
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
+        fps: SCAN_CONFIG.DEFAULT_FPS, 
+        qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
+        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment"
+            facingMode: "environment",
+            width: { ideal: videoConstraintsWidth },
+            height: { ideal: videoConstraintsHeight },
+            focusMode: "continuous"
         }
     };
     
@@ -284,11 +309,15 @@ async function onScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 忽略重复扫码
-    if (decodedText === scanState.lastScannedCode) return;
+    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
+    const now = Date.now();
+    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
+        return; // 如果在设定时间内扫描了相同的码，则忽略
+    }
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
+    scanState.lastScanTime = now; // 记录本次扫码时间
     
     // 处理扫码结果
     if (scanState.isContinuous) {
@@ -300,11 +329,21 @@ async function onScanSuccess(decodedText, decodedResult) {
             
             // 播放成功提示音
             playSuccessSound();
+            
+            // 快速重置处理状态，允许立即扫描下一个码
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY);
         } else {
             showToast('该产品已在队列中，请勿重复扫码', 'warning');
             
             // 播放错误提示音
             playErrorSound();
+            
+            // 对于错误情况，也快速重置
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY + 100); // 比正常情况稍微长一点
         }
     } else {
         // 单次扫码模式，直接上传
@@ -335,14 +374,13 @@ async function onScanSuccess(decodedText, decodedResult) {
             playErrorSound();
             
             showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+            
+            // 减少错误提示后的处理延迟
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
         }
     }
-    
-    // 延迟重置处理状态
-    setTimeout(() => {
-        scanState.isProcessing = false;
-        scanState.lastScannedCode = '';
-    }, 1000);
 }
 
 // 扫码失败回调
@@ -602,8 +640,8 @@ function getProcessFields(processType) {
             timeField = '车止口时间';
             break;
         case '浸漆':
-            employeeField = '';  // 浸漆没有对应的员工字段
             timeField = '浸漆时间';
+            employeeField = ''; // 浸漆没有对应的员工字段
             break;
         default:
             break;
