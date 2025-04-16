@@ -400,7 +400,13 @@ function stopScan() {
         }
     } else {
         stopScanner();
-        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        
+        // 判断当前扫码类型，如果是产品查询则返回首页
+        if (scanState.processType === 'query') {
+            showScreen(SCREENS.HOME);
+        } else {
+            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        }
     }
 }
 
@@ -720,13 +726,29 @@ function startProductScanQuery() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
+    // 获取屏幕尺寸
+    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    const isSmallScreen = screenWidth < 600;
+    
+    // 计算二维码扫描框大小 - The QR box and UI settings
+    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
+    
+    // 获取视频约束参数
+    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
+    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
+    
+    // 使用与普通扫码相同的优化配置
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
+        fps: SCAN_CONFIG.DEFAULT_FPS,
+        qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
+        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment"
+            facingMode: "environment",
+            width: { ideal: videoConstraintsWidth },
+            height: { ideal: videoConstraintsHeight },
+            focusMode: "continuous" // 尝试启用持续对焦
         }
     };
     
@@ -746,11 +768,15 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 忽略重复扫码
-    if (decodedText === scanState.lastScannedCode) return;
+    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
+    const now = Date.now();
+    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
+        return; // 如果在设定时间内扫描了相同的码，则忽略
+    }
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
+    scanState.lastScanTime = now; // 记录本次扫码时间
     
     try {
         // 查询产品详情
@@ -776,8 +802,7 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
         // 延迟重置处理状态
         setTimeout(() => {
             scanState.isProcessing = false;
-            scanState.lastScannedCode = '';
-        }, 1000);
+        }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
     }
 }
 
@@ -1386,11 +1411,10 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
         console.log('查询时间范围:', startDateStr, '至', endDateStr);
         console.log('查询员工:', employeeName);
         
-        // 查询员工完成的产品
+        // 获取全部产品数据
         const { data, error } = await supabase
             .from('products')
             .select('*')
-            .or(`绕线员工.eq.${employeeName},嵌线员工.eq.${employeeName},接线员工.eq.${employeeName},压装员工.eq.${employeeName},车止口员工.eq.${employeeName}`)
             .order('产品编码');
         
         if (error) {
@@ -1398,7 +1422,7 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
             return [];
         }
         
-        // 在前端过滤日期范围
+        // 在前端过滤员工和日期范围
         return (data || []).filter(product => {
             // 检查该员工是否参与了这些工序，并且是在指定日期范围内
             if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) {
@@ -1414,6 +1438,10 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
                 return true;
             }
             if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) {
+                return true;
+            }
+            // 浸漆工序特殊处理（没有员工字段），如果浸漆时间存在且在范围内则显示
+            if (isDateInRange(product['浸漆时间'])) {
                 return true;
             }
             return false;
