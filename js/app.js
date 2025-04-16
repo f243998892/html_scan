@@ -1453,8 +1453,17 @@ async function handleDeleteRecords() {
             });
         });
         
+        // 先删除旧的事件监听器(通过克隆并替换元素)
+        const oldButton = deleteButton;
+        const newButton = oldButton.cloneNode(true);
+        oldButton.parentNode.replaceChild(newButton, oldButton);
+        
         // 添加删除按钮事件监听
-        deleteButton.addEventListener('click', async function() {
+        document.getElementById('delete-selected-records').addEventListener('click', async function() {
+            // 禁用按钮防止重复点击
+            this.disabled = true;
+            this.textContent = '删除中...';
+            
             const selectedRecords = [];
             
             // 获取所有选中的记录索引
@@ -1467,10 +1476,14 @@ async function handleDeleteRecords() {
             
             if (selectedRecords.length === 0) {
                 showToast('请选择要删除的记录', 'warning');
+                this.disabled = false;
+                this.textContent = '删除选中记录';
                 return;
             }
             
             if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
+                this.disabled = false;
+                this.textContent = '删除选中记录';
                 return;
             }
             
@@ -1499,6 +1512,8 @@ async function handleDeleteRecords() {
             } catch (error) {
                 console.error('删除记录失败:', error);
                 showToast('删除记录失败，请重试', 'error');
+                this.disabled = false;
+                this.textContent = '删除选中记录';
             }
         });
         
