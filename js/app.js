@@ -542,9 +542,9 @@ function playSuccessSound() {
     try {
         // 只在用户交互后创建AudioContext
         function createAndPlayAudio() {
-            try {
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
-                audio.play();
+    try {
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
+        audio.play();
             } catch (e) {
                 console.error('无法播放音频', e);
             }
@@ -575,9 +575,9 @@ function playErrorSound() {
     try {
         // 只在用户交互后创建AudioContext
         function createAndPlayAudio() {
-            try {
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
-                audio.play();
+    try {
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
+        audio.play();
             } catch (e) {
                 console.error('无法播放音频', e);
             }
@@ -983,11 +983,11 @@ function showProductDetail(product) {
 async function getMonthRange() {
     // 如果已经有日期范围，则使用已有的
     if (queryState.monthRange.startDate && queryState.monthRange.endDate) {
-        return;
-    }
-    
+            return;
+        }
+        
     // 否则，设置默认为本月
-    setDefaultMonthRange();
+            setDefaultMonthRange();
 }
 
 // 设置默认月份范围为本月
@@ -1137,9 +1137,9 @@ function isDateInRange(dateString) {
 function showModelList(process) {
     try {
         // 记录当前工序
-        queryState.currentProcess = process;
-        
-        // 更新标题
+    queryState.currentProcess = process;
+    
+    // 更新标题
         document.getElementById('models-title').textContent = `${process}工序 - 型号列表`;
         
         // 显示加载中
@@ -1216,12 +1216,12 @@ function showModelList(process) {
             // 添加型号卡片点击事件
             document.querySelectorAll('.model-card').forEach(card => {
                 card.addEventListener('click', function() {
-                    const model = this.getAttribute('data-model');
+            const model = this.getAttribute('data-model');
                     queryState.currentModel = model;
                     showProductList(process, model);
-                });
-            });
-            
+        });
+    });
+    
         }).catch(error => {
             console.error('加载型号列表失败:', error);
             document.getElementById('model-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
@@ -1237,11 +1237,11 @@ function showModelList(process) {
 function showProductList(process, model) {
     try {
         // 记录当前型号
-        queryState.currentModel = model;
-        
-        // 更新标题
-        document.getElementById('products-title').textContent = `${process} - ${model}`;
-        
+    queryState.currentModel = model;
+    
+    // 更新标题
+    document.getElementById('products-title').textContent = `${process} - ${model}`;
+    
         // 显示加载中
         document.getElementById('product-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
         
@@ -1339,19 +1339,19 @@ function showProductList(process, model) {
                 card.addEventListener('click', async function() {
                     const code = this.getAttribute('data-code');
                     try {
-                        const productData = await getProductDetails(code);
-                        if (productData) {
-                            showProductDetail(productData);
-                        } else {
+                const productData = await getProductDetails(code);
+                if (productData) {
+                    showProductDetail(productData);
+                } else {
                             showToast('无法获取产品详情', 'error');
-                        }
-                    } catch (error) {
+                }
+            } catch (error) {
                         console.error('获取产品详情失败:', error);
                         showToast('获取产品详情失败', 'error');
-                    }
-                });
-            });
-            
+            }
+        });
+    });
+    
         }).catch(error => {
             console.error('加载产品列表失败:', error);
             document.getElementById('product-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
