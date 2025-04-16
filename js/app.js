@@ -1001,6 +1001,9 @@ async function loadUserMonthlyProcesses() {
             '浸漆': {}
         };
         
+        // 收集所有产品记录，用于展示完整列表
+        const allProductRecords = [];
+        
         // 处理产品数据
         products.forEach(product => {
             // 检查该用户完成的工序
@@ -1021,6 +1024,14 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['绕线时间']
                 });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '绕线',
+                    '时间': product['绕线时间']
+                });
             }
             
             if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
@@ -1039,6 +1050,14 @@ async function loadUserMonthlyProcesses() {
                 processProducts['嵌线'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['嵌线时间']
+                });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '嵌线',
+                    '时间': product['嵌线时间']
                 });
             }
             
@@ -1059,6 +1078,14 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['接线时间']
                 });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '接线',
+                    '时间': product['接线时间']
+                });
             }
             
             if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
@@ -1077,6 +1104,14 @@ async function loadUserMonthlyProcesses() {
                 processProducts['压装'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['压装时间']
+                });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '压装',
+                    '时间': product['压装时间']
                 });
             }
             
@@ -1097,6 +1132,14 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['车止口时间']
                 });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '车止口',
+                    '时间': product['车止口时间']
+                });
             }
             
             if (isDateInRange(product['浸漆时间'])) {
@@ -1115,6 +1158,14 @@ async function loadUserMonthlyProcesses() {
                 processProducts['浸漆'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['浸漆时间']
+                });
+                
+                // 添加到全部产品记录
+                allProductRecords.push({
+                    '产品编码': product['产品编码'],
+                    '产品型号': product['产品型号'],
+                    '工序': '浸漆',
+                    '时间': product['浸漆时间']
                 });
             }
         });
@@ -1141,13 +1192,74 @@ async function loadUserMonthlyProcesses() {
             processListHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
         }
         
-        document.getElementById('process-list').innerHTML = processListHTML;
+        // 按时间倒序排序所有产品记录
+        allProductRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
+        
+        // 生成所有产品列表HTML
+        let allProductsHTML = '';
+        
+        if (allProductRecords.length > 0) {
+            allProductsHTML = `
+                <div class="mt-4">
+                    <h5 class="mb-3">本月所有产品列表 (共${allProductRecords.length}个)</h5>
+                    <div class="list-group all-products-list">
+            `;
+            
+            allProductRecords.forEach(record => {
+                allProductsHTML += `
+                    <div class="list-group-item list-group-item-action product-record" data-code="${record['产品编码']}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">${getProcessIcon(record['工序'])}</span>
+                                    <strong>${record['产品编码']}</strong>
+                                </div>
+                                <small class="text-muted">产品型号: ${record['产品型号']}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-secondary">${record['工序']}</span>
+                                <small class="d-block text-muted">${formatDate(record['时间'])}</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            allProductsHTML += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        document.getElementById('process-list').innerHTML = processListHTML + allProductsHTML;
         
         // 添加点击事件，显示型号列表
         document.querySelectorAll('.process-item').forEach(item => {
             item.addEventListener('click', function() {
                 const process = this.getAttribute('data-process');
                 showModelList(process);
+            });
+        });
+        
+        // 添加点击事件，显示产品详情
+        document.querySelectorAll('.product-record').forEach(item => {
+            item.addEventListener('click', async function() {
+                const code = this.getAttribute('data-code');
+                
+                try {
+                    // 查询产品详情
+                    const productData = await getProductDetails(code);
+                    
+                    if (productData) {
+                        // 显示产品详情
+                        showProductDetail(productData);
+                    } else {
+                        showToast('未找到该产品信息', 'error');
+                    }
+                } catch (error) {
+                    console.error('查询产品详情失败:', error);
+                    showToast('查询失败，请重试', 'error');
+                }
             });
         });
         
