@@ -283,7 +283,11 @@ function initializeScanner() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
+<<<<<<< HEAD
         formats: ['qr_code'], // 仅支持QR码，减少判断时间
+=======
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
+>>>>>>> parent of b186317 (Update app.js)
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
@@ -725,6 +729,10 @@ function startProductScanQuery() {
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
+<<<<<<< HEAD
+=======
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
+>>>>>>> parent of b186317 (Update app.js)
         videoConstraints: {
             facingMode: "environment"
         }
