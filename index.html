@@ -131,7 +131,6 @@
             <div class="mb-3">
                 <h3 class="text-center">连续扫码</h3>
                 <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
-                    <button class="btn btn-outline-success process-btn-continuous" data-process="wiring">绕线</button>
                     <button class="btn btn-outline-success process-btn-continuous" data-process="stopper">车止口</button>
                     <button class="btn btn-outline-success process-btn-continuous" data-process="immersion">浸漆</button>
                 </div>
@@ -147,6 +146,15 @@
                     <div id="scanner-container" class="mb-3">
                         <video id="scanner-preview" style="width: 100%; max-height: 70vh;"></video>
                     </div>
+                    
+                    <!-- 手动输入产品编码查询功能 -->
+                    <div id="manual-input-container" class="mb-3 d-none">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="manual-product-code" placeholder="请输入产品编码">
+                            <button class="btn btn-primary" id="manual-query-btn">查询</button>
+                        </div>
+                    </div>
+                    
                     <div id="scan-buttons" class="d-flex justify-content-between">
                         <button class="btn btn-danger" id="scan-stop">停止</button>
                         <button class="btn btn-primary d-none" id="scan-upload">上传</button>
