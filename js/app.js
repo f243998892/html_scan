@@ -362,7 +362,15 @@ function stopScan() {
         }
     } else {
         stopScanner();
-        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        
+        // 根据当前扫码类型决定返回的页面
+        if (scanState.processType === 'query') {
+            // 产品扫码查询 - 返回主页
+            showScreen(SCREENS.HOME);
+        } else {
+            // 其他扫码 - 返回对应的扫码选择页面
+            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        }
     }
 }
 
@@ -646,6 +654,9 @@ async function handleProductQuery() {
         
         // 查询并显示用户本月完成的产品工序统计
         await loadUserMonthlyProcesses();
+        
+        // 加载本月流水账
+        await loadMonthlyTransactionList();
     } catch (error) {
         console.error('获取产品查询数据失败:', error);
         showToast('获取数据失败，请重试', 'error');
@@ -1586,4 +1597,120 @@ function getProcessIcon(process) {
     }
     
     return `<i class="bi ${iconClass} ${iconColor}" style="font-size: 1.5rem;"></i>`;
+}
+
+// 加载本月流水账
+async function loadMonthlyTransactionList() {
+    try {
+        // 显示加载中
+        document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 查询用户本月完成的产品
+        const products = await getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        );
+        
+        if (!products || products.length === 0) {
+            document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+            return;
+        }
+        
+        // 将产品数据处理成带有工序信息的列表
+        const transactionRecords = [];
+        
+        products.forEach(product => {
+            const productCode = product['产品编码'];
+            const productModel = product['产品型号'];
+            
+            // 检查各个工序
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '绕线',
+                    '时间': product['绕线时间']
+                });
+            }
+            
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '嵌线',
+                    '时间': product['嵌线时间']
+                });
+            }
+            
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '接线',
+                    '时间': product['接线时间']
+                });
+            }
+            
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '压装',
+                    '时间': product['压装时间']
+                });
+            }
+            
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '车止口',
+                    '时间': product['车止口时间']
+                });
+            }
+            
+            // 浸漆工序特殊处理（没有员工字段）
+            if (isDateInRange(product['浸漆时间'])) {
+                transactionRecords.push({
+                    '产品编码': productCode,
+                    '产品型号': productModel,
+                    '工序': '浸漆',
+                    '时间': product['浸漆时间']
+                });
+            }
+        });
+        
+        // 按时间倒序排序
+        transactionRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
+        
+        // 生成流水账列表
+        let transactionListHTML = '<h4 class="text-center mt-4 mb-3">本月流水账</h4>';
+        
+        transactionRecords.forEach((record, index) => {
+            transactionListHTML += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>产品编码: ${record['产品编码']}</strong><br>
+                                <small class="text-muted">产品型号: ${record['产品型号']}</small><br>
+                                <small class="text-muted">工序: ${record['工序']}</small><br>
+                                <small class="text-muted">时间: ${formatDate(record['时间'])}</small>
+                            </div>
+                            <div class="process-icon">
+                                ${getProcessIcon(record['工序'])}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('transaction-list-container').innerHTML = transactionListHTML;
+        
+    } catch (error) {
+        console.error('加载本月流水账失败:', error);
+        document.getElementById('transaction-list-container').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
 } 
