@@ -34,6 +34,9 @@ const SCAN_CONFIG = {
     DUPLICATE_CODE_INTERVAL: 1500 // 认为是重复扫码的时间间隔(ms)
 };
 
+// 音频上下文
+let audioContext = null;
+
 // 存储当前用户信息
 const userState = {
     fullName: '',
@@ -96,15 +99,37 @@ async function tryAutoLogin() {
 // 添加事件监听
 function addEventListeners() {
     // 登录事件
-    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    document.getElementById('login-btn').addEventListener('click', function() {
+        // 初始化音频上下文
+        initAudioContext();
+        handleLogin();
+    });
     
     // 首页功能卡片点击事件
-    document.getElementById('card-single-scan').addEventListener('click', () => showScreen(SCREENS.SINGLE_SCAN));
-    document.getElementById('card-continuous-scan').addEventListener('click', () => showScreen(SCREENS.CONTINUOUS_SCAN));
-    document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
-    document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
-    document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
-    document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
+    document.getElementById('card-single-scan').addEventListener('click', () => {
+        initAudioContext();
+        showScreen(SCREENS.SINGLE_SCAN);
+    });
+    document.getElementById('card-continuous-scan').addEventListener('click', () => {
+        initAudioContext();
+        showScreen(SCREENS.CONTINUOUS_SCAN);
+    });
+    document.getElementById('card-product-query').addEventListener('click', () => {
+        initAudioContext();
+        handleProductQuery();
+    });
+    document.getElementById('card-product-scan-query').addEventListener('click', () => {
+        initAudioContext();
+        handleProductScanQuery();
+    });
+    document.getElementById('card-inventory').addEventListener('click', () => {
+        initAudioContext();
+        showFeatureNotAvailable('该功能暂未开放，敬请期待');
+    });
+    document.getElementById('card-delete-records').addEventListener('click', () => {
+        initAudioContext();
+        handleDeleteRecords();
+    });
     
     // 设置开关
     document.getElementById('exit-after-scan').addEventListener('change', function(e) {
@@ -304,7 +329,8 @@ function initializeScanner() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
+        // 只扫描二维码格式
+        formatsToSupport: [0], // 0 = QR_CODE
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
@@ -543,23 +569,89 @@ function getChineseProcessName(processType) {
     }
 }
 
+// 初始化音频上下文（需要用户交互后调用）
+function initAudioContext() {
+    if (!audioContext) {
+        try {
+            // 创建AudioContext
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+            console.log('音频上下文已初始化');
+        } catch (e) {
+            console.error('初始化音频上下文失败:', e);
+        }
+    }
+    return audioContext;
+}
+
 // 播放成功提示音
 function playSuccessSound() {
     try {
-        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
-        audio.play();
+        // 确保已初始化音频上下文
+        if (!audioContext) {
+            initAudioContext();
+        }
+        
+        // 如果初始化失败，使用备用方式
+        if (!audioContext) {
+            const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
+            audio.play().catch(e => console.error('播放音频失败:', e));
+            return;
+        }
+        
+        // 生成音频缓冲区
+        const buffer = audioContext.createBuffer(1, 44100 * 0.5, 44100);
+        const channel = buffer.getChannelData(0);
+        
+        // 创建简单的成功音效
+        for (let i = 0; i < buffer.length; i++) {
+            // 生成一个简单的短音效
+            channel[i] = Math.sin(i * 0.05) * Math.exp(-4 * i / buffer.length);
+        }
+        
+        // 创建音频源并播放
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
     } catch (e) {
-        console.error('无法播放音频', e);
+        console.error('播放成功音效失败:', e);
     }
 }
 
 // 播放错误提示音
 function playErrorSound() {
     try {
-        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
-        audio.play();
+        // 确保已初始化音频上下文
+        if (!audioContext) {
+            initAudioContext();
+        }
+        
+        // 如果初始化失败，使用备用方式
+        if (!audioContext) {
+            const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
+            audio.play().catch(e => console.error('播放音频失败:', e));
+            return;
+        }
+        
+        // 生成音频缓冲区
+        const buffer = audioContext.createBuffer(1, 44100 * 0.5, 44100);
+        const channel = buffer.getChannelData(0);
+        
+        // 创建简单的错误音效
+        for (let i = 0; i < buffer.length; i++) {
+            // 频率变化，低-高-低形成错误提示音
+            const freq = 0.1 - 0.05 * Math.sin(i * 0.001);
+            channel[i] = Math.sin(i * freq) * Math.exp(-3 * i / buffer.length);
+        }
+        
+        // 创建音频源并播放
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
     } catch (e) {
-        console.error('无法播放音频', e);
+        console.error('播放错误音效失败:', e);
     }
 }
 
@@ -778,7 +870,8 @@ function startProductScanQuery() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
+        // 只扫描二维码格式
+        formatsToSupport: [0], // 0 = QR_CODE
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
