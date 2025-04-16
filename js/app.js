@@ -1,3 +1,24 @@
+// HTML5 QR Code 支持的格式
+const Html5QrcodeSupportedFormats = {
+    QR_CODE: 0,
+    AZTEC: 1,
+    CODABAR: 2,
+    CODE_39: 3,
+    CODE_93: 4,
+    CODE_128: 5,
+    DATA_MATRIX: 6,
+    MAXICODE: 7,
+    ITF: 8,
+    EAN_13: 9,
+    EAN_8: 10,
+    PDF_417: 11,
+    RSS_14: 12,
+    RSS_EXPANDED: 13,
+    UPC_A: 14,
+    UPC_E: 15,
+    UPC_EAN_EXTENSION: 16
+};
+
 // 全局变量
 const SUPABASE_URL = 'https://mirilhunybcsydhtowqo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcmlsaHVueWJjc3lkaHRvd3FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNjk3MzEsImV4cCI6MjA1Njg0NTczMX0.fQCOraXJXQFshRXxHf2N-VIwTSbEc1hrxXzHP4sIIAw';
@@ -283,7 +304,7 @@ function initializeScanner() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
@@ -400,6 +421,9 @@ function stopScan() {
         }
     } else {
         stopScanner();
+        
+        // 隐藏手动输入框
+        document.getElementById('manual-input-container').classList.add('d-none');
         
         // 判断当前扫码类型，如果是产品查询则返回首页
         if (scanState.processType === 'query') {
@@ -716,6 +740,17 @@ function startProductScanQuery() {
     document.getElementById('scan-upload').classList.add('d-none');
     document.getElementById('scan-pending-list').classList.add('d-none');
     
+    // 显示手动输入框
+    document.getElementById('manual-input-container').classList.remove('d-none');
+    
+    // 添加手动查询按钮事件
+    document.getElementById('manual-query-btn').addEventListener('click', handleManualProductQuery);
+    document.getElementById('manual-product-code').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleManualProductQuery();
+        }
+    });
+    
     // 显示扫码界面
     showScreen(SCREENS.SCAN);
     
@@ -743,7 +778,7 @@ function startProductScanQuery() {
         qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], // 明确使用正确的API设置只支持QR码
         videoConstraints: {
             facingMode: "environment",
             width: { ideal: videoConstraintsWidth },
@@ -761,6 +796,41 @@ function startProductScanQuery() {
         console.error(`无法启动相机: ${err}`);
         showToast('无法启动相机，请检查权限设置', 'error');
     });
+}
+
+// 处理手动输入产品编码查询
+async function handleManualProductQuery() {
+    const productCode = document.getElementById('manual-product-code').value.trim();
+    
+    if (!productCode) {
+        showToast('请输入产品编码', 'warning');
+        return;
+    }
+    
+    try {
+        // 查询产品详情
+        const productData = await getProductDetails(productCode);
+        
+        if (productData) {
+            // 播放成功提示音
+            playSuccessSound();
+            
+            // 显示产品详情
+            showProductDetail(productData);
+            
+            // 清空输入框
+            document.getElementById('manual-product-code').value = '';
+        } else {
+            // 播放错误提示音
+            playErrorSound();
+            
+            showToast('未找到该产品信息', 'error');
+        }
+    } catch (error) {
+        console.error('查询产品信息失败:', error);
+        showToast('查询失败，请重试', 'error');
+        playErrorSound();
+    }
 }
 
 // 产品查询扫码成功回调
