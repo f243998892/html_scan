@@ -400,17 +400,7 @@ function stopScan() {
         }
     } else {
         stopScanner();
-<<<<<<< HEAD
         showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-=======
-        
-        // 判断当前扫码类型，如果是产品查询则返回首页
-        if (scanState.processType === 'query') {
-            showScreen(SCREENS.HOME);
-        } else {
-            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-        }
->>>>>>> parent of 77ec70d (Update app.js)
     }
 }
 
@@ -735,10 +725,6 @@ function startProductScanQuery() {
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-<<<<<<< HEAD
-=======
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
->>>>>>> parent of 77ec70d (Update app.js)
         videoConstraints: {
             facingMode: "environment"
         }
