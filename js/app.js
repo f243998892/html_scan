@@ -615,7 +615,7 @@ function getProcessFields(processType) {
             break;
         case '浸漆':
             timeField = '浸漆时间';
-            employeeField = ''; // 浸漆没有对应的员工字段
+            employeeField = '浸漆员工'; // 修正：浸漆也有员工字段
             break;
         default:
             break;
@@ -655,6 +655,9 @@ async function handleProductQuery() {
         
         // 显示查询屏幕
         showScreen(SCREENS.QUERY);
+        
+        // 确保流水账容器可见
+        document.getElementById('monthly-transactions-container').style.display = 'block';
         
         // 查询并显示用户本月完成的产品工序统计
         await loadUserMonthlyProcesses();
@@ -1314,12 +1317,22 @@ async function handleDeleteRecords() {
         // 获取本月范围
         await getMonthRange();
         
+        // 隐藏流水账容器
+        document.getElementById('monthly-transactions-container').style.display = 'none';
+        
         // 显示加载中
         document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
         
+        // 获取当前用户全名
+        const fullName = localStorage.getItem('user_full_name');
+        if (!fullName) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">无法获取用户信息</div>';
+            return;
+        }
+        
         // 查询用户本月完成的产品
         const products = await getUserMonthlyProducts(
-            userState.fullName,
+            fullName,
             queryState.monthRange.startDate,
             queryState.monthRange.endDate
         );
@@ -1337,7 +1350,7 @@ async function handleDeleteRecords() {
             const productModel = product['产品型号'];
             
             // 检查各个工序
-            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1346,7 +1359,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1355,7 +1368,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1364,7 +1377,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1373,7 +1386,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1382,7 +1395,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            // 浸漆工序特殊处理（没有员工字段）
+            // 浸漆工序特殊处理
             if (isDateInRange(product['浸漆时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
@@ -1404,7 +1417,7 @@ async function handleDeleteRecords() {
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="" id="record-${index}">
+                            <input class="form-check-input" type="checkbox" value="${index}" id="record-${index}" data-index="${index}">
                             <label class="form-check-label" for="record-${index}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -1439,40 +1452,106 @@ async function handleDeleteRecords() {
         const checkboxes = document.querySelectorAll('.form-check-input');
         const deleteButton = document.getElementById('delete-selected-records');
         
+        // 更新删除按钮文本的函数
+        function updateDeleteButtonText() {
+            // 使用更精确的选择器，确保只获取当前页面中的选中复选框
+            const checkedCount = document.querySelectorAll('#process-list .form-check-input:checked').length;
+            deleteButton.disabled = checkedCount === 0;
+            
+            // 只有在有选中记录时才显示数字
+            if (checkedCount > 0) {
+                deleteButton.textContent = `删除选中记录 (${checkedCount})`;
+            } else {
+                deleteButton.textContent = '删除选中记录';
+            }
+            
+            console.log('当前选中的记录数:', checkedCount);
+        }
+        
+        // 在绑定事件前，先确保移除所有现有事件，避免事件重复绑定
         checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const checkedCount = document.querySelectorAll('.form-check-input:checked').length;
-                deleteButton.disabled = checkedCount === 0;
-            });
+            // 克隆并替换节点，以移除所有事件监听器
+            const newCheckbox = checkbox.cloneNode(true);
+            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
         });
+        
+        // 重新获取复选框元素（因为上面已经替换过了）
+        const refreshedCheckboxes = document.querySelectorAll('.form-check-input');
+        
+        // 为每个复选框添加事件
+        refreshedCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateDeleteButtonText);
+        });
+        
+        // 初始化按钮状态
+        updateDeleteButtonText();
+        
+        // 将processRecords存储在按钮上，以便在点击事件中使用
+        deleteButton.processRecords = processRecords;
         
         // 添加删除按钮事件监听
         deleteButton.addEventListener('click', async function() {
+            // 禁用删除按钮，防止重复点击
+            this.disabled = true;
+            
+            // 从按钮中获取processRecords
+            const processRecords = this.processRecords;
+            if (!processRecords || !Array.isArray(processRecords)) {
+                console.error('无法获取处理记录数据');
+                showToast('无法获取处理记录数据，请刷新页面重试', 'error');
+                this.disabled = false;
+                return;
+            }
+            
+            // 重新获取选中的复选框，使用与updateDeleteButtonText相同的选择器
             const selectedRecords = [];
-            checkboxes.forEach((checkbox, index) => {
-                if (checkbox.checked) {
+            const checkedBoxes = document.querySelectorAll('#process-list .form-check-input:checked');
+            
+            checkedBoxes.forEach((checkbox) => {
+                // 安全地解析索引，确保是有效的数字
+                const indexStr = checkbox.getAttribute('data-index');
+                const index = indexStr !== null ? parseInt(indexStr, 10) : NaN;
+                
+                // 检查索引是否为有效数字且在数组范围内
+                if (!isNaN(index) && index >= 0 && index < processRecords.length) {
                     selectedRecords.push(processRecords[index]);
+                } else {
+                    console.warn(`无效的索引: ${index}, processRecords长度: ${processRecords.length}, 原始值: ${indexStr}`);
                 }
             });
             
-            if (selectedRecords.length === 0) {
+            console.log('选中的记录:', selectedRecords);
+            
+            const selectedCount = selectedRecords.length;
+            
+            if (selectedCount === 0) {
                 showToast('请选择要删除的记录', 'warning');
+                this.disabled = false;
                 return;
             }
             
-            if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
+            if (!confirm(`确定要删除选中的 ${selectedCount} 条记录吗？`)) {
+                this.disabled = false;
                 return;
             }
+            
+            this.textContent = '删除中...';
             
             try {
                 let successCount = 0;
                 let failureCount = 0;
                 
                 for (const record of selectedRecords) {
+                    if (!record || typeof record !== 'object' || !record['产品编码']) {
+                        console.error('无效的记录数据:', record);
+                        failureCount++;
+                        continue;
+                    }
+                    
                     const success = await deleteProductProcess(
                         record['产品编码'],
                         record['工序'],
-                        userState.fullName
+                        fullName
                     );
                     
                     if (success) {
@@ -1484,11 +1563,15 @@ async function handleDeleteRecords() {
                 
                 showToast(`删除完成: 成功 ${successCount} 条, 失败 ${failureCount} 条`, 'info');
                 
-                // 重新加载记录
-                handleDeleteRecords();
+                // 延迟一下再重新加载记录
+                setTimeout(() => {
+                    handleDeleteRecords();
+                }, 1000);
             } catch (error) {
                 console.error('删除记录失败:', error);
                 showToast('删除记录失败，请重试', 'error');
+                this.disabled = false;
+                updateDeleteButtonText();
             }
         });
         
@@ -1528,9 +1611,10 @@ async function deleteProductProcess(productCode, processType, employeeName) {
                 break;
             case '浸漆':
                 timeField = '浸漆时间';
-                employeeField = ''; // 浸漆没有对应的员工字段
+                employeeField = '浸漆员工'; 
                 break;
             default:
+                console.error('未知工序类型:', processType);
                 return false;
         }
         
@@ -1542,17 +1626,18 @@ async function deleteProductProcess(productCode, processType, employeeName) {
             .maybeSingle();
         
         if (queryError) {
-            throw queryError;
-        }
-        
-        if (!product) {
-            console.error('产品不存在');
+            console.error('查询产品失败:', queryError);
             return false;
         }
         
-        // 检查是否是当前用户的工序
-        if (employeeField && product[employeeField] !== employeeName) {
-            console.error('不是当前用户的工序');
+        if (!product) {
+            console.error('产品不存在:', productCode);
+            return false;
+        }
+        
+        // 检查是否是当前用户的工序 - 浸漆工序特殊处理
+        if (employeeField && processType !== '浸漆' && product[employeeField] !== employeeName) {
+            console.error('不是当前用户的工序:', productCode, processType, product[employeeField], employeeName);
             return false;
         }
         
@@ -1565,15 +1650,19 @@ async function deleteProductProcess(productCode, processType, employeeName) {
             updateData[employeeField] = null;
         }
         
+        console.log('更新产品数据:', productCode, updateData);
+        
         const { error: updateError } = await supabase
             .from('products')
             .update(updateData)
             .eq('产品编码', productCode);
         
         if (updateError) {
-            throw updateError;
+            console.error('更新产品失败:', updateError);
+            return false;
         }
         
+        console.log('删除产品工序成功:', productCode, processType);
         return true;
     } catch (error) {
         console.error('删除产品工序信息失败:', error);
@@ -1622,17 +1711,10 @@ function getProcessIcon(process) {
 // 加载本月流水账
 async function loadMonthlyTransactionList() {
     try {
-        // 获取当前用户信息
-        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        if (!currentUser || !currentUser.name) {
+        // 获取当前用户信息 - 修复用户信息获取方式
+        const fullName = localStorage.getItem('user_full_name');
+        if (!fullName) {
             document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息</div>';
-            return;
-        }
-
-        // 获取当月日期范围
-        const { startDate, endDate } = await getMonthDateRange();
-        if (!startDate || !endDate) {
-            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取日期范围</div>';
             return;
         }
 
@@ -1642,9 +1724,7 @@ async function loadMonthlyTransactionList() {
         // 查询数据库获取产品记录
         const { data: products, error } = await supabase
             .from('products')
-            .select('*')
-            .gte('created_at', startDate)
-            .lte('created_at', endDate);
+            .select('*');
 
         if (error) {
             console.error('加载产品记录失败:', error);
@@ -1652,63 +1732,63 @@ async function loadMonthlyTransactionList() {
             return;
         }
 
-        // 筛选当前用户处理的记录
+        // 筛选当前用户处理的记录，确保在时间范围内
         const userRecords = [];
-        const employeeName = currentUser.name;
+        const employeeName = fullName;
 
         products.forEach(product => {
             // 检查每个工序，如果该用户参与了处理，则添加记录
-            if (product.绕线员工 === employeeName && product.绕线时间) {
+            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) {
                 userRecords.push({
                     process: '绕线',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.绕线时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['绕线时间']
                 });
             }
             
-            if (product.嵌线员工 === employeeName && product.嵌线时间) {
+            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'])) {
                 userRecords.push({
                     process: '嵌线',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.嵌线时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['嵌线时间']
                 });
             }
             
-            if (product.接线员工 === employeeName && product.接线时间) {
+            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'])) {
                 userRecords.push({
                     process: '接线',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.接线时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['接线时间']
                 });
             }
             
-            if (product.压装员工 === employeeName && product.压装时间) {
+            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'])) {
                 userRecords.push({
                     process: '压装',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.压装时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['压装时间']
                 });
             }
             
-            if (product.车止口员工 === employeeName && product.车止口时间) {
+            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) {
                 userRecords.push({
                     process: '车止口',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.车止口时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['车止口时间']
                 });
             }
             
-            if (product.浸漆员工 === employeeName && product.浸漆时间) {
+            if (isDateInRange(product['浸漆时间'])) {
                 userRecords.push({
                     process: '浸漆',
-                    productCode: product.产品编码,
-                    model: product.产品型号 || '未知型号',
-                    time: product.浸漆时间
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['浸漆时间']
                 });
             }
         });
