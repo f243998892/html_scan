@@ -1611,7 +1611,7 @@ async function deleteProductProcess(productCode, processType, employeeName) {
                 break;
             case '浸漆':
                 timeField = '浸漆时间';
-                employeeField = '浸漆员工'; 
+                employeeField = '浸漆员工';
                 break;
             default:
                 console.error('未知工序类型:', processType);
@@ -1714,31 +1714,36 @@ async function loadMonthlyTransactionList() {
         // 获取当前用户信息 - 修复用户信息获取方式
         const fullName = localStorage.getItem('user_full_name');
         if (!fullName) {
-            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息</div>';
+            console.error('无法获取用户信息');
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息，请重新登录</div>';
             return;
         }
 
         // 显示加载提示
         document.getElementById('monthly-transactions-container').innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
 
+        // 获取本月范围
+        await getMonthRange();
+
         // 查询数据库获取产品记录
         const { data: products, error } = await supabase
             .from('products')
-            .select('*');
+            .select('*')
+            .or(`绕线员工.eq.${fullName},嵌线员工.eq.${fullName},接线员工.eq.${fullName},压装员工.eq.${fullName},车止口员工.eq.${fullName}`)
+            .order('产品编码');
 
         if (error) {
             console.error('加载产品记录失败:', error);
-            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败</div>';
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
             return;
         }
 
         // 筛选当前用户处理的记录，确保在时间范围内
         const userRecords = [];
-        const employeeName = fullName;
 
         products.forEach(product => {
             // 检查每个工序，如果该用户参与了处理，则添加记录
-            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) {
+            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
                 userRecords.push({
                     process: '绕线',
                     productCode: product['产品编码'],
@@ -1747,7 +1752,7 @@ async function loadMonthlyTransactionList() {
                 });
             }
             
-            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'])) {
+            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
                 userRecords.push({
                     process: '嵌线',
                     productCode: product['产品编码'],
@@ -1756,7 +1761,7 @@ async function loadMonthlyTransactionList() {
                 });
             }
             
-            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'])) {
+            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
                 userRecords.push({
                     process: '接线',
                     productCode: product['产品编码'],
@@ -1765,7 +1770,7 @@ async function loadMonthlyTransactionList() {
                 });
             }
             
-            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'])) {
+            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
                 userRecords.push({
                     process: '压装',
                     productCode: product['产品编码'],
@@ -1774,7 +1779,7 @@ async function loadMonthlyTransactionList() {
                 });
             }
             
-            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) {
+            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
                 userRecords.push({
                     process: '车止口',
                     productCode: product['产品编码'],
@@ -1843,7 +1848,7 @@ async function loadMonthlyTransactionList() {
 
     } catch (error) {
         console.error('加载流水账失败:', error);
-        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败</div>';
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
     }
 }
 
