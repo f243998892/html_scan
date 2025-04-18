@@ -4,15 +4,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // 初始化Supabase客户端
 let supabase;
 
-// 设置扫码配置的常量
-const SCAN_CONFIG = {
-    DEFAULT_FPS: 25,          // 默认帧率
-    HIGH_QUALITY_SCAN: true,  // 高质量扫描模式
-    CONTINUOUS_SCAN_DELAY: 200, // 连续扫码延迟时间(ms)
-    SINGLE_SCAN_DELAY: 500,    // 单次扫码延迟时间(ms)
-    DUPLICATE_CODE_INTERVAL: 1500 // 认为是重复扫码的时间间隔(ms)
-};
-
 // 存储当前用户信息
 const userState = {
     fullName: '',
@@ -26,8 +17,7 @@ const scanState = {
     pendingCodes: [],
     lastScannedCode: '',
     isProcessing: false,
-    currentHtml5QrScanner: null,
-    lastScanTime: 0
+    currentHtml5QrScanner: null
 };
 
 // 存储当前查询状态
@@ -58,32 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 初始化应用
 async function initApp() {
-    // 初始化用户交互标志
-    initUserInteraction();
-    
-    // 添加事件监听
     addEventListeners();
-    
-    // 尝试自动登录
     tryAutoLogin();
-}
-
-// 初始化用户交互处理
-function initUserInteraction() {
-    // 添加用户交互事件监听，以便启用音频播放
-    const interactionEvents = ['click', 'touchstart', 'keydown'];
-    const markInteraction = function() {
-        document.body.classList.add('user-interaction');
-        // 移除所有事件监听
-        interactionEvents.forEach(event => {
-            document.removeEventListener(event, markInteraction);
-        });
-    };
-    
-    // 添加各种用户交互事件监听
-    interactionEvents.forEach(event => {
-        document.addEventListener(event, markInteraction);
-    });
 }
 
 // 尝试自动登录
@@ -290,29 +256,14 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 获取屏幕尺寸
-    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const isSmallScreen = screenWidth < 600;
-    
-    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
-    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
-    
-    // 获取视频约束参数
-    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
-    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
-    
-    // 扫码配置 - 使用常量配置
+    // 扫码配置
     const config = {
-        fps: SCAN_CONFIG.DEFAULT_FPS, 
-        qrbox: { width: qrboxSize, height: qrboxSize },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: videoConstraintsWidth },
-            height: { ideal: videoConstraintsHeight },
-            focusMode: "continuous"
+            facingMode: "environment"
         }
     };
     
@@ -333,15 +284,11 @@ async function onScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
-    const now = Date.now();
-    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
-        return; // 如果在设定时间内扫描了相同的码，则忽略
-    }
+    // 忽略重复扫码
+    if (decodedText === scanState.lastScannedCode) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
-    scanState.lastScanTime = now; // 记录本次扫码时间
     
     // 处理扫码结果
     if (scanState.isContinuous) {
@@ -353,21 +300,11 @@ async function onScanSuccess(decodedText, decodedResult) {
             
             // 播放成功提示音
             playSuccessSound();
-            
-            // 快速重置处理状态，允许立即扫描下一个码
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY);
         } else {
             showToast('该产品已在队列中，请勿重复扫码', 'warning');
             
             // 播放错误提示音
             playErrorSound();
-            
-            // 对于错误情况，也快速重置
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY + 100); // 比正常情况稍微长一点
         }
     } else {
         // 单次扫码模式，直接上传
@@ -398,13 +335,14 @@ async function onScanSuccess(decodedText, decodedResult) {
             playErrorSound();
             
             showToast('该产品的该工序已存在，请勿重复扫码', 'error');
-            
-            // 减少错误提示后的处理延迟
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
         }
     }
+    
+    // 延迟重置处理状态
+    setTimeout(() => {
+        scanState.isProcessing = false;
+        scanState.lastScannedCode = '';
+    }, 1000);
 }
 
 // 扫码失败回调
@@ -540,31 +478,8 @@ function getChineseProcessName(processType) {
 // 播放成功提示音
 function playSuccessSound() {
     try {
-        // 只在用户交互后创建AudioContext
-        function createAndPlayAudio() {
-            try {
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
-                audio.play();
-            } catch (e) {
-                console.error('无法播放音频', e);
-            }
-        }
-        
-        // 如果已经有用户交互，直接播放
-        if (document.body.classList.contains('user-interaction')) {
-            createAndPlayAudio();
-        } else {
-            // 延迟到下一个用户交互播放
-            const playOnInteraction = function() {
-                document.body.classList.add('user-interaction');
-                createAndPlayAudio();
-                document.removeEventListener('click', playOnInteraction);
-                document.removeEventListener('touchstart', playOnInteraction);
-            };
-            
-            document.addEventListener('click', playOnInteraction, { once: true });
-            document.addEventListener('touchstart', playOnInteraction, { once: true });
-        }
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
+        audio.play();
     } catch (e) {
         console.error('无法播放音频', e);
     }
@@ -573,31 +488,8 @@ function playSuccessSound() {
 // 播放错误提示音
 function playErrorSound() {
     try {
-        // 只在用户交互后创建AudioContext
-        function createAndPlayAudio() {
-            try {
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
-                audio.play();
-            } catch (e) {
-                console.error('无法播放音频', e);
-            }
-        }
-        
-        // 如果已经有用户交互，直接播放
-        if (document.body.classList.contains('user-interaction')) {
-            createAndPlayAudio();
-        } else {
-            // 延迟到下一个用户交互播放
-            const playOnInteraction = function() {
-                document.body.classList.add('user-interaction');
-                createAndPlayAudio();
-                document.removeEventListener('click', playOnInteraction);
-                document.removeEventListener('touchstart', playOnInteraction);
-            };
-            
-            document.addEventListener('click', playOnInteraction, { once: true });
-            document.addEventListener('touchstart', playOnInteraction, { once: true });
-        }
+        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
+        audio.play();
     } catch (e) {
         console.error('无法播放音频', e);
     }
@@ -710,8 +602,8 @@ function getProcessFields(processType) {
             timeField = '车止口时间';
             break;
         case '浸漆':
+            employeeField = '';  // 浸漆没有对应的员工字段
             timeField = '浸漆时间';
-            employeeField = ''; // 浸漆没有对应的员工字段
             break;
         default:
             break;
@@ -790,28 +682,13 @@ function startProductScanQuery() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 获取屏幕尺寸
-    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const isSmallScreen = screenWidth < 600;
-    
-    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
-    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
-    
-    // 获取视频约束参数
-    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
-    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
-    
     const config = {
-        fps: SCAN_CONFIG.DEFAULT_FPS,
-        qrbox: { width: qrboxSize, height: qrboxSize },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: videoConstraintsWidth },
-            height: { ideal: videoConstraintsHeight },
-            focusMode: "continuous"
+            facingMode: "environment"
         }
     };
     
@@ -831,15 +708,11 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
-    const now = Date.now();
-    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
-        return; // 如果在设定时间内扫描了相同的码，则忽略
-    }
+    // 忽略重复扫码
+    if (decodedText === scanState.lastScannedCode) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
-    scanState.lastScanTime = now; // 记录本次扫码时间
     
     try {
         // 查询产品详情
@@ -865,7 +738,8 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
         // 延迟重置处理状态
         setTimeout(() => {
             scanState.isProcessing = false;
-        }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
+            scanState.lastScannedCode = '';
+        }, 1000);
     }
 }
 
@@ -1089,9 +963,6 @@ async function loadUserMonthlyProcesses() {
             '浸漆': {}
         };
         
-        // 收集所有产品记录，用于展示完整列表
-        const allProductRecords = [];
-        
         // 处理产品数据
         products.forEach(product => {
             // 检查该用户完成的工序
@@ -1112,14 +983,6 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['绕线时间']
                 });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '绕线',
-                    '时间': product['绕线时间']
-                });
             }
             
             if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
@@ -1138,14 +1001,6 @@ async function loadUserMonthlyProcesses() {
                 processProducts['嵌线'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['嵌线时间']
-                });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '嵌线',
-                    '时间': product['嵌线时间']
                 });
             }
             
@@ -1166,14 +1021,6 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['接线时间']
                 });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '接线',
-                    '时间': product['接线时间']
-                });
             }
             
             if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
@@ -1192,14 +1039,6 @@ async function loadUserMonthlyProcesses() {
                 processProducts['压装'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['压装时间']
-                });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '压装',
-                    '时间': product['压装时间']
                 });
             }
             
@@ -1220,14 +1059,6 @@ async function loadUserMonthlyProcesses() {
                     code: product['产品编码'],
                     time: product['车止口时间']
                 });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '车止口',
-                    '时间': product['车止口时间']
-                });
             }
             
             if (isDateInRange(product['浸漆时间'])) {
@@ -1246,14 +1077,6 @@ async function loadUserMonthlyProcesses() {
                 processProducts['浸漆'][product['产品型号']].push({
                     code: product['产品编码'],
                     time: product['浸漆时间']
-                });
-                
-                // 添加到全部产品记录
-                allProductRecords.push({
-                    '产品编码': product['产品编码'],
-                    '产品型号': product['产品型号'],
-                    '工序': '浸漆',
-                    '时间': product['浸漆时间']
                 });
             }
         });
@@ -1280,74 +1103,13 @@ async function loadUserMonthlyProcesses() {
             processListHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
         }
         
-        // 按时间倒序排序所有产品记录
-        allProductRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
-        
-        // 生成所有产品列表HTML
-        let allProductsHTML = '';
-        
-        if (allProductRecords.length > 0) {
-            allProductsHTML = `
-                <div class="mt-4">
-                    <h5 class="mb-3">本月所有产品列表 (共${allProductRecords.length}个)</h5>
-                    <div class="list-group all-products-list">
-            `;
-            
-            allProductRecords.forEach(record => {
-                allProductsHTML += `
-                    <div class="list-group-item list-group-item-action product-record" data-code="${record['产品编码']}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="d-flex align-items-center">
-                                    <span class="me-2">${getProcessIcon(record['工序'])}</span>
-                                    <strong>${record['产品编码']}</strong>
-                                </div>
-                                <small class="text-muted">产品型号: ${record['产品型号']}</small>
-                            </div>
-                            <div class="text-end">
-                                <span class="badge bg-secondary">${record['工序']}</span>
-                                <small class="d-block text-muted">${formatDate(record['时间'])}</small>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            allProductsHTML += `
-                    </div>
-                </div>
-            `;
-        }
-        
-        document.getElementById('process-list').innerHTML = processListHTML + allProductsHTML;
+        document.getElementById('process-list').innerHTML = processListHTML;
         
         // 添加点击事件，显示型号列表
         document.querySelectorAll('.process-item').forEach(item => {
             item.addEventListener('click', function() {
                 const process = this.getAttribute('data-process');
                 showModelList(process);
-            });
-        });
-        
-        // 添加点击事件，显示产品详情
-        document.querySelectorAll('.product-record').forEach(item => {
-            item.addEventListener('click', async function() {
-                const code = this.getAttribute('data-code');
-                
-                try {
-                    // 查询产品详情
-                    const productData = await getProductDetails(code);
-                    
-                    if (productData) {
-                        // 显示产品详情
-                        showProductDetail(productData);
-                    } else {
-                        showToast('未找到该产品信息', 'error');
-                    }
-                } catch (error) {
-                    console.error('查询产品详情失败:', error);
-                    showToast('查询失败，请重试', 'error');
-                }
             });
         });
         
@@ -1611,7 +1373,7 @@ async function handleDeleteRecords() {
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="form-check">
-                            <input class="form-check-input record-checkbox" type="checkbox" value="${index}" id="record-${index}">
+                            <input class="form-check-input" type="checkbox" value="" id="record-${index}">
                             <label class="form-check-label" for="record-${index}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -1643,47 +1405,31 @@ async function handleDeleteRecords() {
         document.getElementById('process-list').innerHTML = recordsHTML;
         
         // 添加复选框事件监听
-        const checkboxes = document.querySelectorAll('.record-checkbox');
+        const checkboxes = document.querySelectorAll('.form-check-input');
         const deleteButton = document.getElementById('delete-selected-records');
         
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+                const checkedCount = document.querySelectorAll('.form-check-input:checked').length;
                 deleteButton.disabled = checkedCount === 0;
             });
         });
         
-        // 先删除旧的事件监听器(通过克隆并替换元素)
-        const oldButton = deleteButton;
-        const newButton = oldButton.cloneNode(true);
-        oldButton.parentNode.replaceChild(newButton, oldButton);
-        
         // 添加删除按钮事件监听
-        document.getElementById('delete-selected-records').addEventListener('click', async function() {
-            // 禁用按钮防止重复点击
-            this.disabled = true;
-            this.textContent = '删除中...';
-            
+        deleteButton.addEventListener('click', async function() {
             const selectedRecords = [];
-            
-            // 获取所有选中的记录索引
-            document.querySelectorAll('.record-checkbox:checked').forEach(checkbox => {
-                const index = parseInt(checkbox.value, 10);
-                if (!isNaN(index) && index >= 0 && index < processRecords.length) {
+            checkboxes.forEach((checkbox, index) => {
+                if (checkbox.checked) {
                     selectedRecords.push(processRecords[index]);
                 }
             });
             
             if (selectedRecords.length === 0) {
                 showToast('请选择要删除的记录', 'warning');
-                this.disabled = false;
-                this.textContent = '删除选中记录';
                 return;
             }
             
             if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
-                this.disabled = false;
-                this.textContent = '删除选中记录';
                 return;
             }
             
@@ -1712,8 +1458,6 @@ async function handleDeleteRecords() {
             } catch (error) {
                 console.error('删除记录失败:', error);
                 showToast('删除记录失败，请重试', 'error');
-                this.disabled = false;
-                this.textContent = '删除选中记录';
             }
         });
         

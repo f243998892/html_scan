@@ -4,15 +4,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // 初始化Supabase客户端
 let supabase;
 
-// 设置扫码配置的常量
-const SCAN_CONFIG = {
-    DEFAULT_FPS: 25,          // 默认帧率
-    HIGH_QUALITY_SCAN: true,  // 高质量扫描模式
-    CONTINUOUS_SCAN_DELAY: 200, // 连续扫码延迟时间(ms)
-    SINGLE_SCAN_DELAY: 500,    // 单次扫码延迟时间(ms)
-    DUPLICATE_CODE_INTERVAL: 1500 // 认为是重复扫码的时间间隔(ms)
-};
-
 // 存储当前用户信息
 const userState = {
     fullName: '',
@@ -26,8 +17,7 @@ const scanState = {
     pendingCodes: [],
     lastScannedCode: '',
     isProcessing: false,
-    currentHtml5QrScanner: null,
-    lastScanTime: 0
+    currentHtml5QrScanner: null
 };
 
 // 存储当前查询状态
@@ -58,32 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 初始化应用
 async function initApp() {
-    // 初始化用户交互标志
-    initUserInteraction();
-    
-    // 添加事件监听
     addEventListeners();
-    
-    // 尝试自动登录
     tryAutoLogin();
-}
-
-// 初始化用户交互处理
-function initUserInteraction() {
-    // 添加用户交互事件监听，以便启用音频播放
-    const interactionEvents = ['click', 'touchstart', 'keydown'];
-    const markInteraction = function() {
-        document.body.classList.add('user-interaction');
-        // 移除所有事件监听
-        interactionEvents.forEach(event => {
-            document.removeEventListener(event, markInteraction);
-        });
-    };
-    
-    // 添加各种用户交互事件监听
-    interactionEvents.forEach(event => {
-        document.addEventListener(event, markInteraction);
-    });
 }
 
 // 尝试自动登录
@@ -290,29 +256,14 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 获取屏幕尺寸
-    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const isSmallScreen = screenWidth < 600;
-    
-    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
-    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
-    
-    // 获取视频约束参数
-    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
-    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
-    
-    // 扫码配置 - 使用常量配置
+    // 扫码配置
     const config = {
-        fps: SCAN_CONFIG.DEFAULT_FPS, 
-        qrbox: { width: qrboxSize, height: qrboxSize },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: videoConstraintsWidth },
-            height: { ideal: videoConstraintsHeight },
-            focusMode: "continuous"
+            facingMode: "environment"
         }
     };
     
@@ -333,15 +284,11 @@ async function onScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
-    const now = Date.now();
-    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
-        return; // 如果在设定时间内扫描了相同的码，则忽略
-    }
+    // 忽略重复扫码
+    if (decodedText === scanState.lastScannedCode) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
-    scanState.lastScanTime = now; // 记录本次扫码时间
     
     // 处理扫码结果
     if (scanState.isContinuous) {
@@ -353,21 +300,11 @@ async function onScanSuccess(decodedText, decodedResult) {
             
             // 播放成功提示音
             playSuccessSound();
-            
-            // 快速重置处理状态，允许立即扫描下一个码
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY);
         } else {
             showToast('该产品已在队列中，请勿重复扫码', 'warning');
             
             // 播放错误提示音
             playErrorSound();
-            
-            // 对于错误情况，也快速重置
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, SCAN_CONFIG.CONTINUOUS_SCAN_DELAY + 100); // 比正常情况稍微长一点
         }
     } else {
         // 单次扫码模式，直接上传
@@ -398,13 +335,14 @@ async function onScanSuccess(decodedText, decodedResult) {
             playErrorSound();
             
             showToast('该产品的该工序已存在，请勿重复扫码', 'error');
-    
-            // 减少错误提示后的处理延迟
-    setTimeout(() => {
-        scanState.isProcessing = false;
-            }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
         }
     }
+    
+    // 延迟重置处理状态
+    setTimeout(() => {
+        scanState.isProcessing = false;
+        scanState.lastScannedCode = '';
+    }, 1000);
 }
 
 // 扫码失败回调
@@ -415,6 +353,8 @@ function onScanFailure(error) {
 
 // 停止扫码并返回
 function stopScan() {
+    console.log("停止扫码，当前扫码类型:", scanState.processType);
+    
     // 如果是连续扫码模式且有待上传的数据，询问是否放弃上传
     if (scanState.isContinuous && scanState.pendingCodes.length > 0) {
         if (confirm('是否放弃上传？')) {
@@ -424,7 +364,17 @@ function stopScan() {
         }
     } else {
         stopScanner();
-        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        
+        // 根据当前扫码类型决定返回的页面
+        if (scanState.processType === 'query') {
+            console.log("产品扫码查询 - 返回主页");
+            // 产品扫码查询 - 返回主页
+            showScreen(SCREENS.HOME);
+        } else {
+            console.log("其他扫码 - 返回选择页面");
+            // 其他扫码 - 返回对应的扫码选择页面
+            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+        }
     }
 }
 
@@ -540,31 +490,8 @@ function getChineseProcessName(processType) {
 // 播放成功提示音
 function playSuccessSound() {
     try {
-        // 只在用户交互后创建AudioContext
-        function createAndPlayAudio() {
-    try {
         const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
         audio.play();
-            } catch (e) {
-                console.error('无法播放音频', e);
-            }
-        }
-        
-        // 如果已经有用户交互，直接播放
-        if (document.body.classList.contains('user-interaction')) {
-            createAndPlayAudio();
-        } else {
-            // 延迟到下一个用户交互播放
-            const playOnInteraction = function() {
-                document.body.classList.add('user-interaction');
-                createAndPlayAudio();
-                document.removeEventListener('click', playOnInteraction);
-                document.removeEventListener('touchstart', playOnInteraction);
-            };
-            
-            document.addEventListener('click', playOnInteraction, { once: true });
-            document.addEventListener('touchstart', playOnInteraction, { once: true });
-        }
     } catch (e) {
         console.error('无法播放音频', e);
     }
@@ -573,31 +500,8 @@ function playSuccessSound() {
 // 播放错误提示音
 function playErrorSound() {
     try {
-        // 只在用户交互后创建AudioContext
-        function createAndPlayAudio() {
-    try {
         const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
         audio.play();
-            } catch (e) {
-                console.error('无法播放音频', e);
-            }
-        }
-        
-        // 如果已经有用户交互，直接播放
-        if (document.body.classList.contains('user-interaction')) {
-            createAndPlayAudio();
-        } else {
-            // 延迟到下一个用户交互播放
-            const playOnInteraction = function() {
-                document.body.classList.add('user-interaction');
-                createAndPlayAudio();
-                document.removeEventListener('click', playOnInteraction);
-                document.removeEventListener('touchstart', playOnInteraction);
-            };
-            
-            document.addEventListener('click', playOnInteraction, { once: true });
-            document.addEventListener('touchstart', playOnInteraction, { once: true });
-        }
     } catch (e) {
         console.error('无法播放音频', e);
     }
@@ -710,8 +614,8 @@ function getProcessFields(processType) {
             timeField = '车止口时间';
             break;
         case '浸漆':
-            employeeField = ''; // 浸漆没有对应的员工字段
             timeField = '浸漆时间';
+            employeeField = '浸漆员工'; // 修正：浸漆也有员工字段
             break;
         default:
             break;
@@ -752,8 +656,14 @@ async function handleProductQuery() {
         // 显示查询屏幕
         showScreen(SCREENS.QUERY);
         
+        // 确保流水账容器可见
+        document.getElementById('monthly-transactions-container').style.display = 'block';
+        
         // 查询并显示用户本月完成的产品工序统计
         await loadUserMonthlyProcesses();
+        
+        // 加载本月流水账
+        await loadMonthlyTransactionList();
     } catch (error) {
         console.error('获取产品查询数据失败:', error);
         showToast('获取数据失败，请重试', 'error');
@@ -790,28 +700,13 @@ function startProductScanQuery() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 获取屏幕尺寸
-    const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const isSmallScreen = screenWidth < 600;
-    
-    // 计算二维码扫描框大小 - 根据屏幕大小动态调整
-    const qrboxSize = isSmallScreen ? Math.min(screenWidth * 0.7, 250) : 300;
-    
-    // 获取视频约束参数
-    const videoConstraintsWidth = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 1280 : 640;
-    const videoConstraintsHeight = SCAN_CONFIG.HIGH_QUALITY_SCAN ? 720 : 480;
-    
     const config = {
-        fps: SCAN_CONFIG.DEFAULT_FPS,
-        qrbox: { width: qrboxSize, height: qrboxSize },
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
-        formats: ['qr_code'], // 仅支持QR码，减少判断时间
         videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: videoConstraintsWidth },
-            height: { ideal: videoConstraintsHeight },
-            focusMode: "continuous"
+            facingMode: "environment"
         }
     };
     
@@ -831,15 +726,11 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 优化重复扫码检测 - 保留上次扫码结果，但减少重复判断的时间间隔
-    const now = Date.now();
-    if (decodedText === scanState.lastScannedCode && (now - scanState.lastScanTime < SCAN_CONFIG.DUPLICATE_CODE_INTERVAL)) {
-        return; // 如果在设定时间内扫描了相同的码，则忽略
-    }
+    // 忽略重复扫码
+    if (decodedText === scanState.lastScannedCode) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
-    scanState.lastScanTime = now; // 记录本次扫码时间
     
     try {
         // 查询产品详情
@@ -865,7 +756,8 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
         // 延迟重置处理状态
         setTimeout(() => {
             scanState.isProcessing = false;
-        }, SCAN_CONFIG.SINGLE_SCAN_DELAY);
+            scanState.lastScannedCode = '';
+        }, 1000);
     }
 }
 
@@ -967,49 +859,81 @@ function showProductDetail(product) {
         immersionDiv.className = 'product-detail-item';
         immersionDiv.innerHTML = `
             <div class="product-detail-label">浸漆:</div>
-            <div>
-                时间: ${formatDate(product['浸漆时间'])}
-            </div>
+            <div>时间: ${formatDate(product['浸漆时间'])}</div>
         `;
         productDetailContent.appendChild(immersionDiv);
     }
     
-    // 显示弹窗
+    // 半成品检验信息
+    if (product['半成品检验时间']) {
+        const semiInspectionDiv = document.createElement('div');
+        semiInspectionDiv.className = 'product-detail-item';
+        semiInspectionDiv.innerHTML = `
+            <div class="product-detail-label">半成品检验:</div>
+            <div>时间: ${formatDate(product['半成品检验时间'])}</div>
+        `;
+        productDetailContent.appendChild(semiInspectionDiv);
+    }
+    
+    // 成品检验信息
+    if (product['成品检验时间']) {
+        const finalInspectionDiv = document.createElement('div');
+        finalInspectionDiv.className = 'product-detail-item';
+        finalInspectionDiv.innerHTML = `
+            <div class="product-detail-label">成品检验:</div>
+            <div>时间: ${formatDate(product['成品检验时间'])}</div>
+        `;
+        productDetailContent.appendChild(finalInspectionDiv);
+    }
+    
+    // 显示模态框
     const productDetailModal = new bootstrap.Modal(document.getElementById('product-detail-modal'));
     productDetailModal.show();
 }
 
 // 获取本月日期范围
 async function getMonthRange() {
-    // 如果已经有日期范围，则使用已有的
-    if (queryState.monthRange.startDate && queryState.monthRange.endDate) {
+    try {
+        // 尝试从数据库获取自定义月份范围
+        const { data, error } = await supabase
+            .from('month_range')
+            .select('*')
+            .order('id', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (error) {
+            console.error('获取月份范围失败:', error);
+            // 使用默认的本月范围
+            setDefaultMonthRange();
             return;
         }
         
-    // 否则，设置默认为本月
+        if (data && data.start_date && data.end_date) {
+            queryState.monthRange.startDate = new Date(data.start_date);
+            queryState.monthRange.endDate = new Date(data.end_date);
+        } else {
+            // 使用默认的本月范围
             setDefaultMonthRange();
+        }
+    } catch (error) {
+        console.error('获取月份范围失败:', error);
+        // 使用默认的本月范围
+        setDefaultMonthRange();
+    }
 }
 
-// 设置默认月份范围为本月
+// 设置默认的本月范围
 function setDefaultMonthRange() {
     const now = new Date();
-    
-    // 本月第一天
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     
-    // 下月第一天 - 1 (本月最后一天)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    // 设置时间为当天的开始和结束
-    firstDay.setHours(0, 0, 0, 0);
-    lastDay.setHours(23, 59, 59, 999);
-    
-    // 存储时间范围
-    queryState.monthRange.startDate = firstDay.toISOString();
-    queryState.monthRange.endDate = lastDay.toISOString();
+    queryState.monthRange.startDate = firstDay;
+    queryState.monthRange.endDate = lastDay;
 }
 
-// 加载用户本月完成的工序统计
+// 加载用户本月完成的产品工序统计
 async function loadUserMonthlyProcesses() {
     try {
         // 显示加载中
@@ -1027,7 +951,7 @@ async function loadUserMonthlyProcesses() {
             return;
         }
         
-        // 统计各个工序的产品数量
+        // 统计各工序数量
         const processCounts = {
             '绕线': 0,
             '嵌线': 0,
@@ -1037,358 +961,349 @@ async function loadUserMonthlyProcesses() {
             '浸漆': 0
         };
         
-        // 统计各个型号的产品数量
-        const modelCounts = {};
+        // 统计各工序和型号
+        const processModels = {
+            '绕线': {},
+            '嵌线': {},
+            '接线': {},
+            '压装': {},
+            '车止口': {},
+            '浸漆': {}
+        };
         
-        // 统计已完成的产品
+        // 统计工序和产品编码
+        const processProducts = {
+            '绕线': {},
+            '嵌线': {},
+            '接线': {},
+            '压装': {},
+            '车止口': {},
+            '浸漆': {}
+        };
+        
+        // 处理产品数据
         products.forEach(product => {
-            // 统计型号
-            const model = product['产品型号'];
-            if (model) {
-                modelCounts[model] = (modelCounts[model] || 0) + 1;
-            }
-            
-            // 统计各个工序
+            // 检查该用户完成的工序
             if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
                 processCounts['绕线']++;
+                
+                // 按型号统计
+                if (!processModels['绕线'][product['产品型号']]) {
+                    processModels['绕线'][product['产品型号']] = 0;
+                }
+                processModels['绕线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['绕线'][product['产品型号']]) {
+                    processProducts['绕线'][product['产品型号']] = [];
+                }
+                processProducts['绕线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['绕线时间']
+                });
             }
             
             if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
                 processCounts['嵌线']++;
+                
+                // 按型号统计
+                if (!processModels['嵌线'][product['产品型号']]) {
+                    processModels['嵌线'][product['产品型号']] = 0;
+                }
+                processModels['嵌线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['嵌线'][product['产品型号']]) {
+                    processProducts['嵌线'][product['产品型号']] = [];
+                }
+                processProducts['嵌线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['嵌线时间']
+                });
             }
             
             if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
                 processCounts['接线']++;
+                
+                // 按型号统计
+                if (!processModels['接线'][product['产品型号']]) {
+                    processModels['接线'][product['产品型号']] = 0;
+                }
+                processModels['接线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['接线'][product['产品型号']]) {
+                    processProducts['接线'][product['产品型号']] = [];
+                }
+                processProducts['接线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['接线时间']
+                });
             }
             
             if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
                 processCounts['压装']++;
+                
+                // 按型号统计
+                if (!processModels['压装'][product['产品型号']]) {
+                    processModels['压装'][product['产品型号']] = 0;
+                }
+                processModels['压装'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['压装'][product['产品型号']]) {
+                    processProducts['压装'][product['产品型号']] = [];
+                }
+                processProducts['压装'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['压装时间']
+                });
             }
             
             if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
                 processCounts['车止口']++;
+                
+                // 按型号统计
+                if (!processModels['车止口'][product['产品型号']]) {
+                    processModels['车止口'][product['产品型号']] = 0;
+                }
+                processModels['车止口'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['车止口'][product['产品型号']]) {
+                    processProducts['车止口'][product['产品型号']] = [];
+                }
+                processProducts['车止口'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['车止口时间']
+                });
             }
             
             if (isDateInRange(product['浸漆时间'])) {
                 processCounts['浸漆']++;
+                
+                // 按型号统计
+                if (!processModels['浸漆'][product['产品型号']]) {
+                    processModels['浸漆'][product['产品型号']] = 0;
+                }
+                processModels['浸漆'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['浸漆'][product['产品型号']]) {
+                    processProducts['浸漆'][product['产品型号']] = [];
+                }
+                processProducts['浸漆'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['浸漆时间']
+                });
             }
         });
         
-        // 生成统计结果HTML
-        let statisticsHTML = '<div class="mb-4">';
-        statisticsHTML += `<h4 class="mb-3">本月工序汇总</h4>`;
+        // 保存查询结果，以便后续使用
+        queryState.processModels = processModels;
+        queryState.processProducts = processProducts;
         
-        // 总计
-        const totalCount = products.length;
-        statisticsHTML += `<div class="alert alert-info">共完成 ${totalCount} 个产品</div>`;
+        // 生成工序列表
+        let processListHTML = '';
         
-        // 工序统计
-        for (const [process, count] of Object.entries(processCounts)) {
-            if (count > 0) {
-                statisticsHTML += `
-                    <div class="card mb-2 process-card" data-process="${process}">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-0">${process}</h5>
-                                    <span>${count} 个产品</span>
-                                </div>
-                                <div class="process-icon">
-                                    ${getProcessIcon(process)}
-                                </div>
-                            </div>
-                        </div>
+        Object.keys(processCounts).forEach(process => {
+            if (processCounts[process] > 0) {
+                processListHTML += `
+                    <div class="process-item" data-process="${process}">
+                        <span>${process}</span>
+                        <span class="badge bg-primary rounded-pill">${processCounts[process]}</span>
                     </div>
                 `;
             }
+        });
+        
+        if (processListHTML === '') {
+            processListHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
         }
         
-        statisticsHTML += '</div>';
+        document.getElementById('process-list').innerHTML = processListHTML;
         
-        document.getElementById('process-list').innerHTML = statisticsHTML;
-        
-        // 添加工序卡片点击事件
-        document.querySelectorAll('.process-card').forEach(card => {
-            card.addEventListener('click', function() {
+        // 添加点击事件，显示型号列表
+        document.querySelectorAll('.process-item').forEach(item => {
+            item.addEventListener('click', function() {
                 const process = this.getAttribute('data-process');
-                queryState.currentProcess = process;
                 showModelList(process);
             });
         });
         
+        // 加载月度流水账
+        loadMonthlyTransactionList();
     } catch (error) {
-        console.error('加载用户本月完成的工序统计失败:', error);
+        console.error('加载用户本月工序统计失败:', error);
         document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
     }
 }
 
-// 检查日期是否在查询范围内
-function isDateInRange(dateString) {
+// 检查日期是否在当前月份范围内
+function isDateInRange(dateString, startDate, endDate) {
     if (!dateString) return false;
     
     const date = new Date(dateString);
-    const start = new Date(queryState.monthRange.startDate);
-    const end = new Date(queryState.monthRange.endDate);
+    
+    // 如果没有提供开始和结束日期，使用queryState中的日期范围
+    if (!startDate || !endDate) {
+        startDate = queryState.monthRange.startDate;
+        endDate = queryState.monthRange.endDate;
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // 移除时间部分进行纯日期比较
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
     
     return date >= start && date <= end;
 }
 
-// 显示工序对应的型号列表
+// 显示型号列表
 function showModelList(process) {
-    try {
-        // 记录当前工序
     queryState.currentProcess = process;
     
     // 更新标题
-        document.getElementById('models-title').textContent = `${process}工序 - 型号列表`;
-        
-        // 显示加载中
-        document.getElementById('model-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
-        
-        // 显示型号列表屏幕
-        showScreen(SCREENS.MODELS);
-        
-        // 查询用户本月完成的产品
-        getUserMonthlyProducts(
-            userState.fullName,
-            queryState.monthRange.startDate,
-            queryState.monthRange.endDate
-        ).then(products => {
-            if (!products || products.length === 0) {
-                document.getElementById('model-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
-                return;
-            }
-            
-            // 筛选出对应工序的产品
-            const filteredProducts = products.filter(product => {
-                switch (process) {
-                    case '绕线':
-                        return product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间']);
-                    case '嵌线':
-                        return product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间']);
-                    case '接线':
-                        return product['接线员工'] === userState.fullName && isDateInRange(product['接线时间']);
-                    case '压装':
-                        return product['压装员工'] === userState.fullName && isDateInRange(product['压装时间']);
-                    case '车止口':
-                        return product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间']);
-                    case '浸漆':
-                        return isDateInRange(product['浸漆时间']);
-                    default:
-                        return false;
-                }
-            });
-            
-            if (filteredProducts.length === 0) {
-                document.getElementById('model-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
-                return;
-            }
-            
-            // 统计各个型号的产品数量
-            const modelCounts = {};
-            
-            filteredProducts.forEach(product => {
-                const model = product['产品型号'] || '未知型号';
-                modelCounts[model] = (modelCounts[model] || 0) + 1;
-            });
-            
-            // 生成型号列表HTML
-            let modelsHTML = '';
-            
-            for (const [model, count] of Object.entries(modelCounts)) {
-                modelsHTML += `
-                    <div class="card mb-2 model-card" data-model="${model}">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-0">${model}</h5>
-                                    <span>${count} 个产品</span>
-                                </div>
-                                <i class="bi bi-chevron-right text-primary"></i>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            document.getElementById('model-list').innerHTML = modelsHTML;
-            
-            // 添加型号卡片点击事件
-            document.querySelectorAll('.model-card').forEach(card => {
-                card.addEventListener('click', function() {
+    document.getElementById('models-title').textContent = `${process}型号列表`;
+    
+    // 获取该工序的所有型号
+    const models = queryState.processModels[process];
+    
+    // 生成型号列表
+    let modelListHTML = '';
+    
+    Object.keys(models).forEach(model => {
+        if (models[model] > 0) {
+            modelListHTML += `
+                <div class="model-item" data-model="${model}">
+                    <span>${model}</span>
+                    <span class="badge bg-success rounded-pill">${models[model]}</span>
+                </div>
+            `;
+        }
+    });
+    
+    if (modelListHTML === '') {
+        modelListHTML = '<div class="text-center my-3">暂无型号数据</div>';
+    }
+    
+    document.getElementById('model-list').innerHTML = modelListHTML;
+    
+    // 添加点击事件，显示产品列表
+    document.querySelectorAll('.model-item').forEach(item => {
+        item.addEventListener('click', function() {
             const model = this.getAttribute('data-model');
-                    queryState.currentModel = model;
-                    showProductList(process, model);
+            showProductList(queryState.currentProcess, model);
         });
     });
     
-        }).catch(error => {
-            console.error('加载型号列表失败:', error);
-            document.getElementById('model-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
-        });
-        
-    } catch (error) {
-        console.error('显示型号列表失败:', error);
-        document.getElementById('model-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
-    }
+    // 显示型号列表屏幕
+    showScreen(SCREENS.MODELS);
 }
 
 // 显示产品列表
 function showProductList(process, model) {
-    try {
-        // 记录当前型号
     queryState.currentModel = model;
     
     // 更新标题
     document.getElementById('products-title').textContent = `${process} - ${model}`;
     
-        // 显示加载中
-        document.getElementById('product-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
-        
-        // 显示产品列表屏幕
-        showScreen(SCREENS.PRODUCTS);
-        
-        // 查询用户本月完成的产品
-        getUserMonthlyProducts(
-            userState.fullName,
-            queryState.monthRange.startDate,
-            queryState.monthRange.endDate
-        ).then(products => {
-            if (!products || products.length === 0) {
-                document.getElementById('product-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
-                return;
-            }
+    // 获取该工序和型号的所有产品
+    const products = queryState.processProducts[process][model] || [];
+    
+    // 按时间排序
+    products.sort((a, b) => new Date(b.time) - new Date(a.time));
+    
+    // 生成产品列表
+    let productListHTML = '';
+    
+    products.forEach(product => {
+        productListHTML += `
+            <div class="product-item" data-code="${product.code}">
+                <span>${product.code}</span>
+                <span>${formatDate(product.time)}</span>
+            </div>
+        `;
+    });
+    
+    if (productListHTML === '') {
+        productListHTML = '<div class="text-center my-3">暂无产品数据</div>';
+    }
+    
+    document.getElementById('product-list').innerHTML = productListHTML;
+    
+    // 添加点击事件，查询产品详情
+    document.querySelectorAll('.product-item').forEach(item => {
+        item.addEventListener('click', async function() {
+            const code = this.getAttribute('data-code');
             
-            // 筛选出对应工序和型号的产品
-            const filteredProducts = products.filter(product => {
-                if (product['产品型号'] !== model) {
-                    return false;
-                }
-                
-                switch (process) {
-                    case '绕线':
-                        return product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间']);
-                    case '嵌线':
-                        return product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间']);
-                    case '接线':
-                        return product['接线员工'] === userState.fullName && isDateInRange(product['接线时间']);
-                    case '压装':
-                        return product['压装员工'] === userState.fullName && isDateInRange(product['压装时间']);
-                    case '车止口':
-                        return product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间']);
-                    case '浸漆':
-                        return isDateInRange(product['浸漆时间']);
-                    default:
-                        return false;
-                }
-            });
-            
-            if (filteredProducts.length === 0) {
-                document.getElementById('product-list').innerHTML = '<div class="text-center my-3">暂无相关数据</div>';
-                return;
-            }
-            
-            // 按时间排序 (新的在前面)
-            filteredProducts.sort((a, b) => {
-                const getTime = (product) => {
-                    switch (process) {
-                        case '绕线': return new Date(product['绕线时间']).getTime();
-                        case '嵌线': return new Date(product['嵌线时间']).getTime();
-                        case '接线': return new Date(product['接线时间']).getTime();
-                        case '压装': return new Date(product['压装时间']).getTime();
-                        case '车止口': return new Date(product['车止口时间']).getTime();
-                        case '浸漆': return new Date(product['浸漆时间']).getTime();
-                        default: return 0;
-                    }
-                };
-                
-                return getTime(b) - getTime(a);
-            });
-            
-            // 生成产品列表HTML
-            let productsHTML = '';
-            
-            filteredProducts.forEach(product => {
-                const code = product['产品编码'];
-                
-                // 获取对应工序的时间
-                let time = '';
-                switch (process) {
-                    case '绕线': time = formatDate(product['绕线时间']); break;
-                    case '嵌线': time = formatDate(product['嵌线时间']); break;
-                    case '接线': time = formatDate(product['接线时间']); break;
-                    case '压装': time = formatDate(product['压装时间']); break;
-                    case '车止口': time = formatDate(product['车止口时间']); break;
-                    case '浸漆': time = formatDate(product['浸漆时间']); break;
-                }
-                
-                productsHTML += `
-                    <div class="card mb-2 product-card" data-code="${code}">
-                        <div class="card-body">
-                            <h5 class="mb-1">${code}</h5>
-                            <div class="text-muted small">${time}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            document.getElementById('product-list').innerHTML = productsHTML;
-            
-            // 添加产品卡片点击事件
-            document.querySelectorAll('.product-card').forEach(card => {
-                card.addEventListener('click', async function() {
-                    const code = this.getAttribute('data-code');
-                    try {
+            try {
+                // 查询产品详情
                 const productData = await getProductDetails(code);
+                
                 if (productData) {
+                    // 显示产品详情
                     showProductDetail(productData);
                 } else {
-                            showToast('无法获取产品详情', 'error');
+                    showToast('未找到该产品信息', 'error');
                 }
             } catch (error) {
-                        console.error('获取产品详情失败:', error);
-                        showToast('获取产品详情失败', 'error');
+                console.error('查询产品详情失败:', error);
+                showToast('查询失败，请重试', 'error');
             }
         });
     });
     
-        }).catch(error => {
-            console.error('加载产品列表失败:', error);
-            document.getElementById('product-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
-        });
-        
-    } catch (error) {
-        console.error('显示产品列表失败:', error);
-        document.getElementById('product-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
-    }
+    // 显示产品列表屏幕
+    showScreen(SCREENS.PRODUCTS);
 }
 
-// 查询用户本月完成的产品
+// 获取用户本月完成的产品
 async function getUserMonthlyProducts(employeeName, startDate, endDate) {
     try {
-        // 员工有可能没有完成任何工序，所以不能直接过滤员工字段
+        // 将日期转换为ISO格式字符串
+        const startDateStr = startDate.toISOString();
+        const endDateStr = endDate.toISOString();
+        
+        console.log('查询时间范围:', startDateStr, '至', endDateStr);
+        console.log('查询员工:', employeeName);
+        
+        // 查询员工完成的产品
         const { data, error } = await supabase
             .from('products')
-            .select();
+            .select('*')
+            .or(`绕线员工.eq.${employeeName},嵌线员工.eq.${employeeName},接线员工.eq.${employeeName},压装员工.eq.${employeeName},车止口员工.eq.${employeeName}`)
+            .order('产品编码');
         
         if (error) {
-            console.error('查询产品信息失败:', error);
+            console.error('查询产品失败:', error);
             return [];
         }
         
-        // 筛选出用户任意一个工序中作为员工的产品
-        const userProducts = data.filter(product => 
-            (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'])) ||
-            (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'])) ||
-            (product['接线员工'] === employeeName && isDateInRange(product['接线时间'])) ||
-            (product['压装员工'] === employeeName && isDateInRange(product['压装时间'])) ||
-            (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'])) ||
-            (employeeName === '' && isDateInRange(product['浸漆时间'])) // 浸漆特殊处理
-        );
-        
-        return userProducts;
+        // 在前端过滤日期范围
+        return (data || []).filter(product => {
+            // 检查该员工是否参与了这些工序，并且是在指定日期范围内
+            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'], startDate, endDate)) {
+                return true;
+            }
+            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'], startDate, endDate)) {
+                return true;
+            }
+            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'], startDate, endDate)) {
+                return true;
+            }
+            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'], startDate, endDate)) {
+                return true;
+            }
+            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'], startDate, endDate)) {
+                return true;
+            }
+            return false;
+        });
     } catch (error) {
-        console.error('查询用户本月完成的产品失败:', error);
+        console.error('获取用户本月产品失败:', error);
         return [];
     }
 }
@@ -1402,12 +1317,22 @@ async function handleDeleteRecords() {
         // 获取本月范围
         await getMonthRange();
         
+        // 隐藏流水账容器
+        document.getElementById('monthly-transactions-container').style.display = 'none';
+        
         // 显示加载中
         document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
         
+        // 获取当前用户全名
+        const fullName = localStorage.getItem('user_full_name');
+        if (!fullName) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">无法获取用户信息</div>';
+            return;
+        }
+        
         // 查询用户本月完成的产品
         const products = await getUserMonthlyProducts(
-            userState.fullName,
+            fullName,
             queryState.monthRange.startDate,
             queryState.monthRange.endDate
         );
@@ -1425,7 +1350,7 @@ async function handleDeleteRecords() {
             const productModel = product['产品型号'];
             
             // 检查各个工序
-            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1434,7 +1359,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1443,7 +1368,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1452,7 +1377,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1461,7 +1386,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
                     '产品型号': productModel,
@@ -1470,7 +1395,7 @@ async function handleDeleteRecords() {
                 });
             }
             
-            // 浸漆工序特殊处理（没有员工字段）
+            // 浸漆工序特殊处理
             if (isDateInRange(product['浸漆时间'])) {
                 processRecords.push({
                     '产品编码': productCode,
@@ -1492,7 +1417,7 @@ async function handleDeleteRecords() {
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="form-check">
-                            <input class="form-check-input record-checkbox" type="checkbox" value="${index}" id="record-${index}">
+                            <input class="form-check-input" type="checkbox" value="${index}" id="record-${index}" data-index="${index}">
                             <label class="form-check-label" for="record-${index}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -1524,46 +1449,109 @@ async function handleDeleteRecords() {
         document.getElementById('process-list').innerHTML = recordsHTML;
         
         // 添加复选框事件监听
-        const checkboxes = document.querySelectorAll('.record-checkbox');
+        const checkboxes = document.querySelectorAll('.form-check-input');
         const deleteButton = document.getElementById('delete-selected-records');
         
+        // 更新删除按钮文本的函数
+        function updateDeleteButtonText() {
+            // 使用更精确的选择器，确保只获取当前页面中的选中复选框
+            const checkedCount = document.querySelectorAll('#process-list .form-check-input:checked').length;
+            deleteButton.disabled = checkedCount === 0;
+            
+            // 只有在有选中记录时才显示数字
+            if (checkedCount > 0) {
+                deleteButton.textContent = `删除选中记录 (${checkedCount})`;
+            } else {
+                deleteButton.textContent = '删除选中记录';
+            }
+            
+            console.log('当前选中的记录数:', checkedCount);
+        }
+        
+        // 在绑定事件前，先确保移除所有现有事件，避免事件重复绑定
         checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
-                deleteButton.disabled = checkedCount === 0;
-            });
+            // 克隆并替换节点，以移除所有事件监听器
+            const newCheckbox = checkbox.cloneNode(true);
+            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
         });
+        
+        // 重新获取复选框元素（因为上面已经替换过了）
+        const refreshedCheckboxes = document.querySelectorAll('.form-check-input');
+        
+        // 为每个复选框添加事件
+        refreshedCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateDeleteButtonText);
+        });
+        
+        // 初始化按钮状态
+        updateDeleteButtonText();
+        
+        // 将processRecords存储在按钮上，以便在点击事件中使用
+        deleteButton.processRecords = processRecords;
         
         // 添加删除按钮事件监听
         deleteButton.addEventListener('click', async function() {
-            const selectedRecords = [];
+            // 禁用删除按钮，防止重复点击
+            this.disabled = true;
             
-            // 获取所有选中的记录索引
-            document.querySelectorAll('.record-checkbox:checked').forEach(checkbox => {
-                const index = parseInt(checkbox.value, 10);
+            // 从按钮中获取processRecords
+            const processRecords = this.processRecords;
+            if (!processRecords || !Array.isArray(processRecords)) {
+                console.error('无法获取处理记录数据');
+                showToast('无法获取处理记录数据，请刷新页面重试', 'error');
+                this.disabled = false;
+                return;
+            }
+            
+            // 重新获取选中的复选框，使用与updateDeleteButtonText相同的选择器
+            const selectedRecords = [];
+            const checkedBoxes = document.querySelectorAll('#process-list .form-check-input:checked');
+            
+            checkedBoxes.forEach((checkbox) => {
+                // 安全地解析索引，确保是有效的数字
+                const indexStr = checkbox.getAttribute('data-index');
+                const index = indexStr !== null ? parseInt(indexStr, 10) : NaN;
+                
+                // 检查索引是否为有效数字且在数组范围内
                 if (!isNaN(index) && index >= 0 && index < processRecords.length) {
                     selectedRecords.push(processRecords[index]);
+                } else {
+                    console.warn(`无效的索引: ${index}, processRecords长度: ${processRecords.length}, 原始值: ${indexStr}`);
                 }
             });
             
-            if (selectedRecords.length === 0) {
+            console.log('选中的记录:', selectedRecords);
+            
+            const selectedCount = selectedRecords.length;
+            
+            if (selectedCount === 0) {
                 showToast('请选择要删除的记录', 'warning');
+                this.disabled = false;
                 return;
             }
             
-            if (!confirm(`确定要删除选中的 ${selectedRecords.length} 条记录吗？`)) {
+            if (!confirm(`确定要删除选中的 ${selectedCount} 条记录吗？`)) {
+                this.disabled = false;
                 return;
             }
+            
+            this.textContent = '删除中...';
             
             try {
                 let successCount = 0;
                 let failureCount = 0;
                 
                 for (const record of selectedRecords) {
+                    if (!record || typeof record !== 'object' || !record['产品编码']) {
+                        console.error('无效的记录数据:', record);
+                        failureCount++;
+                        continue;
+                    }
+                    
                     const success = await deleteProductProcess(
                         record['产品编码'],
                         record['工序'],
-                        userState.fullName
+                        fullName
                     );
                     
                     if (success) {
@@ -1575,11 +1563,15 @@ async function handleDeleteRecords() {
                 
                 showToast(`删除完成: 成功 ${successCount} 条, 失败 ${failureCount} 条`, 'info');
                 
-                // 重新加载记录
-                handleDeleteRecords();
+                // 延迟一下再重新加载记录
+                setTimeout(() => {
+                    handleDeleteRecords();
+                }, 1000);
             } catch (error) {
                 console.error('删除记录失败:', error);
                 showToast('删除记录失败，请重试', 'error');
+                this.disabled = false;
+                updateDeleteButtonText();
             }
         });
         
@@ -1589,81 +1581,283 @@ async function handleDeleteRecords() {
     }
 }
 
-// 删除产品工序记录
+// 删除产品工序信息
 async function deleteProductProcess(productCode, processType, employeeName) {
     try {
         // 确定字段名称
-        const { employeeField, timeField } = getProcessFields(processType);
+        let employeeField = '';
+        let timeField = '';
         
-        // 先查询产品信息，检查工序字段是否已有数据
-        const { data: productData, error: queryError } = await supabase
+        switch (processType) {
+            case '绕线':
+                employeeField = '绕线员工';
+                timeField = '绕线时间';
+                break;
+            case '嵌线':
+                employeeField = '嵌线员工';
+                timeField = '嵌线时间';
+                break;
+            case '接线':
+                employeeField = '接线员工';
+                timeField = '接线时间';
+                break;
+            case '压装':
+                employeeField = '压装员工';
+                timeField = '压装时间';
+                break;
+            case '车止口':
+                employeeField = '车止口员工';
+                timeField = '车止口时间';
+                break;
+            case '浸漆':
+                timeField = '浸漆时间';
+                employeeField = '浸漆员工';
+                break;
+            default:
+                console.error('未知工序类型:', processType);
+                return false;
+        }
+        
+        // 检查是否是当前用户的工序
+        const { data: product, error: queryError } = await supabase
             .from('products')
             .select()
             .eq('产品编码', productCode)
             .maybeSingle();
         
         if (queryError) {
-            console.error('查询产品信息失败:', queryError);
+            console.error('查询产品失败:', queryError);
             return false;
         }
         
-        // 如果找不到产品，返回失败
-        if (!productData) {
+        if (!product) {
             console.error('产品不存在:', productCode);
             return false;
         }
         
-        // 检查是否是本人操作的工序
-        if (employeeField && productData[employeeField] !== employeeName) {
-            console.error('非本人操作的工序，无权删除:', productCode, processType);
+        // 检查是否是当前用户的工序 - 浸漆工序特殊处理
+        if (employeeField && processType !== '浸漆' && product[employeeField] !== employeeName) {
+            console.error('不是当前用户的工序:', productCode, processType, product[employeeField], employeeName);
             return false;
         }
         
-        // 准备更新数据（清空字段）
+        // 清除工序信息
         const updateData = {};
-        
-        // 清空时间字段
         updateData[timeField] = null;
         
-        // 清空员工字段（如果有）
+        // 只有在员工字段存在的情况下才更新
         if (employeeField) {
             updateData[employeeField] = null;
         }
         
-        // 执行更新
+        console.log('更新产品数据:', productCode, updateData);
+        
         const { error: updateError } = await supabase
             .from('products')
             .update(updateData)
             .eq('产品编码', productCode);
         
         if (updateError) {
-            console.error('删除产品工序记录失败:', updateError);
+            console.error('更新产品失败:', updateError);
             return false;
         }
         
+        console.log('删除产品工序成功:', productCode, processType);
         return true;
     } catch (error) {
-        console.error('删除产品工序记录失败:', error);
+        console.error('删除产品工序信息失败:', error);
         return false;
     }
 }
 
-// 获取工序对应的图标
+// 获取工序图标
 function getProcessIcon(process) {
+    let iconClass = '';
+    let iconColor = '';
+    
     switch (process) {
         case '绕线':
-            return '<i class="bi bi-arrow-repeat text-primary" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-rotate-right';
+            iconColor = 'text-primary';
+            break;
         case '嵌线':
-            return '<i class="bi bi-layers text-success" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-cable';
+            iconColor = 'text-success';
+            break;
         case '接线':
-            return '<i class="bi bi-link text-warning" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-power';
+            iconColor = 'text-warning';
+            break;
         case '压装':
-            return '<i class="bi bi-arrow-down-circle text-info" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-compress';
+            iconColor = 'text-danger';
+            break;
         case '车止口':
-            return '<i class="bi bi-tools text-secondary" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-scissors';
+            iconColor = 'text-info';
+            break;
         case '浸漆':
-            return '<i class="bi bi-droplet text-danger" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-droplet';
+            iconColor = 'text-secondary';
+            break;
         default:
-            return '<i class="bi bi-question-circle" style="font-size: 1.5rem;"></i>';
+            iconClass = 'bi-gear';
+            iconColor = 'text-muted';
     }
+    
+    return `<i class="bi ${iconClass} ${iconColor}" style="font-size: 1.5rem;"></i>`;
+}
+
+// 加载本月流水账
+async function loadMonthlyTransactionList() {
+    try {
+        // 获取当前用户信息 - 修复用户信息获取方式
+        const fullName = localStorage.getItem('user_full_name');
+        if (!fullName) {
+            console.error('无法获取用户信息');
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息，请重新登录</div>';
+            return;
+        }
+
+        // 显示加载提示
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
+
+        // 获取本月范围
+        await getMonthRange();
+
+        // 查询数据库获取产品记录
+        const { data: products, error } = await supabase
+            .from('products')
+            .select('*')
+            .or(`绕线员工.eq.${fullName},嵌线员工.eq.${fullName},接线员工.eq.${fullName},压装员工.eq.${fullName},车止口员工.eq.${fullName}`)
+            .order('产品编码');
+
+        if (error) {
+            console.error('加载产品记录失败:', error);
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
+            return;
+        }
+
+        // 筛选当前用户处理的记录，确保在时间范围内
+        const userRecords = [];
+
+        products.forEach(product => {
+            // 检查每个工序，如果该用户参与了处理，则添加记录
+            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
+                userRecords.push({
+                    process: '绕线',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['绕线时间']
+                });
+            }
+            
+            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
+                userRecords.push({
+                    process: '嵌线',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['嵌线时间']
+                });
+            }
+            
+            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
+                userRecords.push({
+                    process: '接线',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['接线时间']
+                });
+            }
+            
+            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
+                userRecords.push({
+                    process: '压装',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['压装时间']
+                });
+            }
+            
+            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
+                userRecords.push({
+                    process: '车止口',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['车止口时间']
+                });
+            }
+            
+            if (isDateInRange(product['浸漆时间'])) {
+                userRecords.push({
+                    process: '浸漆',
+                    productCode: product['产品编码'],
+                    model: product['产品型号'] || '未知型号',
+                    time: product['浸漆时间']
+                });
+            }
+        });
+
+        // 按时间排序（最新的在前）
+        userRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        // 构建HTML表格
+        let html = '';
+        if (userRecords.length === 0) {
+            html = '<div class="alert alert-info">本月无记录</div>';
+        } else {
+            // 创建一个响应式表格
+            html = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">工序</th>
+                                <th scope="col">产品编码</th>
+                                <th scope="col">型号</th>
+                                <th scope="col">时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            userRecords.forEach(record => {
+                // 格式化时间
+                const recordDate = new Date(record.time);
+                const formattedDate = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordDate.getHours()).padStart(2, '0')}:${String(recordDate.getMinutes()).padStart(2, '0')}`;
+                
+                html += `
+                    <tr>
+                        <td>${record.process}</td>
+                        <td>${record.productCode}</td>
+                        <td>${record.model}</td>
+                        <td>${formattedDate}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 更新DOM
+        document.getElementById('monthly-transactions-container').innerHTML = html;
+
+    } catch (error) {
+        console.error('加载流水账失败:', error);
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
+    }
+}
+
+// 在showMonthlyQuery函数中添加对loadMonthlyTransactionList的调用
+function showMonthlyQuery() {
+    showScreen(SCREENS.MONTHLY_QUERY);
+    loadCurrentMonthRange();
+    displayMonthRange();
+    loadUserMonthlyProcesses();
+    // 加载本月流水账
+    loadMonthlyTransactionList();
 } 
