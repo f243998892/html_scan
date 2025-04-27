@@ -1,8 +1,14 @@
 // 全局变量
-const SUPABASE_URL = 'https://mirilhunybcsydhtowqo.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcmlsaHVueWJjc3lkaHRvd3FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNjk3MzEsImV4cCI6MjA1Njg0NTczMX0.fQCOraXJXQFshRXxHf2N-VIwTSbEc1hrxXzHP4sIIAw';
-// 初始化Supabase客户端
-let supabase;
+const DB_CONFIG = {
+    host: 's5.gnip.vip',
+    port: 33946,
+    database: 'postgres',
+    user: 'postgres',
+    password: 'postgres'
+};
+const HTTP_API_URL = 'http://www.fanghui8131.fun';
+// 初始化PostgreSQL客户端
+let dbClient;
 
 // 存储当前用户信息
 const userState = {
@@ -41,10 +47,17 @@ const SCREENS = {
 
 // 初始化应用
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化Supabase - 使用完全限定的访问方式
-    supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 初始化数据库连接
+    initDbConnection();
     initApp();
 });
+
+// 初始化数据库连接
+function initDbConnection() {
+    // 在这里我们将使用HTTP API而不是直接连接数据库
+    // 所有数据库操作都通过HTTP API进行
+    console.log('数据库连接已初始化');
+}
 
 // 初始化应用
 async function initApp() {
@@ -515,53 +528,33 @@ async function updateProductProcess(productCode, processType, employeeName) {
         // 确定字段名称
         const { employeeField, timeField } = getProcessFields(processType);
         
-        // 先查询产品信息，检查工序字段是否已有数据
-        const { data: productData, error: queryError } = await supabase
-            .from('products')
-            .select()
-            .eq('产品编码', productCode)
-            .maybeSingle();
+        // 准备请求数据
+        const updateData = {
+            productCode: productCode,
+            processType: processType,
+            employeeName: employeeName,
+            timeField: timeField,
+            employeeField: employeeField,
+            timestamp: getCurrentISOTimeString()
+        };
         
-        if (queryError) {
-            console.error('查询产品信息失败:', queryError);
+        // 发送HTTP请求到API
+        const response = await fetch(`${HTTP_API_URL}/api/updateProductProcess`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            console.error('更新产品信息失败:', result.error);
             return false;
         }
         
-        // 如果找不到产品，返回失败
-        if (!productData) {
-            console.error('产品不存在:', productCode);
-            return false;
-        }
-        
-        // 检查工序字段是否已有数据
-        if (productData[timeField]) {
-            console.error('该产品的该工序已存在数据，不能覆盖:', productCode, timeField);
-            return false;
-        }
-        
-        // 准备更新数据
-        const updateData = {};
-        
-        // 设置当前时间
-        updateData[timeField] = getCurrentISOTimeString();
-        
-        // 只有在员工字段存在的情况下才更新
-        if (employeeField) {
-            updateData[employeeField] = employeeName;
-        }
-        
-        // 执行更新
-        const { error: updateError } = await supabase
-            .from('products')
-            .update(updateData)
-            .eq('产品编码', productCode);
-        
-        if (updateError) {
-            console.error('更新产品信息失败:', updateError);
-            return false;
-        }
-        
-        return true;
+        return result.success;
     } catch (error) {
         console.error('更新产品信息失败:', error);
         return false;
@@ -572,17 +565,35 @@ async function updateProductProcess(productCode, processType, employeeName) {
 async function batchUpdateProductProcess(productCodes, processType, employeeName) {
     const results = [];
     
-    for (const code of productCodes) {
-        try {
-            const success = await updateProductProcess(code, processType, employeeName);
-            results.push({ code, success });
-        } catch (error) {
-            console.error(`批量更新产品 ${code} 失败:`, error);
-            results.push({ code, success: false });
-        }
-    }
+    // 准备请求数据
+    const batchData = {
+        productCodes: productCodes,
+        processType: processType,
+        employeeName: employeeName
+    };
     
-    return results;
+    try {
+        // 发送HTTP请求到API
+        const response = await fetch(`${HTTP_API_URL}/api/batchUpdateProductProcess`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(batchData)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            console.error('批量更新产品信息失败:', result.error);
+            return productCodes.map(code => ({ code, success: false }));
+        }
+        
+        return result.results;
+    } catch (error) {
+        console.error('批量更新产品信息失败:', error);
+        return productCodes.map(code => ({ code, success: false }));
+    }
 }
 
 // 获取工序对应的字段名
@@ -627,18 +638,15 @@ function getProcessFields(processType) {
 // 查询产品详情
 async function getProductDetails(productCode) {
     try {
-        const { data, error } = await supabase
-            .from('products')
-            .select()
-            .eq('产品编码', productCode)
-            .maybeSingle();
+        const response = await fetch(`${HTTP_API_URL}/api/getProductDetails?productCode=${encodeURIComponent(productCode)}`);
         
-        if (error) {
-            console.error('查询产品详情失败:', error);
+        if (!response.ok) {
+            console.error('查询产品详情失败:', response.statusText);
             return null;
         }
         
-        return data;
+        const result = await response.json();
+        return result.data;
     } catch (error) {
         console.error('查询产品详情失败:', error);
         return null;
@@ -891,35 +899,15 @@ function showProductDetail(product) {
     productDetailModal.show();
 }
 
-// 获取本月日期范围
+// 修改getMonthRange函数
 async function getMonthRange() {
     try {
-        // 尝试从数据库获取自定义月份范围
-        const { data, error } = await supabase
-            .from('month_range')
-            .select('*')
-            .order('id', { ascending: false })
-            .limit(1)
-            .single();
-        
-        if (error) {
-            console.error('获取月份范围失败:', error);
-            // 使用默认的本月范围
-            setDefaultMonthRange();
-            return;
-        }
-        
-        if (data && data.start_date && data.end_date) {
-            queryState.monthRange.startDate = new Date(data.start_date);
-            queryState.monthRange.endDate = new Date(data.end_date);
-        } else {
-            // 使用默认的本月范围
-            setDefaultMonthRange();
-        }
+        // 直接设置默认范围而不是从supabase获取
+        setDefaultMonthRange();
+        return true;
     } catch (error) {
         console.error('获取月份范围失败:', error);
-        // 使用默认的本月范围
-        setDefaultMonthRange();
+        return false;
     }
 }
 
@@ -1270,38 +1258,16 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
         console.log('查询时间范围:', startDateStr, '至', endDateStr);
         console.log('查询员工:', employeeName);
         
-        // 查询员工完成的产品
-        const { data, error } = await supabase
-            .from('products')
-            .select('*')
-            .or(`绕线员工.eq.${employeeName},嵌线员工.eq.${employeeName},接线员工.eq.${employeeName},压装员工.eq.${employeeName},车止口员工.eq.${employeeName}`)
-            .order('产品编码');
+        // 使用HTTP API查询员工完成的产品
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyProducts?employeeName=${encodeURIComponent(employeeName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
         
-        if (error) {
-            console.error('查询产品失败:', error);
+        if (!response.ok) {
+            console.error('查询产品失败:', response.statusText);
             return [];
         }
         
-        // 在前端过滤日期范围
-        return (data || []).filter(product => {
-            // 检查该员工是否参与了这些工序，并且是在指定日期范围内
-            if (product['绕线员工'] === employeeName && isDateInRange(product['绕线时间'], startDate, endDate)) {
-                return true;
-            }
-            if (product['嵌线员工'] === employeeName && isDateInRange(product['嵌线时间'], startDate, endDate)) {
-                return true;
-            }
-            if (product['接线员工'] === employeeName && isDateInRange(product['接线时间'], startDate, endDate)) {
-                return true;
-            }
-            if (product['压装员工'] === employeeName && isDateInRange(product['压装时间'], startDate, endDate)) {
-                return true;
-            }
-            if (product['车止口员工'] === employeeName && isDateInRange(product['车止口时间'], startDate, endDate)) {
-                return true;
-            }
-            return false;
-        });
+        const result = await response.json();
+        return result.data || [];
     } catch (error) {
         console.error('获取用户本月产品失败:', error);
         return [];
@@ -1618,52 +1584,33 @@ async function deleteProductProcess(productCode, processType, employeeName) {
                 return false;
         }
         
-        // 检查是否是当前用户的工序
-        const { data: product, error: queryError } = await supabase
-            .from('products')
-            .select()
-            .eq('产品编码', productCode)
-            .maybeSingle();
+        // 准备请求数据
+        const deleteData = {
+            productCode: productCode,
+            processType: processType,
+            employeeName: employeeName,
+            timeField: timeField,
+            employeeField: employeeField
+        };
         
-        if (queryError) {
-            console.error('查询产品失败:', queryError);
-            return false;
-        }
+        // 发送HTTP请求到API
+        const response = await fetch(`${HTTP_API_URL}/api/deleteProductProcess`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(deleteData)
+        });
         
-        if (!product) {
-            console.error('产品不存在:', productCode);
-            return false;
-        }
+        const result = await response.json();
         
-        // 检查是否是当前用户的工序 - 浸漆工序特殊处理
-        if (employeeField && processType !== '浸漆' && product[employeeField] !== employeeName) {
-            console.error('不是当前用户的工序:', productCode, processType, product[employeeField], employeeName);
-            return false;
-        }
-        
-        // 清除工序信息
-        const updateData = {};
-        updateData[timeField] = null;
-        
-        // 只有在员工字段存在的情况下才更新
-        if (employeeField) {
-            updateData[employeeField] = null;
-        }
-        
-        console.log('更新产品数据:', productCode, updateData);
-        
-        const { error: updateError } = await supabase
-            .from('products')
-            .update(updateData)
-            .eq('产品编码', productCode);
-        
-        if (updateError) {
-            console.error('更新产品失败:', updateError);
+        if (!response.ok) {
+            console.error('删除产品工序失败:', result.error);
             return false;
         }
         
         console.log('删除产品工序成功:', productCode, processType);
-        return true;
+        return result.success;
     } catch (error) {
         console.error('删除产品工序信息失败:', error);
         return false;
@@ -1724,79 +1671,22 @@ async function loadMonthlyTransactionList() {
 
         // 获取本月范围
         await getMonthRange();
+        
+        // 将日期转换为ISO格式字符串
+        const startDateStr = queryState.monthRange.startDate.toISOString();
+        const endDateStr = queryState.monthRange.endDate.toISOString();
 
-        // 查询数据库获取产品记录
-        const { data: products, error } = await supabase
-            .from('products')
-            .select('*')
-            .or(`绕线员工.eq.${fullName},嵌线员工.eq.${fullName},接线员工.eq.${fullName},压装员工.eq.${fullName},车止口员工.eq.${fullName}`)
-            .order('产品编码');
+        // 使用HTTP API查询数据库获取产品记录
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
 
-        if (error) {
-            console.error('加载产品记录失败:', error);
+        if (!response.ok) {
+            console.error('加载产品记录失败:', response.statusText);
             document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
             return;
         }
 
-        // 筛选当前用户处理的记录，确保在时间范围内
-        const userRecords = [];
-
-        products.forEach(product => {
-            // 检查每个工序，如果该用户参与了处理，则添加记录
-            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
-                userRecords.push({
-                    process: '绕线',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['绕线时间']
-                });
-            }
-            
-            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
-                userRecords.push({
-                    process: '嵌线',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['嵌线时间']
-                });
-            }
-            
-            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
-                userRecords.push({
-                    process: '接线',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['接线时间']
-                });
-            }
-            
-            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
-                userRecords.push({
-                    process: '压装',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['压装时间']
-                });
-            }
-            
-            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
-                userRecords.push({
-                    process: '车止口',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['车止口时间']
-                });
-            }
-            
-            if (isDateInRange(product['浸漆时间'])) {
-                userRecords.push({
-                    process: '浸漆',
-                    productCode: product['产品编码'],
-                    model: product['产品型号'] || '未知型号',
-                    time: product['浸漆时间']
-                });
-            }
-        });
+        const result = await response.json();
+        const userRecords = result.data || [];
 
         // 按时间排序（最新的在前）
         userRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
