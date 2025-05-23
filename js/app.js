@@ -501,6 +501,45 @@ function startScan(processType, isContinuous) {
     
     // 确保浮动工序框在扫码页面也显示
     createFloatingProcess();
+    
+    // 创建独立的闪光灯按钮
+    createLightButton();
+}
+
+// 创建独立的闪光灯按钮
+function createLightButton() {
+    console.log('创建独立闪光灯按钮');
+    
+    // 先移除可能存在的按钮
+    const existingBtn = document.getElementById('torch-button');
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+    
+    // 创建新按钮
+    const lightBtn = document.createElement('button');
+    lightBtn.id = 'torch-button';
+    lightBtn.className = 'torch-button';
+    lightBtn.textContent = '补光灯';
+    
+    // 添加到body
+    document.body.appendChild(lightBtn);
+    
+    // 添加点击事件
+    lightBtn.addEventListener('click', function() {
+        console.log('闪光灯按钮被点击');
+        
+        if (!scanState.currentHtml5QrScanner) {
+            console.log('扫码器未初始化，无法操作闪光灯');
+            showToast('扫码器未就绪，无法操作闪光灯', 'warning');
+            return;
+        }
+        
+        // 尝试切换闪光灯
+        toggleTorch(scanState.currentHtml5QrScanner, lightBtn);
+    });
+    
+    console.log('闪光灯按钮添加成功');
 }
 
 // 初始化扫码器
@@ -514,8 +553,8 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 添加闪光灯按钮
-    addTorchButton(scannerContainer, html5QrCode);
+    // 不再在这里添加闪光灯按钮，而是独立添加
+    // addTorchButton(scannerContainer, html5QrCode);
     
     // 为所有类型扫码增加手动输入功能
     addManualInputField();
@@ -626,73 +665,6 @@ function initializeScanner() {
     });
 }
 
-// 添加闪光灯按钮
-function addTorchButton(container, scanner) {
-    // 先检查是否存在旧按钮，存在则移除
-    const existingButton = document.getElementById('torch-button');
-    if (existingButton) {
-        existingButton.remove();
-    }
-    
-    // 创建闪光灯按钮
-    const torchButton = document.createElement('button');
-    torchButton.id = 'torch-button';
-    torchButton.className = 'torch-button';
-    torchButton.innerHTML = '<i class="bi bi-lightbulb"></i>';
-    torchButton.title = '开启补光灯';
-    torchButton.type = 'button';
-    
-    // 保存闪光灯状态
-    let isTorchOn = false;
-    
-    // 添加按钮点击事件
-    torchButton.addEventListener('click', () => {
-        toggleTorch(scanner, torchButton);
-    });
-    
-    // 添加按钮到body，而不是容器
-    document.body.appendChild(torchButton);
-    
-    // 显示提示
-    setTimeout(() => {
-        showToast('点击右下角橙色按钮可开启补光灯', 'info', 3000);
-    }, 1000);
-}
-
-// 切换闪光灯状态
-async function toggleTorch(scanner, button) {
-    try {
-        // 获取当前闪光灯状态
-        const torchState = await scanner.getTorchState();
-        const newState = !torchState;
-        
-        // 切换闪光灯状态
-        await scanner.toggleFlash();
-        
-        // 更新按钮状态
-        if (newState) {
-            // 闪光灯开启
-            button.classList.add('active');
-            button.innerHTML = '<i class="bi bi-lightbulb-fill"></i>';
-            button.title = '关闭补光灯';
-            button.setAttribute('data-status', '开');
-            button.style.animation = 'none'; // 停止脉动动画
-            showToast('补光灯已开启', 'success', 1000);
-        } else {
-            // 闪光灯关闭
-            button.classList.remove('active');
-            button.innerHTML = '<i class="bi bi-lightbulb"></i>';
-            button.title = '开启补光灯';
-            button.setAttribute('data-status', '关');
-            button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
-            showToast('补光灯已关闭', 'info', 1000);
-        }
-    } catch (error) {
-        console.error('切换闪光灯失败:', error);
-        showToast('您的设备不支持闪光灯或无法访问', 'error');
-    }
-}
-
 // 检测设备性能
 async function checkDevicePerformance() {
     try {
@@ -713,6 +685,61 @@ async function checkDevicePerformance() {
     } catch (error) {
         console.error('性能检测失败:', error);
         return false; // 默认不是低端设备
+    }
+}
+
+// 切换闪光灯状态
+async function toggleTorch(scanner, button) {
+    try {
+        // 检查是否初始化了扫码器
+        if (!scanner) {
+            console.error('扫码器未初始化，无法操作闪光灯');
+            showToast('扫码器未就绪，无法操作闪光灯', 'warning');
+            return;
+        }
+        
+        console.log('尝试切换闪光灯状态');
+        
+        // 获取当前闪光灯状态
+        let torchState = false;
+        try {
+            torchState = await scanner.getTorchState();
+            console.log('当前闪光灯状态:', torchState);
+        } catch (stateError) {
+            console.error('获取闪光灯状态失败:', stateError);
+        }
+        
+        const newState = !torchState;
+        
+        // 切换闪光灯状态
+        try {
+            await scanner.toggleFlash();
+            console.log('闪光灯状态已切换为:', newState ? '开' : '关');
+        } catch (toggleError) {
+            console.error('切换闪光灯失败:', toggleError);
+            showToast('闪光灯切换失败，可能不支持此功能', 'error');
+            return;
+        }
+        
+        // 更新按钮状态
+        if (newState) {
+            // 闪光灯开启
+            button.classList.add('active');
+            button.textContent = '关闭灯';
+            button.style.backgroundColor = '#4caf50'; // 绿色
+            button.style.animation = 'none'; // 停止脉动动画
+            showToast('补光灯已开启', 'success', 1000);
+        } else {
+            // 闪光灯关闭
+            button.classList.remove('active');
+            button.textContent = '补光灯';
+            button.style.backgroundColor = '#ff5722'; // 恢复橙色
+            button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
+            showToast('补光灯已关闭', 'info', 1000);
+        }
+    } catch (error) {
+        console.error('切换闪光灯操作失败:', error);
+        showToast('无法操作闪光灯，设备可能不支持', 'error');
     }
 }
 
@@ -964,36 +991,41 @@ function stopScan() {
     if (scanState.isContinuous && scanState.pendingCodes.length > 0) {
         if (confirm('是否放弃上传？')) {
             scanState.pendingCodes = [];
-            stopScanner().then(() => {
-                // 只有在非查询模式下才移除手动输入框
-                if (scanState.processType !== 'query') {
-                    const existingInputs = document.querySelectorAll('#manual-input-container');
-                    existingInputs.forEach(element => element.remove());
-                }
-                
-                // 修改：直接返回主页
-                showScreen(SCREENS.HOME);
-            }).catch(error => {
-                console.error('停止扫码器出错:', error);
-                // 即使出错也返回主页
-                showScreen(SCREENS.HOME);
-            });
+            cleanupScanResources(); // 使用统一的清理函数
+            // 修改：直接返回主页
+            showScreen(SCREENS.HOME);
         }
     } else {
+        cleanupScanResources(); // 使用统一的清理函数
+        // 修改：直接返回主页
+        showScreen(SCREENS.HOME);
+    }
+}
+
+// 清理扫码相关资源
+function cleanupScanResources() {
+    // 移除闪光灯按钮
+    const torchButton = document.getElementById('torch-button');
+    if (torchButton) {
+        console.log("移除闪光灯按钮");
+        torchButton.remove();
+    }
+    
+    // 停止扫码器
+    if (scanState.currentHtml5QrScanner) {
         stopScanner().then(() => {
+            console.log("扫码器已停止");
+            
             // 只有在非查询模式下才移除手动输入框
             if (scanState.processType !== 'query') {
                 const existingInputs = document.querySelectorAll('#manual-input-container');
                 existingInputs.forEach(element => element.remove());
             }
-            
-            // 修改：直接返回主页
-            showScreen(SCREENS.HOME);
         }).catch(error => {
             console.error('停止扫码器出错:', error);
-            // 即使出错也返回主页
-            showScreen(SCREENS.HOME);
         });
+    } else {
+        console.log("没有活动的扫码器");
     }
 }
 

@@ -185,21 +185,25 @@
         /* 闪光灯按钮样式 - 改为更醒目的样式 */
         .torch-button {
             position: fixed; /* 改为固定位置 */
-            bottom: 80px;
+            bottom: 100px;
             right: 20px;
-            background-color: rgba(255, 87, 34, 0.9); /* 橙色背景更醒目 */
+            background-color: #ff5722; /* 更亮的橙色 */
             color: white;
-            border: none;
+            border: 3px solid #fff; /* 白色边框 */
             border-radius: 50%;
-            width: 70px; /* 增大尺寸 */
-            height: 70px; /* 增大尺寸 */
-            display: flex;
+            width: 80px; /* 进一步增大尺寸 */
+            height: 80px; /* 进一步增大尺寸 */
+            display: flex !important; /* 强制显示 */
             align-items: center;
             justify-content: center;
-            font-size: 2rem; /* 增大图标 */
-            box-shadow: 0 4px 10px rgba(255, 87, 34, 0.7); /* 更明显的阴影 */
-            z-index: 1000; /* 确保在最上层 */
+            font-size: 1.2rem; /* 文字大小 */
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 87, 34, 0.9); /* 更强的阴影 */
+            z-index: 9999 !important; /* 确保最顶层 */
             animation: pulse 1.5s infinite; /* 添加脉动效果 */
+            visibility: visible !important; /* 强制可见 */
+            opacity: 1 !important; /* 强制不透明 */
+            pointer-events: auto !important; /* 确保可点击 */
         }
         
         @keyframes pulse {
@@ -222,19 +226,11 @@
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.8);
         }
         
-        .torch-button::after {
+        /* 修改为明确的文字说明，不再依赖伪元素 */
+        .torch-button::before {
             content: '补光灯';
-            position: absolute;
-            bottom: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            white-space: nowrap;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: bold;
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 3px 8px;
-            border-radius: 10px;
         }
         
         /* 扫码容器相对定位，以便放置闪光灯按钮 */
