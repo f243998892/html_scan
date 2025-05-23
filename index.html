@@ -182,33 +182,123 @@
             box-shadow: 0 3px 6px rgba(0,0,0,0.16);
         }
         
-        /* 闪光灯按钮样式 */
+        /* 闪光灯按钮样式 - 改为更醒目的样式 */
         .torch-button {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.6);
+            position: fixed; /* 改为固定位置 */
+            bottom: 80px;
+            right: 20px;
+            background-color: rgba(255, 87, 34, 0.9); /* 橙色背景更醒目 */
             color: white;
             border: none;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 70px; /* 增大尺寸 */
+            height: 70px; /* 增大尺寸 */
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            z-index: 100;
+            font-size: 2rem; /* 增大图标 */
+            box-shadow: 0 4px 10px rgba(255, 87, 34, 0.7); /* 更明显的阴影 */
+            z-index: 1000; /* 确保在最上层 */
+            animation: pulse 1.5s infinite; /* 添加脉动效果 */
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 4px 10px rgba(255, 87, 34, 0.7);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 4px 20px rgba(255, 87, 34, 0.9);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 4px 10px rgba(255, 87, 34, 0.7);
+            }
         }
         
         .torch-button.active {
-            background-color: #ff5722;
-            box-shadow: 0 0 10px rgba(255, 87, 34, 0.7);
+            background-color: #4caf50; /* 绿色表示已开启 */
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.8);
+        }
+        
+        .torch-button::after {
+            content: '补光灯';
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 3px 8px;
+            border-radius: 10px;
         }
         
         /* 扫码容器相对定位，以便放置闪光灯按钮 */
         #scanner-container {
             position: relative;
+        }
+        
+        /* 浮动工序提醒框样式 */
+        .floating-process {
+            position: fixed;
+            background-color: rgba(138, 43, 226, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 999;
+            pointer-events: none; /* 不可选中 */
+            user-select: none; /* 禁止选择文本 */
+            animation: float-blink 2s infinite, process-bounce 15s linear infinite;
+        }
+        
+        @keyframes float-blink {
+            0%, 100% { 
+                background-color: rgba(138, 43, 226, 0.9);
+                box-shadow: 0 5px 15px rgba(138, 43, 226, 0.5);
+            }
+            50% { 
+                background-color: rgba(255, 87, 34, 0.9);
+                box-shadow: 0 5px 20px rgba(255, 87, 34, 0.7);
+            }
+        }
+        
+        @keyframes process-bounce {
+            0%, 100% {
+                transform: translate(0, 0);
+            }
+            10% {
+                transform: translate(20vw, 15vh);
+            }
+            20% {
+                transform: translate(-10vw, 30vh);
+            }
+            30% {
+                transform: translate(30vw, 5vh);
+            }
+            40% {
+                transform: translate(10vw, -15vh);
+            }
+            50% {
+                transform: translate(-20vw, 10vh);
+            }
+            60% {
+                transform: translate(25vw, 25vh);
+            }
+            70% {
+                transform: translate(-30vw, -5vh);
+            }
+            80% {
+                transform: translate(5vw, -25vh);
+            }
+            90% {
+                transform: translate(-25vw, -20vh);
+            }
         }
     </style>
 </head>

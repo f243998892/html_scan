@@ -273,6 +273,9 @@ function navigateToHome() {
         
         // 显示主屏幕
         showScreen(SCREENS.HOME);
+        
+        // 创建浮动工序名称框
+        createFloatingProcess();
     } catch (error) {
         console.error('导航到首页失败:', error);
     }
@@ -320,20 +323,39 @@ function showScreen(screenId) {
     try {
         console.log('切换到页面:', screenId);
         
-    // 隐藏所有屏幕
-    Object.values(SCREENS).forEach(id => {
-        document.getElementById(id).classList.add('d-none');
-    });
-    
-    // 显示目标屏幕
-    document.getElementById(screenId).classList.remove('d-none');
+        // 隐藏所有屏幕
+        Object.values(SCREENS).forEach(id => {
+            document.getElementById(id).classList.add('d-none');
+        });
+        
+        // 显示目标屏幕
+        document.getElementById(screenId).classList.remove('d-none');
         
         // 隐藏所有模态框
         hideAllModals();
-    
-    // 如果切换回首页，停止扫码
-    if (screenId === SCREENS.HOME && scanState.currentHtml5QrScanner) {
-        stopScanner();
+        
+        // 如果切换回首页，停止扫码
+        if (screenId === SCREENS.HOME && scanState.currentHtml5QrScanner) {
+            stopScanner();
+        }
+        
+        // 在查询页面隐藏浮动工序框，其他页面显示
+        const floatingProcessEl = document.getElementById('floating-process');
+        if (floatingProcessEl) {
+            if (screenId === SCREENS.QUERY || 
+                screenId === SCREENS.MODELS || 
+                screenId === SCREENS.PRODUCTS ||
+                screenId === SCREENS.DELETE_RECORDS) {
+                floatingProcessEl.style.display = 'none';
+            } else {
+                floatingProcessEl.style.display = 'block';
+            }
+        } else if (screenId !== SCREENS.QUERY && 
+                  screenId !== SCREENS.MODELS && 
+                  screenId !== SCREENS.PRODUCTS &&
+                  screenId !== SCREENS.DELETE_RECORDS) {
+            // 创建浮动工序名称框（如果不存在）
+            createFloatingProcess();
         }
     } catch (error) {
         console.error('切换屏幕失败:', error);
@@ -476,6 +498,9 @@ function startScan(processType, isContinuous) {
     
     // 初始化扫码器
     initializeScanner();
+    
+    // 确保浮动工序框在扫码页面也显示
+    createFloatingProcess();
 }
 
 // 初始化扫码器
@@ -625,8 +650,13 @@ function addTorchButton(container, scanner) {
         toggleTorch(scanner, torchButton);
     });
     
-    // 添加按钮到扫码容器
-    container.appendChild(torchButton);
+    // 添加按钮到body，而不是容器
+    document.body.appendChild(torchButton);
+    
+    // 显示提示
+    setTimeout(() => {
+        showToast('点击右下角橙色按钮可开启补光灯', 'info', 3000);
+    }, 1000);
 }
 
 // 切换闪光灯状态
@@ -645,22 +675,21 @@ async function toggleTorch(scanner, button) {
             button.classList.add('active');
             button.innerHTML = '<i class="bi bi-lightbulb-fill"></i>';
             button.title = '关闭补光灯';
+            button.setAttribute('data-status', '开');
+            button.style.animation = 'none'; // 停止脉动动画
             showToast('补光灯已开启', 'success', 1000);
         } else {
             // 闪光灯关闭
             button.classList.remove('active');
             button.innerHTML = '<i class="bi bi-lightbulb"></i>';
             button.title = '开启补光灯';
+            button.setAttribute('data-status', '关');
+            button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
             showToast('补光灯已关闭', 'info', 1000);
         }
     } catch (error) {
         console.error('切换闪光灯失败:', error);
         showToast('您的设备不支持闪光灯或无法访问', 'error');
-        
-        // 隐藏不支持的按钮
-        if (button) {
-            button.style.display = 'none';
-        }
     }
 }
 
@@ -981,6 +1010,12 @@ function stopScanner() {
             }
         } catch (e) {
             console.log('清理视频流失败:', e);
+        }
+        
+        // 移除闪光灯按钮
+        const torchButton = document.getElementById('torch-button');
+        if (torchButton) {
+            torchButton.remove();
         }
         
         return new Promise((resolve, reject) => {
@@ -2761,4 +2796,45 @@ function handleContinuousScan() {
     
     // 开始扫码
     startScan(selectedProcess, true);
+}
+
+// 创建浮动工序名称框
+function createFloatingProcess() {
+    // 移除已存在的浮动框
+    const existingFloat = document.getElementById('floating-process');
+    if (existingFloat) {
+        existingFloat.remove();
+    }
+    
+    // 获取当前工序名称
+    const processSelect = document.getElementById('process-select');
+    if (!processSelect || processSelect.selectedIndex < 0) return;
+    
+    const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
+    
+    // 创建浮动框元素
+    const floatingDiv = document.createElement('div');
+    floatingDiv.id = 'floating-process';
+    floatingDiv.className = 'floating-process';
+    
+    // 设置内容 - 工序名称加上醒目符号
+    floatingDiv.innerHTML = `⚠️ 当前工序: <span style="font-size: 1.5em;">${selectedProcessText}</span> ⚠️`;
+    
+    // 随机初始位置
+    const initialX = Math.random() * (window.innerWidth - 200);
+    const initialY = Math.random() * (window.innerHeight - 100);
+    floatingDiv.style.left = `${initialX}px`;
+    floatingDiv.style.top = `${initialY}px`;
+    
+    // 添加到body
+    document.body.appendChild(floatingDiv);
+    
+    // 设置随机的移动速度和方向
+    createRandomMovement(floatingDiv);
+}
+
+// 为浮动工序框创建随机移动
+function createRandomMovement(element) {
+    // 为了保持页面性能，不再需要额外的JavaScript动画，
+    // 我们使用CSS实现的复杂路径动画已经足够
 }
