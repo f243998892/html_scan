@@ -553,43 +553,8 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 不再在这里添加闪光灯按钮，而是独立添加
-    // addTorchButton(scannerContainer, html5QrCode);
-    
     // 为所有类型扫码增加手动输入功能
     addManualInputField();
-    
-    // 扫码配置 - 针对低端设备优化参数
-    const config = {
-        fps: 10, // 降低帧率以减轻低端设备负担
-        qrbox: { width: 280, height: 280 }, // 增大扫码区域
-        aspectRatio: 1.0,
-        disableFlip: false, // 允许翻转以提高识别率
-        formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE, 
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.DATA_MATRIX
-        ], // 支持更多码制
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true // 使用浏览器原生条形码检测器（如果支持）
-        },
-        rememberLastUsedCamera: true, // 记住上次使用的摄像头
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // 只使用摄像头扫描以优化性能
-        // 设置更高的分辨率，但为低端设备保留回退选项
-        videoConstraints: {
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            facingMode: "environment",
-            // 设置自动对焦和增强对比度
-            advanced: [
-                { focusMode: "continuous" },
-                { exposureMode: "continuous" },
-                { whiteBalanceMode: "continuous" }
-            ]
-        }
-    };
     
     // 添加扫码帮助提示
     addScanningHelpTips();
@@ -601,68 +566,206 @@ function initializeScanner() {
     
     // 先检测设备性能，为低端设备使用更简单的配置
     checkDevicePerformance().then(isLowEndDevice => {
-        let finalConfig = config;
-        
-        if (isLowEndDevice) {
-            console.log('检测到低端设备，使用简化配置');
-            finalConfig = {
-                fps: 5, // 更低的帧率
-                qrbox: 300, // 更大的扫码区域
-                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], // 只支持常用码制
-                videoConstraints: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    facingMode: "environment"
-                }
-            };
-            
-            // 显示低端设备提示
-            showToast('已为您的设备优化扫码设置', 'info', 2000);
-        }
+        // 扫码配置 - 针对低端设备优化参数
+        const config = {
+            fps: isLowEndDevice ? 5 : 10,
+            qrbox: isLowEndDevice ? 300 : { width: 280, height: 280 },
+            aspectRatio: 1.0,
+            disableFlip: false, // 允许翻转以提高识别率
+            formatsToSupport: isLowEndDevice ? 
+                [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128] : 
+                [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, 
+                Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39, 
+                Html5QrcodeSupportedFormats.DATA_MATRIX],
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true, // 使用浏览器原生条形码检测器
+                autoEnableTorch: false // 关闭自动开启闪光灯
+            },
+            rememberLastUsedCamera: true, // 记住上次使用的摄像头
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // 只使用摄像头扫描
+            videoConstraints: {
+                width: { ideal: isLowEndDevice ? 640 : 1280, min: 640 },
+                height: { ideal: isLowEndDevice ? 480 : 720, min: 480 },
+                facingMode: "environment",
+                advanced: [
+                    { focusMode: "continuous" },
+                    { exposureMode: "continuous" },
+                    { whiteBalanceMode: "continuous" },
+                    { torch: false } // 初始不开启闪光灯
+                ]
+            }
+        };
         
         // 启动扫码
-        html5QrCode.start(
-            { facingMode: "environment" },
-            finalConfig,
-            successCallback,
-            onScanFailure
-        ).catch(err => {
-            console.error(`无法启动相机: ${err}`);
-            showToast('无法启动相机，请检查权限设置', 'error');
-            
-            // 添加错误恢复机制
-            setTimeout(() => {
-                try {
-                    // 如果启动失败，尝试使用更简单的配置重试
-                    const simpleConfig = {
-                        fps: 5,
-                        qrbox: 250,
-                        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
-                    };
-                    html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure);
-                } catch (retryErr) {
-                    console.error('重试启动相机失败:', retryErr);
-                    
-                    // 如果相机完全无法启动，显示仅手动输入模式提示
-                    showToast('相机无法启动，请使用手动输入模式', 'warning', 5000);
-                    
-                    // 确保手动输入区域可见
-                    const manualInputContainer = document.getElementById('manual-input-container');
-                    if (manualInputContainer) {
-                        manualInputContainer.style.display = 'block';
-                        manualInputContainer.style.marginTop = '20px';
-                        manualInputContainer.style.marginBottom = '20px';
-                        
-                        // 添加明显提示
-                        const helpText = document.createElement('div');
-                        helpText.className = 'alert alert-info';
-                        helpText.innerHTML = '<strong>提示：</strong> 相机无法启动，请使用手动输入产品编码';
-                        manualInputContainer.prepend(helpText);
-                    }
-                }
-            }, 1000);
-        });
+        startScanner(html5QrCode, config, successCallback);
     });
+}
+
+// 启动扫码器
+function startScanner(html5QrCode, config, successCallback) {
+    // 先清理旧的扫码会话
+    if (html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => console.error('停止旧的扫码会话失败:', err));
+    }
+    
+    // 显示加载提示
+    showToast('正在启动摄像头...', 'info', 2000);
+    
+    // 启动扫码
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        successCallback,
+        onScanFailure
+    ).then(() => {
+        console.log('扫码器启动成功');
+        // 检查闪光灯支持情况
+        checkTorchSupport(html5QrCode);
+    }).catch(err => {
+        console.error(`无法启动相机: ${err}`);
+        showToast('无法启动相机，请检查权限设置', 'error');
+        
+        // 添加错误恢复机制
+        setTimeout(() => {
+            try {
+                // 如果启动失败，尝试使用更简单的配置重试
+                const simpleConfig = {
+                    fps: 5,
+                    qrbox: 250,
+                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
+                };
+                html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure)
+                .then(() => {
+                    console.log('使用简化配置启动扫码器成功');
+                    // 检查闪光灯支持情况
+                    checkTorchSupport(html5QrCode);
+                });
+            } catch (retryErr) {
+                console.error('重试启动相机失败:', retryErr);
+                
+                // 如果相机完全无法启动，显示仅手动输入模式提示
+                showToast('相机无法启动，请使用手动输入模式', 'warning', 5000);
+                
+                // 确保手动输入区域可见
+                const manualInputContainer = document.getElementById('manual-input-container');
+                if (manualInputContainer) {
+                    manualInputContainer.style.display = 'block';
+                    manualInputContainer.style.marginTop = '20px';
+                    manualInputContainer.style.marginBottom = '20px';
+                    
+                    // 添加明显提示
+                    const helpText = document.createElement('div');
+                    helpText.className = 'alert alert-info';
+                    helpText.innerHTML = '<strong>提示：</strong> 相机无法启动，请使用手动输入产品编码';
+                    manualInputContainer.prepend(helpText);
+                }
+            }
+        }, 1000);
+    });
+}
+
+// 检查闪光灯支持情况
+async function checkTorchSupport(scanner) {
+    try {
+        // 检测浏览器是否支持闪光灯
+        const hasFlash = await scanner.getRunningTrackCapabilities();
+        console.log('相机能力:', hasFlash);
+        
+        let torchSupported = false;
+        
+        // 分析相机能力
+        if (hasFlash && hasFlash.torch !== undefined) {
+            torchSupported = hasFlash.torch;
+        } else if (hasFlash && Array.isArray(hasFlash) && hasFlash.length > 0) {
+            // 某些浏览器返回数组
+            torchSupported = hasFlash.some(cap => cap && cap.torch);
+        }
+        
+        console.log('闪光灯支持状态:', torchSupported);
+        
+        if (torchSupported) {
+            console.log('设备支持闪光灯，创建按钮');
+            createLightButton();
+            showToast('设备支持补光灯功能，请点击右下角按钮开启', 'info', 3000);
+        } else {
+            console.log('设备不支持闪光灯功能');
+            showToast('您的设备可能不支持补光灯功能', 'warning', 2000);
+            // 创建模拟闪光灯按钮
+            createFakeTorchButton();
+        }
+    } catch (error) {
+        console.error('检查闪光灯支持失败:', error);
+        // 创建模拟闪光灯按钮
+        createFakeTorchButton();
+    }
+}
+
+// 创建模拟闪光灯按钮 - 当设备不支持真实闪光灯时使用
+function createFakeTorchButton() {
+    console.log('创建模拟闪光灯按钮');
+    
+    // 先移除可能存在的按钮
+    const existingBtn = document.getElementById('torch-button');
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+    
+    // 创建新按钮
+    const fakeBtn = document.createElement('button');
+    fakeBtn.id = 'torch-button';
+    fakeBtn.className = 'torch-button';
+    fakeBtn.textContent = '屏幕补光';
+    
+    // 添加到body
+    document.body.appendChild(fakeBtn);
+    
+    // 添加点击事件 - 实现屏幕补光而非相机闪光灯
+    let isScreenLightOn = false;
+    fakeBtn.addEventListener('click', function() {
+        console.log('模拟闪光灯按钮被点击');
+        
+        if (!isScreenLightOn) {
+            // 开启屏幕补光 - 创建一个白色半透明遮罩
+            const overlay = document.createElement('div');
+            overlay.id = 'screen-light-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
+            overlay.style.zIndex = '9000'; // 低于按钮但高于其他元素
+            overlay.style.pointerEvents = 'none'; // 点击穿透
+            
+            document.body.appendChild(overlay);
+            
+            // 更新按钮状态
+            fakeBtn.classList.add('active');
+            fakeBtn.textContent = '关闭补光';
+            fakeBtn.style.backgroundColor = '#4caf50'; // 绿色
+            fakeBtn.style.animation = 'none'; // 停止脉动动画
+            
+            isScreenLightOn = true;
+            showToast('屏幕补光已开启', 'success', 1000);
+        } else {
+            // 关闭屏幕补光
+            const overlay = document.getElementById('screen-light-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+            
+            // 更新按钮状态
+            fakeBtn.classList.remove('active');
+            fakeBtn.textContent = '屏幕补光';
+            fakeBtn.style.backgroundColor = '#ff5722'; // 恢复橙色
+            fakeBtn.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
+            
+            isScreenLightOn = false;
+            showToast('屏幕补光已关闭', 'info', 1000);
+        }
+    });
+    
+    console.log('模拟闪光灯按钮添加成功');
 }
 
 // 检测设备性能
@@ -699,6 +802,33 @@ async function toggleTorch(scanner, button) {
         }
         
         console.log('尝试切换闪光灯状态');
+
+        // 先检查设备是否支持闪光灯
+        try {
+            const capabilities = await scanner.getRunningTrackCapabilities();
+            console.log('设备能力:', capabilities);
+            
+            // 检查闪光灯支持情况
+            let hasTorch = false;
+            
+            if (capabilities) {
+                if (typeof capabilities === 'object' && capabilities.torch !== undefined) {
+                    hasTorch = true;
+                } else if (Array.isArray(capabilities) && capabilities.length > 0) {
+                    hasTorch = capabilities.some(cap => cap && cap.torch !== undefined);
+                }
+            }
+            
+            if (!hasTorch) {
+                console.log('设备不支持闪光灯，转为使用屏幕补光');
+                // 移除现有按钮并创建模拟补光按钮
+                button.remove();
+                createFakeTorchButton();
+                return;
+            }
+        } catch (e) {
+            console.log('获取设备能力失败，尝试直接操作闪光灯', e);
+        }
         
         // 获取当前闪光灯状态
         let torchState = false;
@@ -713,33 +843,59 @@ async function toggleTorch(scanner, button) {
         
         // 切换闪光灯状态
         try {
-            await scanner.toggleFlash();
+            // 尝试直接通过MediaTrack设置闪光灯
+            const track = scanner.getRunningTrack();
+            if (track && typeof track.applyConstraints === 'function') {
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ torch: newState }]
+                    });
+                    console.log('直接通过MediaTrack设置闪光灯成功');
+                } catch (err) {
+                    // 如果直接设置失败，尝试使用库的方法
+                    await scanner.toggleFlash();
+                    console.log('通过库方法切换闪光灯成功');
+                }
+            } else {
+                // 回退到库方法
+                await scanner.toggleFlash();
+            }
+            
             console.log('闪光灯状态已切换为:', newState ? '开' : '关');
+            
+            // 更新按钮状态
+            if (newState) {
+                // 闪光灯开启
+                button.classList.add('active');
+                button.textContent = '关闭灯';
+                button.style.backgroundColor = '#4caf50'; // 绿色
+                button.style.animation = 'none'; // 停止脉动动画
+                showToast('补光灯已开启', 'success', 1000);
+            } else {
+                // 闪光灯关闭
+                button.classList.remove('active');
+                button.textContent = '补光灯';
+                button.style.backgroundColor = '#ff5722'; // 恢复橙色
+                button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
+                showToast('补光灯已关闭', 'info', 1000);
+            }
         } catch (toggleError) {
-            console.error('切换闪光灯失败:', toggleError);
-            showToast('闪光灯切换失败，可能不支持此功能', 'error');
+            console.error('切换闪光灯失败，改用模拟闪光灯:', toggleError);
+            
+            // 如果切换失败，改用模拟闪光灯
+            button.remove();
+            createFakeTorchButton();
             return;
-        }
-        
-        // 更新按钮状态
-        if (newState) {
-            // 闪光灯开启
-            button.classList.add('active');
-            button.textContent = '关闭灯';
-            button.style.backgroundColor = '#4caf50'; // 绿色
-            button.style.animation = 'none'; // 停止脉动动画
-            showToast('补光灯已开启', 'success', 1000);
-        } else {
-            // 闪光灯关闭
-            button.classList.remove('active');
-            button.textContent = '补光灯';
-            button.style.backgroundColor = '#ff5722'; // 恢复橙色
-            button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
-            showToast('补光灯已关闭', 'info', 1000);
         }
     } catch (error) {
         console.error('切换闪光灯操作失败:', error);
-        showToast('无法操作闪光灯，设备可能不支持', 'error');
+        showToast('无法操作闪光灯，改用模拟补光', 'warning');
+        
+        // 移除当前按钮，创建模拟按钮
+        if (button && button.parentNode) {
+            button.remove();
+        }
+        createFakeTorchButton();
     }
 }
 
