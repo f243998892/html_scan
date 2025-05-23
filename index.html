@@ -140,6 +140,47 @@
             margin: 15px 0;
             box-shadow: 0 3px 6px rgba(0,0,0,0.16);
         }
+        
+        /* 工序名称闪烁效果 */
+        .process-highlight {
+            animation: process-blink 1.5s infinite;
+            font-size: 1.5rem !important;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        @keyframes process-blink {
+            0%, 100% { 
+                background-color: #8a2be2; 
+                color: white;
+                box-shadow: 0 0 10px rgba(138, 43, 226, 0.8);
+            }
+            50% { 
+                background-color: #ff5722; 
+                color: white;
+                box-shadow: 0 0 15px rgba(255, 87, 34, 0.8);
+            }
+        }
+        
+        /* 工序警告样式 - 用于主页显示当前工序 */
+        .process-warning {
+            position: fixed;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 87, 34, 0.9);
+            color: white;
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+            max-width: 90%;
+        }
     </style>
 </head>
 <body>

@@ -268,10 +268,50 @@ function navigateToHome() {
             userFullnameElement.textContent = `用户: ${userState.fullName || '未登录'}`;
         }
         
+        // 在主页上方添加工序提醒条
+        showProcessWarning();
+        
         // 显示主屏幕
         showScreen(SCREENS.HOME);
     } catch (error) {
         console.error('导航到首页失败:', error);
+    }
+}
+
+// 在主页显示当前选择的工序提醒条
+function showProcessWarning() {
+    // 移除已存在的提醒条
+    const existingWarning = document.getElementById('process-warning');
+    if (existingWarning) {
+        existingWarning.remove();
+    }
+    
+    const processSelect = document.getElementById('process-select');
+    if (processSelect && processSelect.selectedIndex >= 0) {
+        const selectedText = processSelect.options[processSelect.selectedIndex].text;
+        
+        // 创建提醒条
+        const warningDiv = document.createElement('div');
+        warningDiv.id = 'process-warning';
+        warningDiv.className = 'process-warning';
+        warningDiv.innerHTML = `当前工序: <span class="process-highlight">${selectedText}</span>`;
+        
+        // 添加到body
+        document.body.appendChild(warningDiv);
+        
+        // 5秒后自动消失
+        setTimeout(() => {
+            const div = document.getElementById('process-warning');
+            if (div) {
+                div.style.opacity = '0';
+                div.style.transition = 'opacity 0.5s';
+                setTimeout(() => {
+                    if (div.parentNode) {
+                        div.parentNode.removeChild(div);
+                    }
+                }, 500);
+            }
+        }, 5000);
     }
 }
 
@@ -417,7 +457,7 @@ function startScan(processType, isContinuous) {
     const processName = getChineseProcessName(processType);
     
     // 更新UI
-    document.getElementById('scan-title').innerHTML = `<span style="color:#8a2be2; font-weight:bold; font-size:1.3rem;">${processName}</span> 扫码`;
+    document.getElementById('scan-title').innerHTML = `<span style="color:#8a2be2; font-weight:bold; font-size:1.3rem;">扫码工序: <span class="process-highlight">${processName}</span></span>`;
     
     // 连续扫码模式显示上传按钮和待上传列表
     if (isContinuous) {
@@ -449,56 +489,221 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 扫码配置 - 进一步优化参数
+    // 为所有类型扫码增加手动输入功能
+    addManualInputField();
+    
+    // 扫码配置 - 针对低端设备优化参数
     const config = {
-        fps: 20, // 提高FPS到20以提高识别速度
-        qrbox: { width: 220, height: 220 }, // 调整扫码区域大小为更合适的尺寸
+        fps: 10, // 降低帧率以减轻低端设备负担
+        qrbox: { width: 280, height: 280 }, // 增大扫码区域
         aspectRatio: 1.0,
-        disableFlip: true, // 禁用翻转以提高性能
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], // 只支持必要的码制
+        disableFlip: false, // 允许翻转以提高识别率
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE, 
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.DATA_MATRIX
+        ], // 支持更多码制
         experimentalFeatures: {
             useBarCodeDetectorIfSupported: true // 使用浏览器原生条形码检测器（如果支持）
         },
         rememberLastUsedCamera: true, // 记住上次使用的摄像头
         supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // 只使用摄像头扫描以优化性能
-        // 设置更高的分辨率
+        // 设置更高的分辨率，但为低端设备保留回退选项
         videoConstraints: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: "environment"
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            facingMode: "environment",
+            // 设置自动对焦和增强对比度
+            advanced: [
+                { focusMode: "continuous" },
+                { exposureMode: "continuous" },
+                { whiteBalanceMode: "continuous" }
+            ]
         }
     };
+    
+    // 添加扫码帮助提示
+    addScanningHelpTips();
     
     // 根据扫码类型选择回调函数
     const successCallback = (scanState.processType === 'query') 
         ? onProductQueryScanSuccess
         : onScanSuccess;
     
-    // 启动扫码
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        successCallback,
-        onScanFailure
-    ).catch(err => {
-        console.error(`无法启动相机: ${err}`);
-        showToast('无法启动相机，请检查权限设置', 'error');
+    // 先检测设备性能，为低端设备使用更简单的配置
+    checkDevicePerformance().then(isLowEndDevice => {
+        let finalConfig = config;
         
-        // 添加错误恢复机制
-        setTimeout(() => {
-            try {
-                // 如果启动失败，尝试使用更简单的配置重试
-                const simpleConfig = {
-                    fps: 10,
-                    qrbox: 250,
-                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
-                };
-                html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure);
-            } catch (retryErr) {
-                console.error('重试启动相机失败:', retryErr);
-            }
-        }, 1000);
+        if (isLowEndDevice) {
+            console.log('检测到低端设备，使用简化配置');
+            finalConfig = {
+                fps: 5, // 更低的帧率
+                qrbox: 300, // 更大的扫码区域
+                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], // 只支持常用码制
+                videoConstraints: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: "environment"
+                }
+            };
+            
+            // 显示低端设备提示
+            showToast('已为您的设备优化扫码设置', 'info', 2000);
+        }
+        
+        // 启动扫码
+        html5QrCode.start(
+            { facingMode: "environment" },
+            finalConfig,
+            successCallback,
+            onScanFailure
+        ).catch(err => {
+            console.error(`无法启动相机: ${err}`);
+            showToast('无法启动相机，请检查权限设置', 'error');
+            
+            // 添加错误恢复机制
+            setTimeout(() => {
+                try {
+                    // 如果启动失败，尝试使用更简单的配置重试
+                    const simpleConfig = {
+                        fps: 5,
+                        qrbox: 250,
+                        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
+                    };
+                    html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure);
+                } catch (retryErr) {
+                    console.error('重试启动相机失败:', retryErr);
+                    
+                    // 如果相机完全无法启动，显示仅手动输入模式提示
+                    showToast('相机无法启动，请使用手动输入模式', 'warning', 5000);
+                    
+                    // 确保手动输入区域可见
+                    const manualInputContainer = document.getElementById('manual-input-container');
+                    if (manualInputContainer) {
+                        manualInputContainer.style.display = 'block';
+                        manualInputContainer.style.marginTop = '20px';
+                        manualInputContainer.style.marginBottom = '20px';
+                        
+                        // 添加明显提示
+                        const helpText = document.createElement('div');
+                        helpText.className = 'alert alert-info';
+                        helpText.innerHTML = '<strong>提示：</strong> 相机无法启动，请使用手动输入产品编码';
+                        manualInputContainer.prepend(helpText);
+                    }
+                }
+            }, 1000);
+        });
     });
+}
+
+// 检测设备性能
+async function checkDevicePerformance() {
+    try {
+        // 使用简单的性能检测
+        const start = performance.now();
+        let counter = 0;
+        
+        // 执行一些计算来测试设备性能
+        for (let i = 0; i < 1000000; i++) {
+            counter += Math.sqrt(i);
+        }
+        
+        const duration = performance.now() - start;
+        console.log(`性能测试耗时: ${duration}ms`);
+        
+        // 如果计算时间超过100毫秒，认为是低端设备
+        return duration > 100;
+    } catch (error) {
+        console.error('性能检测失败:', error);
+        return false; // 默认不是低端设备
+    }
+}
+
+// 为所有类型扫码增加手动输入功能
+function addManualInputField() {
+    // 移除已存在的手动输入框，确保不重复创建
+    const existingInputs = document.querySelectorAll('#manual-input-container');
+    existingInputs.forEach(container => container.remove());
+    
+    // 获取扫码容器
+    const scannerContainer = document.getElementById('scanner-container');
+    if (!scannerContainer) return;
+    
+    // 创建并添加手动输入框
+    const manualInputContainer = document.createElement('div');
+    manualInputContainer.className = 'mb-3';
+    manualInputContainer.id = 'manual-input-container';
+    manualInputContainer.innerHTML = `
+        <div class="input-group mb-3">
+            <input type="text" class="form-control form-control-lg" id="manual-product-code" placeholder="手动输入产品编码">
+            <button class="btn btn-primary btn-lg" id="submit-manual-code" type="button">确认</button>
+        </div>
+    `;
+    
+    // 添加到扫码容器之后
+    scannerContainer.parentNode.insertBefore(manualInputContainer, scannerContainer.nextSibling);
+    
+    // 添加手动输入事件
+    const submitButton = document.getElementById('submit-manual-code');
+    const inputField = document.getElementById('manual-product-code');
+    
+    if (submitButton && inputField) {
+        // 点击确认按钮
+        submitButton.addEventListener('click', handleManualCodeInput);
+        
+        // 按回车确认
+        inputField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleManualCodeInput();
+            }
+        });
+    }
+}
+
+// 添加扫码帮助提示
+function addScanningHelpTips() {
+    const scannerContainer = document.getElementById('scanner-container');
+    if (!scannerContainer || !scannerContainer.parentNode) return;
+    
+    const helpTipsContainer = document.createElement('div');
+    helpTipsContainer.className = 'alert alert-info mt-2';
+    helpTipsContainer.innerHTML = `
+        <h5 class="mb-2">扫码技巧:</h5>
+        <ul class="mb-0">
+            <li>保持设备稳定，避免晃动</li>
+            <li>确保产品条码在框内，光线充足</li>
+            <li>如扫码失败，可尝试手动输入</li>
+        </ul>
+    `;
+    
+    // 添加到扫码容器之后
+    scannerContainer.parentNode.insertBefore(helpTipsContainer, scannerContainer.nextSibling);
+}
+
+// 处理手动输入的产品码
+function handleManualCodeInput() {
+    const inputField = document.getElementById('manual-product-code');
+    if (!inputField) return;
+    
+    const productCode = inputField.value.trim();
+    if (!productCode) {
+        showToast('请输入产品编码', 'warning');
+        return;
+    }
+    
+    // 根据当前模式处理手动输入的码
+    if (scanState.processType === 'query') {
+        // 产品查询模式
+        handleManualInput();
+    } else {
+        // 扫码模式 - 模拟扫码成功
+        onScanSuccess(productCode, { result: { text: productCode } });
+    }
+    
+    // 清空输入框
+    inputField.value = '';
 }
 
 // 扫码成功回调
@@ -554,10 +759,16 @@ async function onScanSuccess(decodedText, decodedResult) {
                 
                 showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
                 
-                // 单次扫码模式，回到上一页面
+                // 修改：单次扫码成功后直接返回主页
                 setTimeout(() => {
-                    stopScanner();
-                    showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+                    stopScanner().then(() => {
+                        // 返回主页
+                        showScreen(SCREENS.HOME);
+                    }).catch(error => {
+                        console.error('停止扫码器失败:', error);
+                        // 即使出错也返回主页
+                        showScreen(SCREENS.HOME);
+                    });
                 }, 1000);
             } else {
                 // 播放错误提示音
@@ -665,11 +876,12 @@ function stopScan() {
                     existingInputs.forEach(element => element.remove());
                 }
                 
-                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+                // 修改：直接返回主页
+                showScreen(SCREENS.HOME);
             }).catch(error => {
                 console.error('停止扫码器出错:', error);
-                // 即使出错也尝试返回
-                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+                // 即使出错也返回主页
+                showScreen(SCREENS.HOME);
             });
         }
     } else {
@@ -680,24 +892,12 @@ function stopScan() {
                 existingInputs.forEach(element => element.remove());
             }
             
-            // 根据当前扫码类型决定返回的页面
-            if (scanState.processType === 'query') {
-                console.log("产品扫码查询 - 返回主页");
-                // 产品扫码查询 - 返回主页
-                showScreen(SCREENS.HOME);
-            } else {
-                console.log("其他扫码 - 返回选择页面");
-                // 其他扫码 - 返回对应的扫码选择页面
-                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-            }
+            // 修改：直接返回主页
+            showScreen(SCREENS.HOME);
         }).catch(error => {
             console.error('停止扫码器出错:', error);
-            // 即使出错也尝试返回
-            if (scanState.processType === 'query') {
-                showScreen(SCREENS.HOME);
-            } else {
-                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-            }
+            // 即使出错也返回主页
+            showScreen(SCREENS.HOME);
         });
     }
 }
@@ -2447,7 +2647,7 @@ function handleSingleScan() {
     
     // 设置单个扫码工序提示
     const processDisplay = document.getElementById('single-scan-process');
-    processDisplay.innerHTML = `<strong>当前工序:</strong> ${selectedProcessText}`;
+    processDisplay.innerHTML = `<strong>当前工序:</strong> <span class="process-highlight">${selectedProcessText}</span>`;
     processDisplay.style.fontSize = '1.4rem'; // 确保字体足够大
     
     // 设置扫码状态
@@ -2472,12 +2672,18 @@ function handleContinuousScan() {
         return;
     }
     
+    // 检查是否是允许的连续扫码工序（车止口和浸漆）
+    if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion') {
+        showToast('只有车止口和浸漆工序支持连续扫码', 'error');
+        return;
+    }
+    
     // 保存工序选择
     saveProcessSelection(selectedProcess);
     
     // 设置连续扫码工序提示
     const processDisplay = document.getElementById('continuous-scan-process');
-    processDisplay.innerHTML = `<strong>当前工序:</strong> ${selectedProcessText}`;
+    processDisplay.innerHTML = `<strong>当前工序:</strong> <span class="process-highlight">${selectedProcessText}</span>`;
     processDisplay.style.fontSize = '1.4rem'; // 确保字体足够大
     
     // 设置扫码状态
