@@ -489,6 +489,9 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
+    // 添加闪光灯按钮
+    addTorchButton(scannerContainer, html5QrCode);
+    
     // 为所有类型扫码增加手动输入功能
     addManualInputField();
     
@@ -596,6 +599,69 @@ function initializeScanner() {
             }, 1000);
         });
     });
+}
+
+// 添加闪光灯按钮
+function addTorchButton(container, scanner) {
+    // 先检查是否存在旧按钮，存在则移除
+    const existingButton = document.getElementById('torch-button');
+    if (existingButton) {
+        existingButton.remove();
+    }
+    
+    // 创建闪光灯按钮
+    const torchButton = document.createElement('button');
+    torchButton.id = 'torch-button';
+    torchButton.className = 'torch-button';
+    torchButton.innerHTML = '<i class="bi bi-lightbulb"></i>';
+    torchButton.title = '开启补光灯';
+    torchButton.type = 'button';
+    
+    // 保存闪光灯状态
+    let isTorchOn = false;
+    
+    // 添加按钮点击事件
+    torchButton.addEventListener('click', () => {
+        toggleTorch(scanner, torchButton);
+    });
+    
+    // 添加按钮到扫码容器
+    container.appendChild(torchButton);
+}
+
+// 切换闪光灯状态
+async function toggleTorch(scanner, button) {
+    try {
+        // 获取当前闪光灯状态
+        const torchState = await scanner.getTorchState();
+        const newState = !torchState;
+        
+        // 切换闪光灯状态
+        await scanner.toggleFlash();
+        
+        // 更新按钮状态
+        if (newState) {
+            // 闪光灯开启
+            button.classList.add('active');
+            button.innerHTML = '<i class="bi bi-lightbulb-fill"></i>';
+            button.title = '关闭补光灯';
+            showToast('补光灯已开启', 'success', 1000);
+        } else {
+            // 闪光灯关闭
+            button.classList.remove('active');
+            button.innerHTML = '<i class="bi bi-lightbulb"></i>';
+            button.title = '开启补光灯';
+            showToast('补光灯已关闭', 'info', 1000);
+        }
+    } catch (error) {
+        console.error('切换闪光灯失败:', error);
+        showToast('您的设备不支持闪光灯或无法访问', 'error');
+        
+        // 隐藏不支持的按钮
+        if (button) {
+            button.style.display = 'none';
+        }
+    }
 }
 
 // 检测设备性能

@@ -128,23 +128,10 @@
             color: #8a2be2;
         }
         
-        /* 扫码页面工序显示样式 */
-        .current-process-display {
-            background-color: #8a2be2;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 1.4rem;
-            font-weight: bold;
-            text-align: center;
-            margin: 15px 0;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
-        }
-        
         /* 工序名称闪烁效果 */
         .process-highlight {
-            animation: process-blink 1.5s infinite;
-            font-size: 1.5rem !important;
+            animation: process-blink 0.75s infinite;
+            font-size: 3rem !important;
             font-weight: bold;
             padding: 3px 8px;
             border-radius: 4px;
@@ -172,7 +159,7 @@
             transform: translateX(-50%);
             background-color: rgba(255, 87, 34, 0.9);
             color: white;
-            font-size: 1.3rem;
+            font-size: 1.8rem;
             font-weight: bold;
             padding: 8px 15px;
             border-radius: 20px;
@@ -180,6 +167,48 @@
             z-index: 1000;
             text-align: center;
             max-width: 90%;
+        }
+        
+        /* 扫码页面工序显示样式 */
+        .current-process-display {
+            background-color: #8a2be2;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+        }
+        
+        /* 闪光灯按钮样式 */
+        .torch-button {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+        
+        .torch-button.active {
+            background-color: #ff5722;
+            box-shadow: 0 0 10px rgba(255, 87, 34, 0.7);
+        }
+        
+        /* 扫码容器相对定位，以便放置闪光灯按钮 */
+        #scanner-container {
+            position: relative;
         }
     </style>
 </head>
