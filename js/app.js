@@ -207,6 +207,8 @@ function saveProcessSelection(processType) {
     try {
         localStorage.setItem('selected_process', processType);
         console.log('工序选择已保存:', processType);
+        // 立即更新浮动工序框
+        createFloatingProcess();
     } catch (error) {
         console.error('保存工序选择失败:', error);
     }
@@ -512,45 +514,6 @@ function startScan(processType, isContinuous) {
     
     // 确保浮动工序框在扫码页面也显示
     createFloatingProcess();
-    
-    // 创建独立的闪光灯按钮
-    createLightButton();
-}
-
-// 创建独立的闪光灯按钮
-function createLightButton() {
-    console.log('创建独立闪光灯按钮');
-    
-    // 先移除可能存在的按钮
-    const existingBtn = document.getElementById('torch-button');
-    if (existingBtn) {
-        existingBtn.remove();
-    }
-    
-    // 创建新按钮
-    const lightBtn = document.createElement('button');
-    lightBtn.id = 'torch-button';
-    lightBtn.className = 'torch-button';
-    lightBtn.textContent = '补光灯';
-    
-    // 添加到body
-    document.body.appendChild(lightBtn);
-    
-    // 添加点击事件
-    lightBtn.addEventListener('click', function() {
-        console.log('闪光灯按钮被点击');
-        
-        if (!scanState.currentHtml5QrScanner) {
-            console.log('扫码器未初始化，无法操作闪光灯');
-            showToast('扫码器未就绪，无法操作闪光灯', 'warning');
-            return;
-        }
-        
-        // 尝试切换闪光灯
-        toggleTorch(scanState.currentHtml5QrScanner, lightBtn);
-    });
-    
-    console.log('闪光灯按钮添加成功');
 }
 
 // 初始化扫码器
@@ -669,110 +632,6 @@ function startScanner(html5QrCode, config, successCallback) {
     });
 }
 
-// 检查闪光灯支持情况
-async function checkTorchSupport(scanner) {
-    try {
-        // 检测浏览器是否支持闪光灯
-        const hasFlash = await scanner.getRunningTrackCapabilities();
-        console.log('相机能力:', hasFlash);
-        
-        let torchSupported = false;
-        
-        // 分析相机能力
-        if (hasFlash && hasFlash.torch !== undefined) {
-            torchSupported = hasFlash.torch;
-        } else if (hasFlash && Array.isArray(hasFlash) && hasFlash.length > 0) {
-            // 某些浏览器返回数组
-            torchSupported = hasFlash.some(cap => cap && cap.torch);
-        }
-        
-        console.log('闪光灯支持状态:', torchSupported);
-        
-        if (torchSupported) {
-            console.log('设备支持闪光灯，创建按钮');
-            createLightButton();
-            showToast('设备支持补光灯功能，请点击右下角按钮开启', 'info', 3000);
-        } else {
-            console.log('设备不支持闪光灯功能');
-            showToast('您的设备可能不支持补光灯功能', 'warning', 2000);
-            // 创建模拟闪光灯按钮
-            createFakeTorchButton();
-        }
-    } catch (error) {
-        console.error('检查闪光灯支持失败:', error);
-        // 创建模拟闪光灯按钮
-        createFakeTorchButton();
-    }
-}
-
-// 创建模拟闪光灯按钮 - 当设备不支持真实闪光灯时使用
-function createFakeTorchButton() {
-    console.log('创建模拟闪光灯按钮');
-    
-    // 先移除可能存在的按钮
-    const existingBtn = document.getElementById('torch-button');
-    if (existingBtn) {
-        existingBtn.remove();
-    }
-    
-    // 创建新按钮
-    const fakeBtn = document.createElement('button');
-    fakeBtn.id = 'torch-button';
-    fakeBtn.className = 'torch-button';
-    fakeBtn.textContent = '屏幕补光';
-    
-    // 添加到body
-    document.body.appendChild(fakeBtn);
-    
-    // 添加点击事件 - 实现屏幕补光而非相机闪光灯
-    let isScreenLightOn = false;
-    fakeBtn.addEventListener('click', function() {
-        console.log('模拟闪光灯按钮被点击');
-        
-        if (!isScreenLightOn) {
-            // 开启屏幕补光 - 创建一个白色半透明遮罩
-            const overlay = document.createElement('div');
-            overlay.id = 'screen-light-overlay';
-            overlay.style.position = 'fixed';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100%';
-            overlay.style.height = '100%';
-            overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
-            overlay.style.zIndex = '9000'; // 低于按钮但高于其他元素
-            overlay.style.pointerEvents = 'none'; // 点击穿透
-            
-            document.body.appendChild(overlay);
-            
-            // 更新按钮状态
-            fakeBtn.classList.add('active');
-            fakeBtn.textContent = '关闭补光';
-            fakeBtn.style.backgroundColor = '#4caf50'; // 绿色
-            fakeBtn.style.animation = 'none'; // 停止脉动动画
-            
-            isScreenLightOn = true;
-            showToast('屏幕补光已开启', 'success', 1000);
-        } else {
-            // 关闭屏幕补光
-            const overlay = document.getElementById('screen-light-overlay');
-            if (overlay) {
-                overlay.remove();
-            }
-            
-            // 更新按钮状态
-            fakeBtn.classList.remove('active');
-            fakeBtn.textContent = '屏幕补光';
-            fakeBtn.style.backgroundColor = '#ff5722'; // 恢复橙色
-            fakeBtn.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
-            
-            isScreenLightOn = false;
-            showToast('屏幕补光已关闭', 'info', 1000);
-        }
-    });
-    
-    console.log('模拟闪光灯按钮添加成功');
-}
-
 // 检测设备性能
 async function checkDevicePerformance() {
     try {
@@ -798,110 +657,8 @@ async function checkDevicePerformance() {
 
 // 切换闪光灯状态
 async function toggleTorch(scanner, button) {
-    try {
-        // 检查是否初始化了扫码器
-        if (!scanner) {
-            console.error('扫码器未初始化，无法操作闪光灯');
-            showToast('扫码器未就绪，无法操作闪光灯', 'warning');
-            return;
-        }
-        
-        console.log('尝试切换闪光灯状态');
-
-        // 先检查设备是否支持闪光灯
-        try {
-            const capabilities = await scanner.getRunningTrackCapabilities();
-            console.log('设备能力:', capabilities);
-            
-            // 检查闪光灯支持情况
-            let hasTorch = false;
-            
-            if (capabilities) {
-                if (typeof capabilities === 'object' && capabilities.torch !== undefined) {
-                    hasTorch = true;
-                } else if (Array.isArray(capabilities) && capabilities.length > 0) {
-                    hasTorch = capabilities.some(cap => cap && cap.torch !== undefined);
-                }
-            }
-            
-            if (!hasTorch) {
-                console.log('设备不支持闪光灯，转为使用屏幕补光');
-                // 移除现有按钮并创建模拟补光按钮
-                button.remove();
-                createFakeTorchButton();
-                return;
-            }
-        } catch (e) {
-            console.log('获取设备能力失败，尝试直接操作闪光灯', e);
-        }
-        
-        // 获取当前闪光灯状态
-        let torchState = false;
-        try {
-            torchState = await scanner.getTorchState();
-            console.log('当前闪光灯状态:', torchState);
-        } catch (stateError) {
-            console.error('获取闪光灯状态失败:', stateError);
-        }
-        
-        const newState = !torchState;
-        
-        // 切换闪光灯状态
-        try {
-            // 尝试直接通过MediaTrack设置闪光灯
-            const track = scanner.getRunningTrack();
-            if (track && typeof track.applyConstraints === 'function') {
-                try {
-                    await track.applyConstraints({
-                        advanced: [{ torch: newState }]
-                    });
-                    console.log('直接通过MediaTrack设置闪光灯成功');
-                } catch (err) {
-                    // 如果直接设置失败，尝试使用库的方法
-                    await scanner.toggleFlash();
-                    console.log('通过库方法切换闪光灯成功');
-                }
-            } else {
-                // 回退到库方法
-                await scanner.toggleFlash();
-            }
-            
-            console.log('闪光灯状态已切换为:', newState ? '开' : '关');
-            
-            // 更新按钮状态
-            if (newState) {
-                // 闪光灯开启
-                button.classList.add('active');
-                button.textContent = '关闭灯';
-                button.style.backgroundColor = '#4caf50'; // 绿色
-                button.style.animation = 'none'; // 停止脉动动画
-                showToast('补光灯已开启', 'success', 1000);
-            } else {
-                // 闪光灯关闭
-                button.classList.remove('active');
-                button.textContent = '补光灯';
-                button.style.backgroundColor = '#ff5722'; // 恢复橙色
-                button.style.animation = 'pulse 1.5s infinite'; // 恢复脉动动画
-                showToast('补光灯已关闭', 'info', 1000);
-            }
-        } catch (toggleError) {
-            console.error('切换闪光灯失败，改用模拟闪光灯:', toggleError);
-            
-            // 如果切换失败，改用模拟闪光灯
-            button.remove();
-            createFakeTorchButton();
-            return;
-        }
-    } catch (error) {
-        console.error('切换闪光灯操作失败:', error);
-        showToast('无法操作闪光灯，改用模拟补光', 'warning');
-        
-        // 移除当前按钮，创建模拟按钮
-        if (button && button.parentNode) {
-            button.remove();
-        }
-        createFakeTorchButton();
-    }
+    // 空函数，闪光灯功能已移除
+    console.log('闪光灯功能已禁用');
 }
 
 // 为所有类型扫码增加手动输入功能
@@ -2997,6 +2754,7 @@ function createFloatingProcess() {
     if (!processSelect || processSelect.selectedIndex < 0) return;
     
     const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
+    console.log('创建浮动工序框, 当前选择工序:', selectedProcessText);
     
     // 创建浮动框元素
     const floatingDiv = document.createElement('div');
@@ -3014,13 +2772,4 @@ function createFloatingProcess() {
     
     // 添加到body
     document.body.appendChild(floatingDiv);
-    
-    // 设置随机的移动速度和方向
-    createRandomMovement(floatingDiv);
-}
-
-// 为浮动工序框创建随机移动
-function createRandomMovement(element) {
-    // 为了保持页面性能，不再需要额外的JavaScript动画，
-    // 我们使用CSS实现的复杂路径动画已经足够
 }
