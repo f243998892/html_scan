@@ -378,8 +378,11 @@ function startScan(processType, isContinuous) {
     scanState.lastScannedCode = '';
     scanState.isProcessing = false;
     
+    // 获取工序的中文名称
+    const processName = getChineseProcessName(processType);
+    
     // 更新UI
-    document.getElementById('scan-title').textContent = `${getChineseProcessName(processType)}扫码`;
+    document.getElementById('scan-title').innerHTML = `<span style="color:#8a2be2; font-weight:bold; font-size:1.3rem;">${processName}</span> 扫码`;
     
     // 连续扫码模式显示上传按钮和待上传列表
     if (isContinuous) {
@@ -2132,6 +2135,8 @@ async function handleDeleteRecords() {
         const fixedButtonsContainer = document.createElement('div');
         fixedButtonsContainer.className = 'fixed-bottom bg-white border-top p-2';
         fixedButtonsContainer.id = 'fixed-delete-buttons';
+        fixedButtonsContainer.style.boxShadow = '0 -2px 10px rgba(0,0,0,0.1)';
+        fixedButtonsContainer.style.zIndex = '1030';
         fixedButtonsContainer.innerHTML = `
             <div class="container">
                 <div class="row">
@@ -2193,7 +2198,7 @@ async function handleDeleteRecords() {
         
         // 构建HTML表格 - 与台账查询页面相同的表格样式
         let html = `
-            <div class="table-responsive">
+            <div class="table-responsive mb-5 pb-5"> <!-- 添加底部间距，避免按钮遮挡内容 -->
                 <table class="table table-striped table-bordered table-sm">
                     <thead class="table-dark">
                         <tr>
@@ -2392,7 +2397,8 @@ function handleSingleScan() {
     
     // 设置单个扫码工序提示
     const processDisplay = document.getElementById('single-scan-process');
-    processDisplay.textContent = `当前工序: ${selectedProcessText}`;
+    processDisplay.innerHTML = `<strong>当前工序:</strong> ${selectedProcessText}`;
+    processDisplay.style.fontSize = '1.4rem'; // 确保字体足够大
     
     // 设置扫码状态
     scanState.processType = selectedProcess;
@@ -2418,7 +2424,8 @@ function handleContinuousScan() {
     
     // 设置连续扫码工序提示
     const processDisplay = document.getElementById('continuous-scan-process');
-    processDisplay.textContent = `当前工序: ${selectedProcessText}`;
+    processDisplay.innerHTML = `<strong>当前工序:</strong> ${selectedProcessText}`;
+    processDisplay.style.fontSize = '1.4rem'; // 确保字体足够大
     
     // 设置扫码状态
     scanState.processType = selectedProcess;
