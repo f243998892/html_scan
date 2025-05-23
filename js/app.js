@@ -160,11 +160,13 @@ function addEventListeners() {
     document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
     document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
     
-    // 工序选择下拉框变化时保存选择
+    // 工序选择下拉框变化时保存选择并立即更新浮动框
     const processSelect = document.getElementById('process-select');
     if (processSelect) {
         processSelect.addEventListener('change', function() {
             saveProcessSelection(this.value);
+            // 立即更新浮动工序框
+            createFloatingProcess();
         });
     }
     
@@ -404,7 +406,7 @@ function showToast(message, type = 'success', duration = 3000) {
     const toastElement = document.createElement('div');
     toastElement.classList.add('custom-toast', 'p-3', 'mb-2');
     
-    // 设置Toast样式
+    // 设置Toast样式 - 现在显示在屏幕中间
     switch(type) {
         case 'success':
             toastElement.classList.add('bg-success', 'text-white');
@@ -432,12 +434,21 @@ function showToast(message, type = 'success', duration = 3000) {
     toastElement.textContent = message;
     toastContainer.appendChild(toastElement);
     
-    // 添加样式确保toast不被底部按钮遮挡
-    toastElement.style.zIndex = '1050';
+    // 增加样式使Toast显示在屏幕中间
+    toastElement.style.position = 'fixed';
+    toastElement.style.top = '50%';
+    toastElement.style.left = '50%';
+    toastElement.style.transform = 'translate(-50%, -50%)';
+    toastElement.style.zIndex = '9999';
+    toastElement.style.minWidth = '200px';
+    toastElement.style.textAlign = 'center';
+    toastElement.style.borderRadius = '8px';
+    toastElement.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.3)';
     
     // 自动关闭
     setTimeout(() => {
         toastElement.style.opacity = '0';
+        toastElement.style.transition = 'opacity 0.3s ease';
         setTimeout(() => {
             toastContainer.removeChild(toastElement);
         }, 300);
@@ -578,8 +589,7 @@ function initializeScanner() {
                 Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39, 
                 Html5QrcodeSupportedFormats.DATA_MATRIX],
             experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true, // 使用浏览器原生条形码检测器
-                autoEnableTorch: false // 关闭自动开启闪光灯
+                useBarCodeDetectorIfSupported: true // 使用浏览器原生条形码检测器
             },
             rememberLastUsedCamera: true, // 记住上次使用的摄像头
             supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // 只使用摄像头扫描
@@ -590,8 +600,7 @@ function initializeScanner() {
                 advanced: [
                     { focusMode: "continuous" },
                     { exposureMode: "continuous" },
-                    { whiteBalanceMode: "continuous" },
-                    { torch: false } // 初始不开启闪光灯
+                    { whiteBalanceMode: "continuous" }
                 ]
             }
         };
@@ -619,8 +628,6 @@ function startScanner(html5QrCode, config, successCallback) {
         onScanFailure
     ).then(() => {
         console.log('扫码器启动成功');
-        // 检查闪光灯支持情况
-        checkTorchSupport(html5QrCode);
     }).catch(err => {
         console.error(`无法启动相机: ${err}`);
         showToast('无法启动相机，请检查权限设置', 'error');
@@ -637,8 +644,6 @@ function startScanner(html5QrCode, config, successCallback) {
                 html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure)
                 .then(() => {
                     console.log('使用简化配置启动扫码器成功');
-                    // 检查闪光灯支持情况
-                    checkTorchSupport(html5QrCode);
                 });
             } catch (retryErr) {
                 console.error('重试启动相机失败:', retryErr);
@@ -1160,13 +1165,6 @@ function stopScan() {
 
 // 清理扫码相关资源
 function cleanupScanResources() {
-    // 移除闪光灯按钮
-    const torchButton = document.getElementById('torch-button');
-    if (torchButton) {
-        console.log("移除闪光灯按钮");
-        torchButton.remove();
-    }
-    
     // 停止扫码器
     if (scanState.currentHtml5QrScanner) {
         stopScanner().then(() => {
