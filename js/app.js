@@ -14,8 +14,7 @@ let dbClient;
 
 // 存储当前用户信息
 const userState = {
-    fullName: '',
-    exitAfterScan: false
+    fullName: ''
 };
 
 // 存储当前扫码状态
@@ -124,11 +123,10 @@ async function initApp() {
 // 尝试自动登录
 async function tryAutoLogin() {
     try {
-    const savedFullName = localStorage.getItem('user_full_name');
-    if (savedFullName) {
-        userState.fullName = savedFullName;
-        userState.exitAfterScan = localStorage.getItem('exit_after_scan') === 'true';
-        navigateToHome();
+        const savedFullName = localStorage.getItem('user_full_name');
+        if (savedFullName) {
+            userState.fullName = savedFullName;
+            navigateToHome();
             console.log('自动登录成功:', savedFullName);
         } else {
             // 没有登录信息，显示登录页面
@@ -148,8 +146,8 @@ function addEventListeners() {
     document.getElementById('login-btn').addEventListener('click', handleLogin);
     
     // 首页功能卡片点击事件
-    document.getElementById('card-single-scan').addEventListener('click', () => showScreen(SCREENS.SINGLE_SCAN));
-    document.getElementById('card-continuous-scan').addEventListener('click', () => showScreen(SCREENS.CONTINUOUS_SCAN));
+    document.getElementById('card-single-scan').addEventListener('click', handleSingleScan);
+    document.getElementById('card-continuous-scan').addEventListener('click', handleContinuousScan);
     document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
     document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
     document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
@@ -196,34 +194,27 @@ function addEventListeners() {
 // 处理登录
 async function handleLogin() {
     try {
-    const nameInput = document.getElementById('username');
-    const fullName = nameInput.value.trim();
-    
-    if (!fullName) {
-        showToast('请输入姓名', 'warning');
-        return;
-    }
-    
+        const nameInput = document.getElementById('username');
+        const fullName = nameInput.value.trim();
+        
+        if (!fullName) {
+            showToast('请输入姓名', 'warning');
+            return;
+        }
+        
         // 保存用户信息到状态和本地存储
-    userState.fullName = fullName;
+        userState.fullName = fullName;
         
         // 确保localStorage可用
         try {
-    localStorage.setItem('user_full_name', fullName);
-    
-            // 设置默认的退出设置
-            if (localStorage.getItem('exit_after_scan') === null) {
-                localStorage.setItem('exit_after_scan', 'false');
-            }
-            userState.exitAfterScan = localStorage.getItem('exit_after_scan') === 'true';
+            localStorage.setItem('user_full_name', fullName);
         } catch (storageError) {
             console.error('无法访问localStorage:', storageError);
             // 虽然localStorage失败，但仍可继续使用，只是设置不会被保存
-            userState.exitAfterScan = false;
         }
         
         // 导航到首页
-    navigateToHome();
+        navigateToHome();
         
         // 显示登录成功提示
         showToast(`欢迎，${fullName}！`, 'success');
@@ -242,17 +233,10 @@ function navigateToHome() {
             userFullnameElement.textContent = `用户: ${userState.fullName || '未登录'}`;
         }
         
-        // 设置退出选项状态
-        const exitAfterScanElement = document.getElementById('exit-after-scan');
-        if (exitAfterScanElement) {
-            exitAfterScanElement.checked = userState.exitAfterScan;
-        }
-        
-        // 显示首页
-    showScreen(SCREENS.HOME);
+        // 显示主屏幕
+        showScreen(SCREENS.HOME);
     } catch (error) {
-        console.error('导航到首页时发生错误:', error);
-        showToast('页面加载失败', 'error');
+        console.error('导航到首页失败:', error);
     }
 }
 
@@ -532,20 +516,11 @@ async function onScanSuccess(decodedText, decodedResult) {
                 
                 showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
                 
-                // 如果设置了扫码成功后退出，则退出
-                if (userState.exitAfterScan) {
-                    // 延迟一秒后退出
-                    setTimeout(() => {
-                        stopScanner();
-                        window.close(); // 尝试关闭窗口
-                    }, 1000);
-                } else {
-                    // 单次扫码模式，回到上一页面
-                    setTimeout(() => {
-                        stopScanner();
-                        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-                    }, 1000);
-                }
+                // 单次扫码模式，回到上一页面
+                setTimeout(() => {
+                    stopScanner();
+                    showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+                }, 1000);
             } else {
                 // 播放错误提示音
                 playErrorSound();
@@ -2403,3 +2378,55 @@ async function handleDeleteRecords() {
             updateDeleteButtonState();
     }
 } 
+
+// 处理单个扫码
+function handleSingleScan() {
+    const processSelect = document.getElementById('process-select');
+    const selectedProcess = processSelect.value;
+    const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
+    
+    if (!selectedProcess) {
+        showToast('请先选择工序', 'warning');
+        return;
+    }
+    
+    // 设置单个扫码工序提示
+    const processDisplay = document.getElementById('single-scan-process');
+    processDisplay.textContent = `当前工序: ${selectedProcessText}`;
+    
+    // 设置扫码状态
+    scanState.processType = selectedProcess;
+    scanState.isContinuous = false;
+    
+    // 显示单个扫码页面
+    showScreen(SCREENS.SINGLE_SCAN);
+    
+    // 开始扫码
+    startScan(selectedProcess, false);
+}
+
+// 处理连续扫码
+function handleContinuousScan() {
+    const processSelect = document.getElementById('process-select');
+    const selectedProcess = processSelect.value;
+    const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
+    
+    if (!selectedProcess) {
+        showToast('请先选择工序', 'warning');
+        return;
+    }
+    
+    // 设置连续扫码工序提示
+    const processDisplay = document.getElementById('continuous-scan-process');
+    processDisplay.textContent = `当前工序: ${selectedProcessText}`;
+    
+    // 设置扫码状态
+    scanState.processType = selectedProcess;
+    scanState.isContinuous = true;
+    
+    // 显示连续扫码页面
+    showScreen(SCREENS.CONTINUOUS_SCAN);
+    
+    // 开始扫码
+    startScan(selectedProcess, true);
+}

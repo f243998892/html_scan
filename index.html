@@ -160,11 +160,16 @@
                 <div class="col-12">
                     <div class="card shadow-sm bg-light">
                         <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0 fs-6">扫码成功后自动退出APP:</h5>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="exit-after-scan">
-                                </div>
+                            <div class="form-group">
+                                <label for="process-select" class="form-label">工序选择：</label>
+                                <select class="form-select" id="process-select">
+                                    <option value="wiring">绕线</option>
+                                    <option value="embedding">嵌线</option>
+                                    <option value="wiring_connect">接线</option>
+                                    <option value="pressing">压装</option>
+                                    <option value="stopper">车止口</option>
+                                    <option value="immersion">浸漆</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -227,14 +232,7 @@
         <div id="single-scan-screen" class="d-none">
             <div class="mb-3">
                 <h3 class="text-center">单个扫码</h3>
-                <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
-                    <button class="btn btn-outline-primary process-btn" data-process="wiring">绕线</button>
-                    <button class="btn btn-outline-primary process-btn" data-process="embedding">嵌线</button>
-                    <button class="btn btn-outline-primary process-btn" data-process="wiring_connect">接线</button>
-                    <button class="btn btn-outline-primary process-btn" data-process="pressing">压装</button>
-                    <button class="btn btn-outline-primary process-btn" data-process="stopper">车止口</button>
-                    <button class="btn btn-outline-primary process-btn" data-process="immersion">浸漆</button>
-                </div>
+                <p id="single-scan-process" class="text-center mt-3"></p>
             </div>
             <button class="btn btn-secondary mt-3 w-100" id="single-scan-back">返回</button>
         </div>
@@ -243,10 +241,7 @@
         <div id="continuous-scan-screen" class="d-none">
             <div class="mb-3">
                 <h3 class="text-center">连续扫码</h3>
-                <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
-                    <button class="btn btn-outline-success process-btn-continuous" data-process="stopper">车止口</button>
-                    <button class="btn btn-outline-success process-btn-continuous" data-process="immersion">浸漆</button>
-                </div>
+                <p id="continuous-scan-process" class="text-center mt-3"></p>
             </div>
             <button class="btn btn-secondary mt-3 w-100" id="continuous-scan-back">返回</button>
         </div>
