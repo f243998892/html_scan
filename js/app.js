@@ -109,7 +109,7 @@ async function initApp() {
         console.log('初始化应用...');
         
         // 首先添加事件监听
-    addEventListeners();
+        addEventListeners();
         
         // 尝试自动登录，如果失败会显示登录页面
         await tryAutoLogin();
@@ -124,8 +124,15 @@ async function initApp() {
 async function tryAutoLogin() {
     try {
         const savedFullName = localStorage.getItem('user_full_name');
+        console.log('尝试自动登录，保存的用户名:', savedFullName);
+        
         if (savedFullName) {
             userState.fullName = savedFullName;
+            
+            // 加载保存的工序设置
+            loadSavedProcessSelection();
+            
+            // 导航到主页
             navigateToHome();
             console.log('自动登录成功:', savedFullName);
         } else {
@@ -153,11 +160,13 @@ function addEventListeners() {
     document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
     document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
     
-    // 设置开关
-    document.getElementById('exit-after-scan').addEventListener('change', function(e) {
-        userState.exitAfterScan = e.target.checked;
-        localStorage.setItem('exit_after_scan', e.target.checked);
-    });
+    // 工序选择下拉框变化时保存选择
+    const processSelect = document.getElementById('process-select');
+    if (processSelect) {
+        processSelect.addEventListener('change', function() {
+            saveProcessSelection(this.value);
+        });
+    }
     
     // 单次扫码工序按钮
     document.querySelectorAll('.process-btn').forEach(btn => {
@@ -189,6 +198,32 @@ function addEventListeners() {
     // 扫码相关
     document.getElementById('scan-stop').addEventListener('click', stopScan);
     document.getElementById('scan-upload').addEventListener('click', uploadPendingCodes);
+}
+
+// 保存工序选择到本地存储
+function saveProcessSelection(processType) {
+    try {
+        localStorage.setItem('selected_process', processType);
+        console.log('工序选择已保存:', processType);
+    } catch (error) {
+        console.error('保存工序选择失败:', error);
+    }
+}
+
+// 从本地存储加载工序选择
+function loadSavedProcessSelection() {
+    try {
+        const savedProcess = localStorage.getItem('selected_process');
+        if (savedProcess) {
+            const processSelect = document.getElementById('process-select');
+            if (processSelect) {
+                processSelect.value = savedProcess;
+                console.log('已恢复保存的工序选择:', savedProcess);
+            }
+        }
+    } catch (error) {
+        console.error('加载工序选择失败:', error);
+    }
 }
 
 // 处理登录
@@ -623,35 +658,47 @@ function stopScan() {
     if (scanState.isContinuous && scanState.pendingCodes.length > 0) {
         if (confirm('是否放弃上传？')) {
             scanState.pendingCodes = [];
-            stopScanner();
-            
+            stopScanner().then(() => {
+                // 只有在非查询模式下才移除手动输入框
+                if (scanState.processType !== 'query') {
+                    const existingInputs = document.querySelectorAll('#manual-input-container');
+                    existingInputs.forEach(element => element.remove());
+                }
+                
+                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+            }).catch(error => {
+                console.error('停止扫码器出错:', error);
+                // 即使出错也尝试返回
+                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+            });
+        }
+    } else {
+        stopScanner().then(() => {
             // 只有在非查询模式下才移除手动输入框
             if (scanState.processType !== 'query') {
                 const existingInputs = document.querySelectorAll('#manual-input-container');
                 existingInputs.forEach(element => element.remove());
             }
             
-            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-        }
-    } else {
-        stopScanner();
-        
-        // 只有在非查询模式下才移除手动输入框
-        if (scanState.processType !== 'query') {
-            const existingInputs = document.querySelectorAll('#manual-input-container');
-            existingInputs.forEach(element => element.remove());
-        }
-        
-        // 根据当前扫码类型决定返回的页面
-        if (scanState.processType === 'query') {
-            console.log("产品扫码查询 - 返回主页");
-            // 产品扫码查询 - 返回主页
-            showScreen(SCREENS.HOME);
-        } else {
-            console.log("其他扫码 - 返回选择页面");
-            // 其他扫码 - 返回对应的扫码选择页面
-            showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-        }
+            // 根据当前扫码类型决定返回的页面
+            if (scanState.processType === 'query') {
+                console.log("产品扫码查询 - 返回主页");
+                // 产品扫码查询 - 返回主页
+                showScreen(SCREENS.HOME);
+            } else {
+                console.log("其他扫码 - 返回选择页面");
+                // 其他扫码 - 返回对应的扫码选择页面
+                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+            }
+        }).catch(error => {
+            console.error('停止扫码器出错:', error);
+            // 即使出错也尝试返回
+            if (scanState.processType === 'query') {
+                showScreen(SCREENS.HOME);
+            } else {
+                showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+            }
+        });
     }
 }
 
@@ -2395,6 +2442,9 @@ function handleSingleScan() {
         return;
     }
     
+    // 保存工序选择
+    saveProcessSelection(selectedProcess);
+    
     // 设置单个扫码工序提示
     const processDisplay = document.getElementById('single-scan-process');
     processDisplay.innerHTML = `<strong>当前工序:</strong> ${selectedProcessText}`;
@@ -2421,6 +2471,9 @@ function handleContinuousScan() {
         showToast('请先选择工序', 'warning');
         return;
     }
+    
+    // 保存工序选择
+    saveProcessSelection(selectedProcess);
     
     // 设置连续扫码工序提示
     const processDisplay = document.getElementById('continuous-scan-process');
