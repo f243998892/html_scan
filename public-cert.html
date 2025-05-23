@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公网证书下载</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { padding: 20px; }
+        .device-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .domain-badge {
+            font-size: 1rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background-color: #f8f9fa;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">公网证书下载</h1>
+        
+        <div class="alert alert-warning mb-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>注意：</strong>此页面提供的证书用于公网访问 <span class="fw-bold">www.fanghui8131.fun</span>。使用此证书可避免浏览器安全警告。
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-android2 text-success device-icon"></i>
+                        <h5 class="card-title">安卓设备</h5>
+                        <div class="domain-badge">
+                            <i class="bi bi-globe me-1"></i>www.fanghui8131.fun
+                        </div>
+                        <p>请下载适用于安卓设备的公网证书:</p>
+                        <a href="/public-ca/public_rootCA.cer" class="btn btn-success mb-2">
+                            <i class="bi bi-download me-1"></i>下载公网证书 (.cer)
+                        </a>
+                        <div class="alert alert-info mt-3 text-start">
+                            <small><i class="bi bi-info-circle me-1"></i>安装提示：下载后点击证书文件，在安全设置中选择"VPN和应用"用途安装。</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-apple text-dark device-icon"></i>
+                        <h5 class="card-title">iOS设备</h5>
+                        <div class="domain-badge">
+                            <i class="bi bi-globe me-1"></i>www.fanghui8131.fun
+                        </div>
+                        <p>请下载适用于iPhone/iPad的公网证书:</p>
+                        <a href="/public-ca/public_rootCA.der" class="btn btn-dark mb-2">
+                            <i class="bi bi-download me-1"></i>下载公网证书 (.der)
+                        </a>
+                        <div class="alert alert-info mt-3 text-start">
+                            <small><i class="bi bi-info-circle me-1"></i>安装提示：下载后前往"设置"→"已下载描述文件"安装，再到"关于本机"→"证书信任设置"开启信任。</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-question-circle me-2"></i>常见问题</h5>
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                为什么需要安装公网证书？
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p>自签名证书不被操作系统默认信任，需要手动安装并信任才能避免浏览器安全警告。安装此证书后，您可以通过HTTPS安全地访问我们的公网站点：</p>
+                                <div class="d-grid gap-2 col-md-8 mx-auto mt-3">
+                                    <a href="https://www.fanghui8131.fun" class="btn btn-outline-primary">
+                                        <i class="bi bi-globe me-2"></i>访问公网站点
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                证书安装后仍显示不安全？
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>确保您已正确安装并信任证书</li>
+                                    <li>尝试重启浏览器或设备</li>
+                                    <li>确认访问的域名为 <code>https://www.fanghui8131.fun</code></li>
+                                    <li>iOS设备需要在"关于本机"→"证书信任设置"中开启信任</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <a href="/install-public-ca.html" class="btn btn-primary me-2">
+                <i class="bi bi-book me-1"></i>查看详细安装教程
+            </a>
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="bi bi-house me-1"></i>返回首页
+            </a>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

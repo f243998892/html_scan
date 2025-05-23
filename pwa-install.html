@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安装应用</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">安装扫码应用到主屏幕</h3>
+                <p>将此Web应用安装到主屏幕，可以获得更好的体验：</p>
+                
+                <!-- iOS设备安装指南 -->
+                <div class="mb-4">
+                    <h5>iOS设备：</h5>
+                    <ol class="mb-3">
+                        <li>在Safari浏览器中打开 <a href="http://192.168.0.215">http://192.168.0.215</a></li>
+                        <li>点击分享按钮 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M15 14.5a2.5 2.5 0 0 0-1.7.7l-7.3-4.2c0-.2.1-.3.1-.5 0-.2 0-.3-.1-.5l7.3-4.2c.4.3 1 .7 1.7.7 1.4 0 2.5-1.1 2.5-2.5S16.4 1.5 15 1.5 12.5 2.6 12.5 4c0 .2 0 .3.1.5L5.3 8.7c-.4-.3-1-.7-1.7-.7C2.1 8 1 9.1 1 10.5S2.1 13 3.5 13c.7 0 1.3-.3 1.7-.7l7.3 4.2c0 .2-.1.3-.1.5 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5-1-2.5-2.4-2.5z"/></svg></li>
+                        <li>向下滑动并找到"添加到主屏幕"</li>
+                        <li>点击"添加"</li>
+                    </ol>
+                </div>
+                
+                <!-- Android设备安装指南 -->
+                <div class="mb-4">
+                    <h5>Android设备：</h5>
+                    <ol class="mb-3">
+                        <li>在Chrome浏览器中打开 <a href="http://192.168.0.215">http://192.168.0.215</a></li>
+                        <li>点击菜单按钮（右上角三个点）</li>
+                        <li>选择"安装应用"或"添加到主屏幕"</li>
+                        <li>确认安装</li>
+                    </ol>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>优点：</strong> 添加到主屏幕后，应用可以全屏运行，并且可以更方便地访问相机等功能。
+                </div>
+                <div class="text-center mt-4">
+                    <a href="/" class="btn btn-primary btn-lg">继续访问网站</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // 注册Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        // 暂时禁用Service Worker注册
+        console.log('Service Worker 已禁用');
+        /*
+        navigator.serviceWorker.register('/service-worker.js');
+        */
+      });
+    }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载证书</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    <style>
+        body { padding: 20px; }
+        .device-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .protocol-badge {
+            font-size: 0.8rem;
+            padding: 3px 6px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .http-badge {
+            background-color: #ffc107;
+            color: #000;
+        }
+        .https-badge {
+            background-color: #198754;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">证书下载</h1>
+        
+        <div class="alert alert-warning mb-4">
+            <h5><i class="bi bi-exclamation-triangle-fill me-2"></i>重要说明</h5>
+            <p><strong>iOS用户访问流程：</strong></p>
+            <ol>
+                <li>先通过 <span class="badge protocol-badge http-badge">HTTP</span> <strong>http://192.168.0.215</strong> 下载并安装证书</li>
+                <li>然后通过 <span class="badge protocol-badge https-badge">HTTPS</span> <strong>https://192.168.0.215</strong> 访问系统</li>
+            </ol>
+            <p>如果直接访问HTTPS站点会提示不安全，这是由于iOS强制要求用户手动安装并信任自签名证书。</p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-android2 text-success device-icon"></i>
+                        <h5 class="card-title">安卓设备</h5>
+                        <p>请下载适用于安卓设备的证书:</p>
+                        <a href="/ca/rootCA.cer" class="btn btn-success mb-2">
+                            <i class="bi bi-download me-1"></i>下载安卓证书 (.cer)
+                        </a>
+                        <a href="data:application/x-pkcs12;base64,MIIFpDCCA4ygAwIBAgIJAO8DIPtL9iZCMA0GCSqGSIb3DQEBCwUAMGkxCzAJBgNVBAYTAkNOMQ4wDAYDVQQIDAVTdGF0ZTENMAsGA1UEBwwEQ2l0eTEUMBIGA1UECgwLT3JnYW5pemF0aW9uMRQwEgYDVQQDDAtJbnRlcm5hbCBDQTERMA8GA1UEBwwIU2hhbmdoYWkwHhcNMjUwNTA5MDgzMDM3WhcNMzUwNTA2MDgzMDM3WjBpMQswCQYDVQQGEwJDTjEOMAwGA1UECAwFU3RhdGUxDTALBgNVBAcMBENpdHkxFDASBgNVBAoMC09yZ2FuaXphdGlvbjEUMBIGA1UEAwwLSW50ZXJuYWwgQ0ExETAPBgNVBAcMCFNoYW5naGFpMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwgD94NIOvJRXR0jrVuuuRbXK0xDLdcHMM0xxtHgsIuP/FxWJmKB1hDu8x1j1jNZv2/lmI1/Pf2gxOvRTH5BsFrZc4SxlvEOBJPg/yCJBXpmVUABvxkTGtNm8iUSLJ6ZXifgdFieCzEHuT3U6WzflfGJPOx0jRZy9WRRIxrT4WvNRtj+0ZXX7H1Yb2BlHrNJ+cQNKOEAO6LXjnNLgCDGJcQ4HnI2Y9YB7xT+CvQQXcZdZNMtG+i5JCVMP9/rI+FYC7i5e+AKGjfZlBGBk22PYyeWS/PuJZw0Y8W2Gh47qBCCGxDqjk1YiUvlQ5rf7mQBAGZXzUDTjD5hZhQeY6REIwpllPCvAkgc7ESBvIFQDVSgpcqRiNVECWbwN5MQZbKmHvr27rqYW7kIrVV/t/4VAUo1Wf357jHKD22XYuUqMDXOu8fUHjVX5YWoFpB3Iv+33lKTPwl67A6wxRSA8EZsGV5m/JO+ESQKvPGQ8U4QwwBZLmJjNupkzm/+4i+RJwbxcKfVJv3jfHo/uHsZy1JL+m+fQ06FvDl+oL/ZEMiT6hO51bAWgBmQAGLfPbTz8JT9+ZF1x42EBfZlQ7v3nQSrNLp3FBz1xwqmCR0kZ+i1UF3GG7bIyCbPWBV4r12/P1w+/4Oz5yBl1IfPYwDfWXQcCAwEAAaNgMF4wCwYDVR0PBAQDAgHGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMB8GA1UdIwQYMBaAFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMA0GCSqGSIb3DQEBCwUAA4ICAQB6Cx8UqSX9aj0YUVIiqVYzj4YwoLsq28bsOhhLQZaRtPJ1F2Fz7QF6hHeSGh9kO8cBfUDjOILj+/sNE9YDlFXMB7rAaU0jmmLAZXQNJ8UiKZWU3y9TRy9k60eJ3FUWZ2g55JSFPmP41KWXwHl/V9xm2U3n5KnGMR6ZHgqbH7r8p43oE1Dj/ZpgkjUPTOzznXQKEoSeR06N95EhKkr+5i4wCiucLKMHVbUCrUiSvDQZvKv+Bs8JEpCv4IPQT4a7pQz8K4zaNO8EkTUV/uQFohdGZ2bIqNZwV6lv2ygxm4zQSnOQjkbMfmGEZ3N34UxjJ+0BoqgUWBVSUqCjU8TzCObMABgZbUOcVKXdlHAQyOwX6R7wKxoXajNV+Y3LZ0WEmdflRWy2k51CNPjwPF28+pXLSW8tpC9D+Jvx+9+U32xyiOi3l3s0KfXePVdwRzxz5fKK5Q8uTt3r9RjKTTZCvmTKI5tXX7N5+v4Zu6/T79GGwcKf7vrNJeYdIvPxd7ZqnpJ4gMyX/c8jBZBTiJKSWE5QdAE/7FNqVQf+lPDXK0SSoTZXVnb2Cq7mJLH1lKa5OT4Y7cCGDrIUoSTkucj76iJ/XnnDZNEbPQcB++jLKSZ1LXH5nJHxpKnI2Ow84Q==" class="btn btn-outline-success mt-2" download="rootCA.cer">备用下载</a>
+                        <div class="alert alert-info mt-3 text-start">
+                            <small><i class="bi bi-info-circle me-1"></i>安装提示：下载后点击证书文件，在安全设置中选择"VPN和应用"用途安装。</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-apple me-2"></i>iOS设备 - 特别注意
+                    </div>
+                    <div class="card-body text-center">
+                        <i class="bi bi-apple text-dark device-icon"></i>
+                        <h5 class="card-title">iPhone/iPad用户</h5>
+                        <p>请先通过<span class="badge bg-warning text-dark">HTTP</span>下载证书：</p>
+                        <a href="/ca/rootCA.der" class="btn btn-dark mb-2">
+                            <i class="bi bi-download me-1"></i>下载iOS证书 (.der)
+                        </a>
+                        <a href="data:application/x-x509-ca-cert;base64,MIIFpDCCA4ygAwIBAgIJAO8DIPtL9iZCMA0GCSqGSIb3DQEBCwUAMGkxCzAJBgNVBAYTAkNOMQ4wDAYDVQQIDAVTdGF0ZTENMAsGA1UEBwwEQ2l0eTEUMBIGA1UECgwLT3JnYW5pemF0aW9uMRQwEgYDVQQDDAtJbnRlcm5hbCBDQTERMA8GA1UEBwwIU2hhbmdoYWkwHhcNMjUwNTA5MDgzMDM3WhcNMzUwNTA2MDgzMDM3WjBpMQswCQYDVQQGEwJDTjEOMAwGA1UECAwFU3RhdGUxDTALBgNVBAcMBENpdHkxFDASBgNVBAoMC09yZ2FuaXphdGlvbjEUMBIGA1UEAwwLSW50ZXJuYWwgQ0ExETAPBgNVBAcMCFNoYW5naGFpMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwgD94NIOvJRXR0jrVuuuRbXK0xDLdcHMM0xxtHgsIuP/FxWJmKB1hDu8x1j1jNZv2/lmI1/Pf2gxOvRTH5BsFrZc4SxlvEOBJPg/yCJBXpmVUABvxkTGtNm8iUSLJ6ZXifgdFieCzEHuT3U6WzflfGJPOx0jRZy9WRRIxrT4WvNRtj+0ZXX7H1Yb2BlHrNJ+cQNKOEAO6LXjnNLgCDGJcQ4HnI2Y9YB7xT+CvQQXcZdZNMtG+i5JCVMP9/rI+FYC7i5e+AKGjfZlBGBk22PYyeWS/PuJZw0Y8W2Gh47qBCCGxDqjk1YiUvlQ5rf7mQBAGZXzUDTjD5hZhQeY6REIwpllPCvAkgc7ESBvIFQDVSgpcqRiNVECWbwN5MQZbKmHvr27rqYW7kIrVV/t/4VAUo1Wf357jHKD22XYuUqMDXOu8fUHjVX5YWoFpB3Iv+33lKTPwl67A6wxRSA8EZsGV5m/JO+ESQKvPGQ8U4QwwBZLmJjNupkzm/+4i+RJwbxcKfVJv3jfHo/uHsZy1JL+m+fQ06FvDl+oL/ZEMiT6hO51bAWgBmQAGLfPbTz8JT9+ZF1x42EBfZlQ7v3nQSrNLp3FBz1xwqmCR0kZ+i1UF3GG7bIyCbPWBV4r12/P1w+/4Oz5yBl1IfPYwDfWXQcCAwEAAaNgMF4wCwYDVR0PBAQDAgHGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMB8GA1UdIwQYMBaAFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMA0GCSqGSIb3DQEBCwUAA4ICAQB6Cx8UqSX9aj0YUVIiqVYzj4YwoLsq28bsOhhLQZaRtPJ1F2Fz7QF6hHeSGh9kO8cBfUDjOILj+/sNE9YDlFXMB7rAaU0jmmLAZXQNJ8UiKZWU3y9TRy9k60eJ3FUWZ2g55JSFPmP41KWXwHl/V9xm2U3n5KnGMR6ZHgqbH7r8p43oE1Dj/ZpgkjUPTOzznXQKEoSeR06N95EhKkr+5i4wCiucLKMHVbUCrUiSvDQZvKv+Bs8JEpCv4IPQT4a7pQz8K4zaNO8EkTUV/uQFohdGZ2bIqNZwV6lv2ygxm4zQSnOQjkbMfmGEZ3N34UxjJ+0BoqgUWBVSUqCjU8TzCObMABgZbUOcVKXdlHAQyOwX6R7wKxoXajNV+Y3LZ0WEmdflRWy2k51CNPjwPF28+pXLSW8tpC9D+Jvx+9+U32xyiOi3l3s0KfXePVdwRzxz5fKK5Q8uTt3r9RjKTTZCvmTKI5tXX7N5+v4Zu6/T79GGwcKf7vrNJeYdIvPxd7ZqnpJ4gMyX/c8jBZBTiJKSWE5QdAE/7FNqVQf+lPDXK0SSoTZXVnb2Cq7mJLH1lKa5OT4Y7cCGDrIUoSTkucj76iJ/XnnDZNEbPQcB++jLKSZ1LXH5nJHxpKnI2Ow84Q==" class="btn btn-outline-dark mt-2" download="rootCA.der">备用下载</a>
+                        <div class="alert alert-warning mt-3 text-start">
+                            <small><i class="bi bi-exclamation-triangle me-1"></i><strong>重要提示：</strong> iOS用户必须先完成证书安装才能打开HTTPS站点，否则系统会提示"不安全"而无法访问。</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>常见问题</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                为什么iOS无法直接通过HTTPS访问？
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p>iOS对自签名证书有严格的安全限制，必须先完成以下步骤：</p>
+                                <ol>
+                                    <li>通过HTTP下载证书文件</li>
+                                    <li>在设置中安装证书</li>
+                                    <li>在"证书信任设置"中手动开启信任</li>
+                                    <li>然后才能通过HTTPS访问内网应用</li>
+                                </ol>
+                                <p>这是苹果的安全策略，无法绕过，请耐心按照步骤操作。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                安卓提示"无法读取证书文件"怎么办？
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p>这可能是证书格式问题，请尝试：</p>
+                                <ol>
+                                    <li>确保使用"安卓设备"专用的下载按钮</li>
+                                    <li>下载后重命名文件为<code>rootCA.cer</code>格式（如已是此格式可忽略）</li>
+                                    <li>使用文件管理器打开，选择"VPN和应用"方式安装</li>
+                                    <li>如仍有问题，请联系管理员获取帮助</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <a href="/install-ca.html" class="btn btn-primary me-2">
+                <i class="bi bi-book me-1"></i>查看详细安装教程
+            </a>
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="bi bi-house me-1"></i>返回首页
+            </a>
+        </div>
+    </div>
+    
+    <script src="js/bootstrap/bootstrap.bundle.min.js"></script>
+</body>
+</html>

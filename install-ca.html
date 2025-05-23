@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安装证书</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    <style>
+        body { padding: 20px; }
+        .device-icon { font-size: 3rem; margin-bottom: 15px; }
+        .nav-pills .nav-link.active { background-color: #0d6efd; }
+        .nav-pills .nav-link { color: #0d6efd; }
+        .protocol-badge {
+            font-size: 0.8rem;
+            padding: 3px 6px;
+            margin-right: 5px;
+        }
+        .http-badge {
+            background-color: #ffc107;
+            color: #000;
+        }
+        .https-badge {
+            background-color: #198754;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">安装内网CA证书</h3>
+                
+                <!-- iOS用户特别指南 -->
+                <div class="alert alert-warning">
+                    <h5><i class="bi bi-exclamation-triangle-fill me-2"></i>iOS用户特别注意</h5>
+                    <p>由于iOS安全限制，您必须严格按照以下流程操作：</p>
+                    <ol>
+                        <li>通过 <span class="badge protocol-badge http-badge">HTTP</span> <strong>http://192.168.0.215</strong> <a href="http://192.168.0.215/download-cert.html">下载证书</a></li>
+                        <li>按照本页面指南完成证书安装和信任设置</li>
+                        <li>然后通过 <span class="badge protocol-badge https-badge">HTTPS</span> <strong>https://192.168.0.215</strong> 安全访问系统</li>
+                    </ol>
+                    <p>如果直接访问HTTPS站点会提示"此网站不安全"，这是因为iOS需要您手动信任自签名证书。</p>
+                </div>
+                
+                <p>要通过HTTPS安全访问内网应用，请先<a href="/download-cert.html" class="fw-bold">下载适合您设备的证书</a>，然后按照以下说明安装：</p>
+                
+                <!-- 设备选择标签页 -->
+                <ul class="nav nav-pills mb-4 justify-content-center" id="deviceTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active d-flex align-items-center" id="android-tab" data-bs-toggle="pill" data-bs-target="#android" type="button" role="tab">
+                            <i class="bi bi-android2 me-2"></i>安卓设备
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link d-flex align-items-center" id="ios-tab" data-bs-toggle="pill" data-bs-target="#ios" type="button" role="tab">
+                            <i class="bi bi-apple me-2"></i>iOS设备
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- 标签页内容 -->
+                <div class="tab-content" id="deviceTabContent">
+                    <!-- 安卓设备安装指南 -->
+                    <div class="tab-pane fade show active" id="android" role="tabpanel">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-android2 text-success device-icon"></i>
+                            <h4>安卓设备安装步骤</h4>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-1-circle-fill me-2 text-primary"></i>下载并打开证书</h5>
+                                <ol class="mb-3">
+                                    <li>从<a href="/download-cert.html" class="fw-bold">下载证书页面</a>下载<b class="text-success">安卓证书(.cer格式)</b></li>
+                                    <li>下载完成后，在通知栏找到下载的证书并点击</li>
+                                    <li>如果自动打开失败，请使用文件管理器找到并打开下载的证书文件</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-2-circle-fill me-2 text-primary"></i>设置证书用途</h5>
+                                <ol class="mb-3">
+                                    <li>系统会提示为证书命名，可以使用默认名称</li>
+                                    <li class="text-danger fw-bold">重要：在弹出窗口选择"VPN和应用"作为证书用途</li>
+                                    <li>如果没有看到此选项，尝试在"证书名称"下方找到"凭据用途"选项</li>
+                                </ol>
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>如果安装时提示"无法读取证书文件"，请确保下载的是<b>.cer</b>格式的证书，并且使用文件管理器打开它。
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-3-circle-fill me-2 text-primary"></i>完成安装</h5>
+                                <ol class="mb-3">
+                                    <li>如果设备有锁屏密码或指纹，需要验证以确认安装</li>
+                                    <li>安装完成后，系统会提示证书已安装</li>
+                                    <li>现在可以通过HTTPS访问内网站点了</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- iOS设备安装指南 -->
+                    <div class="tab-pane fade" id="ios" role="tabpanel">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-apple text-dark device-icon"></i>
+                            <h4>iOS设备安装步骤</h4>
+                        </div>
+                        <div class="card mb-3 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <strong><i class="bi bi-exclamation-triangle me-2"></i>先决条件</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2 fw-bold">必须先通过HTTP下载证书，否则无法访问HTTPS站点：</p>
+                                <a href="http://192.168.0.215/download-cert.html" class="btn btn-warning mb-3">
+                                    <i class="bi bi-download me-1"></i>通过HTTP下载证书
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-1-circle-fill me-2 text-primary"></i>下载证书</h5>
+                                <ol class="mb-3">
+                                    <li>使用上方按钮或从<a href="http://192.168.0.215/download-cert.html" class="fw-bold">HTTP下载页面</a>下载<b class="text-dark">iOS证书(.der格式)</b></li>
+                                    <li>系统将提示"此网站正尝试下载配置描述文件"，点击"允许"</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-2-circle-fill me-2 text-primary"></i>安装证书</h5>
+                                <ol class="mb-3">
+                                    <li>打开"设置"应用</li>
+                                    <li>点击顶部的"已下载描述文件"通知</li>
+                                    <li>点击"安装"，然后输入设备密码</li>
+                                </ol>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>如果没有看到"已下载描述文件"，请转到"设置" → "通用" → "描述文件"查找。
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-3-circle-fill me-2 text-primary"></i>信任证书</h5>
+                                <ol class="mb-3">
+                                    <li>返回"设置"主页</li>
+                                    <li>转到"通用" → "关于本机" → "证书信任设置"</li>
+                                    <li class="text-danger fw-bold">开启对"Internal CA"证书的完全信任（非常重要！）</li>
+                                    <li>现在可以通过HTTPS访问内网站点了</li>
+                                </ol>
+                                <div class="alert alert-danger">
+                                    <i class="bi bi-exclamation-circle me-2"></i><strong>必须完成信任设置！</strong> 如果跳过此步骤，iOS将会继续阻止访问HTTPS站点。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <strong><i class="bi bi-info-circle me-2"></i>提示：</strong> 安装证书后，请使用 <a href="https://192.168.0.215" class="fw-bold">https://192.168.0.215</a> 访问应用。
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="http://192.168.0.215/download-cert.html" class="btn btn-warning btn-lg me-2">
+                        <i class="bi bi-download me-2"></i>HTTP下载证书
+                    </a>
+                    <a href="https://192.168.0.215" class="btn btn-primary btn-lg me-2">
+                        <i class="bi bi-shield-check me-2"></i>HTTPS安全访问
+                    </a>
+                    <a href="/" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-house me-2"></i>返回首页
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/bootstrap/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

@@ -1,0 +1,563 @@
+async function getMonthRange() {
+    try {
+        // 从API获取月份范围
+        const response = await fetch(`${HTTP_API_URL}/api/getMonthRange`);
+        
+        if (!response.ok) {
+            console.error('获取月份范围失败:', response.statusText);
+            // 设置默认范围作为备用
+            setDefaultMonthRange();
+            return true;
+        }
+        
+        const result = await response.json();
+        if (result.data && result.data.startDate && result.data.endDate) {
+            queryState.monthRange.startDate = new Date(result.data.startDate);
+            queryState.monthRange.endDate = new Date(result.data.endDate);
+            console.log('从数据库获取的月份范围:', 
+                queryState.monthRange.startDate.toISOString(), '至', 
+                queryState.monthRange.endDate.toISOString());
+            return true;
+        } else {
+            // 如果API返回的数据不完整，使用默认范围
+            console.warn('API返回的月份范围不完整，使用默认范围');
+            setDefaultMonthRange();
+            return true;
+        }
+    } catch (error) {
+        console.error('获取月份范围失败:', error);
+        setDefaultMonthRange();
+        return true;
+    }
+}
+
+// 设置默认月份范围（本月第一天到最后一天）
+function setDefaultMonthRange() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    queryState.monthRange.startDate = firstDay;
+    queryState.monthRange.endDate = lastDay;
+    
+    console.log('使用默认月份范围:', 
+        queryState.monthRange.startDate.toISOString(), '至', 
+        queryState.monthRange.endDate.toISOString());
+}
+
+// 加载用户本月完成的产品工序统计
+async function loadUserMonthlyProcesses() {
+    try {
+        // 显示加载中
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 查询用户本月完成的产品
+        const products = await getUserMonthlyProducts(
+            userState.fullName,
+            queryState.monthRange.startDate,
+            queryState.monthRange.endDate
+        );
+        
+        if (!products || products.length === 0) {
+            document.getElementById('process-list').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+            return;
+        }
+        
+        // 统计各工序数量
+        const processCounts = {
+            '绕线': 0,
+            '嵌线': 0,
+            '接线': 0,
+            '压装': 0,
+            '车止口': 0,
+            '浸漆': 0
+        };
+        
+        // 统计各工序和型号
+        const processModels = {
+            '绕线': {},
+            '嵌线': {},
+            '接线': {},
+            '压装': {},
+            '车止口': {},
+            '浸漆': {}
+        };
+        
+        // 统计工序和产品编码
+        const processProducts = {
+            '绕线': {},
+            '嵌线': {},
+            '接线': {},
+            '压装': {},
+            '车止口': {},
+            '浸漆': {}
+        };
+        
+        // 处理产品数据
+        products.forEach(product => {
+            // 检查该用户完成的工序
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'])) {
+                processCounts['绕线']++;
+                
+                // 按型号统计
+                if (!processModels['绕线'][product['产品型号']]) {
+                    processModels['绕线'][product['产品型号']] = 0;
+                }
+                processModels['绕线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['绕线'][product['产品型号']]) {
+                    processProducts['绕线'][product['产品型号']] = [];
+                }
+                processProducts['绕线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['绕线时间']
+                });
+            }
+            
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'])) {
+                processCounts['嵌线']++;
+                
+                // 按型号统计
+                if (!processModels['嵌线'][product['产品型号']]) {
+                    processModels['嵌线'][product['产品型号']] = 0;
+                }
+                processModels['嵌线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['嵌线'][product['产品型号']]) {
+                    processProducts['嵌线'][product['产品型号']] = [];
+                }
+                processProducts['嵌线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['嵌线时间']
+                });
+            }
+            
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'])) {
+                processCounts['接线']++;
+                
+                // 按型号统计
+                if (!processModels['接线'][product['产品型号']]) {
+                    processModels['接线'][product['产品型号']] = 0;
+                }
+                processModels['接线'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['接线'][product['产品型号']]) {
+                    processProducts['接线'][product['产品型号']] = [];
+                }
+                processProducts['接线'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['接线时间']
+                });
+            }
+            
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'])) {
+                processCounts['压装']++;
+                
+                // 按型号统计
+                if (!processModels['压装'][product['产品型号']]) {
+                    processModels['压装'][product['产品型号']] = 0;
+                }
+                processModels['压装'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['压装'][product['产品型号']]) {
+                    processProducts['压装'][product['产品型号']] = [];
+                }
+                processProducts['压装'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['压装时间']
+                });
+            }
+            
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'])) {
+                processCounts['车止口']++;
+                
+                // 按型号统计
+                if (!processModels['车止口'][product['产品型号']]) {
+                    processModels['车止口'][product['产品型号']] = 0;
+                }
+                processModels['车止口'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['车止口'][product['产品型号']]) {
+                    processProducts['车止口'][product['产品型号']] = [];
+                }
+                processProducts['车止口'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['车止口时间']
+                });
+            }
+            
+            if (isDateInRange(product['浸漆时间'])) {
+                processCounts['浸漆']++;
+                
+                // 按型号统计
+                if (!processModels['浸漆'][product['产品型号']]) {
+                    processModels['浸漆'][product['产品型号']] = 0;
+                }
+                processModels['浸漆'][product['产品型号']]++;
+                
+                // 存储产品编码和时间
+                if (!processProducts['浸漆'][product['产品型号']]) {
+                    processProducts['浸漆'][product['产品型号']] = [];
+                }
+                processProducts['浸漆'][product['产品型号']].push({
+                    code: product['产品编码'],
+                    time: product['浸漆时间']
+                });
+            }
+        });
+        
+        // 保存查询结果，以便后续使用
+        queryState.processModels = processModels;
+        queryState.processProducts = processProducts;
+        
+        // 生成工序列表
+        let processListHTML = '';
+        
+        Object.keys(processCounts).forEach(process => {
+            if (processCounts[process] > 0) {
+                processListHTML += `
+                    <div class="process-item" data-process="${process}">
+                        <span>${process}</span>
+                        <span class="badge bg-primary rounded-pill">${processCounts[process]}</span>
+                    </div>
+                `;
+            }
+        });
+        
+        if (processListHTML === '') {
+            processListHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
+        }
+        
+        document.getElementById('process-list').innerHTML = processListHTML;
+        
+        // 添加点击事件，显示型号列表
+        document.querySelectorAll('.process-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const process = this.getAttribute('data-process');
+                showModelList(process);
+            });
+        });
+        
+        // 加载月度流水账
+        loadMonthlyTransactionList();
+    } catch (error) {
+        console.error('加载用户本月工序统计失败:', error);
+        document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
+    }
+}
+
+// 检查日期是否在当前月份范围内
+function isDateInRange(dateString, startDate, endDate) {
+    if (!dateString) return false;
+    
+    const date = new Date(dateString);
+    
+    // 如果没有提供开始和结束日期，使用queryState中的日期范围
+    if (!startDate || !endDate) {
+        startDate = queryState.monthRange.startDate;
+        endDate = queryState.monthRange.endDate;
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // 移除时间部分进行纯日期比较
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    return date >= start && date <= end;
+}
+
+// 显示型号列表
+function showModelList(process) {
+    queryState.currentProcess = process;
+    
+    // 更新标题
+    document.getElementById('models-title').textContent = `${process}型号列表`;
+    
+    // 获取该工序的所有型号
+    const models = queryState.processModels[process];
+    
+    // 生成型号列表
+    let modelListHTML = '';
+    
+    Object.keys(models).forEach(model => {
+        if (models[model] > 0) {
+            modelListHTML += `
+                <div class="model-item" data-model="${model}">
+                    <span>${model}</span>
+                    <span class="badge bg-success rounded-pill">${models[model]}</span>
+                </div>
+            `;
+        }
+    });
+    
+    if (modelListHTML === '') {
+        modelListHTML = '<div class="text-center my-3">暂无型号数据</div>';
+    }
+    
+    document.getElementById('model-list').innerHTML = modelListHTML;
+    
+    // 添加点击事件，显示产品列表
+    document.querySelectorAll('.model-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const model = this.getAttribute('data-model');
+            showProductList(queryState.currentProcess, model);
+        });
+    });
+    
+    // 显示型号列表屏幕
+    showScreen(SCREENS.MODELS);
+}
+
+// 显示产品列表
+function showProductList(process, model) {
+    queryState.currentModel = model;
+    
+    // 更新标题
+    document.getElementById('products-title').textContent = `${process} - ${model}`;
+    
+    // 获取该工序和型号的所有产品
+    const products = queryState.processProducts[process][model] || [];
+    
+    // 按时间排序
+    products.sort((a, b) => new Date(b.time) - new Date(a.time));
+    
+    // 生成产品列表
+    let productListHTML = '';
+    
+    products.forEach(product => {
+        productListHTML += `
+            <div class="product-item" data-code="${product.code}">
+                <span>${product.code}</span>
+                <span>${formatDate(product.time)}</span>
+            </div>
+        `;
+    });
+    
+    if (productListHTML === '') {
+        productListHTML = '<div class="text-center my-3">暂无产品数据</div>';
+    }
+    
+    document.getElementById('product-list').innerHTML = productListHTML;
+    
+    // 添加点击事件，查询产品详情
+    document.querySelectorAll('.product-item').forEach(item => {
+        item.addEventListener('click', async function() {
+            const code = this.getAttribute('data-code');
+            
+            try {
+                // 查询产品详情
+                const productData = await getProductDetails(code);
+                
+                if (productData) {
+                    // 显示产品详情
+                    showProductDetail(productData);
+                } else {
+                    showToast('未找到该产品信息', 'error');
+                }
+            } catch (error) {
+                console.error('查询产品详情失败:', error);
+                showToast('查询失败，请重试', 'error');
+            }
+        });
+    });
+    
+    // 显示产品列表屏幕
+    showScreen(SCREENS.PRODUCTS);
+}
+
+// 获取用户本月完成的产品
+async function getUserMonthlyProducts(employeeName, startDate, endDate) {
+    try {
+        // 将日期转换为ISO格式字符串
+        const startDateStr = startDate.toISOString();
+        const endDateStr = endDate.toISOString();
+        
+        console.log('查询时间范围:', startDateStr, '至', endDateStr);
+        console.log('查询员工:', employeeName);
+        
+        // 使用HTTP API查询员工完成的产品
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyProducts?employeeName=${encodeURIComponent(employeeName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
+        
+        if (!response.ok) {
+            console.error('查询产品失败:', response.statusText);
+            return [];
+        }
+        
+        const result = await response.json();
+        return result.data || [];
+    } catch (error) {
+        console.error('获取用户本月产品失败:', error);
+        return [];
+    }
+}
+
+// 获取工序图标
+function getProcessIcon(process) {
+    let iconClass = '';
+    let iconColor = '';
+    
+    switch (process) {
+        case '绕线':
+            iconClass = 'bi-rotate-right';
+            iconColor = 'text-primary';
+            break;
+        case '嵌线':
+            iconClass = 'bi-cable';
+            iconColor = 'text-success';
+            break;
+        case '接线':
+            iconClass = 'bi-power';
+            iconColor = 'text-warning';
+            break;
+        case '压装':
+            iconClass = 'bi-compress';
+            iconColor = 'text-danger';
+            break;
+        case '车止口':
+            iconClass = 'bi-scissors';
+            iconColor = 'text-info';
+            break;
+        case '浸漆':
+            iconClass = 'bi-droplet';
+            iconColor = 'text-secondary';
+            break;
+        default:
+            iconClass = 'bi-gear';
+            iconColor = 'text-muted';
+    }
+    
+    return `<i class="bi ${iconClass} ${iconColor}" style="font-size: 1.5rem;"></i>`;
+}
+
+// 加载本月流水账
+async function loadMonthlyTransactionList() {
+    try {
+        // 获取当前用户信息 - 修复用户信息获取方式
+        const fullName = localStorage.getItem('user_full_name');
+        if (!fullName) {
+            console.error('无法获取用户信息');
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-warning">无法获取用户信息，请重新登录</div>';
+            return;
+        }
+
+        // 显示加载提示
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
+
+        // 确保容器可见
+        document.getElementById('monthly-transactions-container').style.display = 'block';
+
+        // 获取本月范围
+        await getMonthRange();
+
+        // 将日期转换为ISO格式字符串
+        const startDateStr = queryState.monthRange.startDate.toISOString();
+        const endDateStr = queryState.monthRange.endDate.toISOString();
+
+        // 使用HTTP API查询数据库获取产品记录
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
+
+        if (!response.ok) {
+            console.error('加载产品记录失败:', response.statusText);
+            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
+            return;
+        }
+
+        const result = await response.json();
+        const userRecords = result.data || [];
+
+        // 按时间排序（最新的在前）
+        userRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        // 构建HTML表格
+        let html = '';
+        if (userRecords.length === 0) {
+            html = '<div class="alert alert-info">本月无记录</div>';
+        } else {
+            // 创建一个响应式表格
+            html = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">工序</th>
+                                <th scope="col">产品编码</th>
+                                <th scope="col">型号</th>
+                                <th scope="col">时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            userRecords.forEach(record => {
+                // 格式化时间
+                const recordDate = new Date(record.time);
+                const formattedDate = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordDate.getHours()).padStart(2, '0')}:${String(recordDate.getMinutes()).padStart(2, '0')}`;
+                
+                html += `
+                    <tr>
+                        <td>${record.process}</td>
+                        <td>${record.productCode}</td>
+                        <td>${record.model}</td>
+                        <td>${formattedDate}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 更新DOM
+        document.getElementById('monthly-transactions-container').innerHTML = html;
+
+    } catch (error) {
+        console.error('加载流水账失败:', error);
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
+    }
+}
+
+// 在showMonthlyQuery函数中添加对loadMonthlyTransactionList的调用
+function showMonthlyQuery() {
+    showScreen(SCREENS.MONTHLY_QUERY);
+    loadCurrentMonthRange();
+    displayMonthRange();
+    loadUserMonthlyProcesses();
+    // 加载本月流水账
+    loadMonthlyTransactionList();
+}
+
+// 添加获取产品记录的函数
+async function fetchRecords() {
+    try {
+        // 使用实际的API获取数据
+        const response = await fetch(`${HTTP_API_URL}/api/getRecords`);
+        
+        if (!response.ok) {
+            console.error('获取记录失败:', response.statusText);
+            showToast('获取记录失败，请重试', 'error');
+            // 如果API失败，使用全局变量中的记录作为备用
+            return globalRecords;
+        }
+        
+        const result = await response.json();
+        return result.data || [];
+    } catch (error) {
+        console.error('获取记录时出错:', error);
+        showToast('加载记录失败，请重试', 'error');
+        // 如果API失败，使用全局变量中的记录作为备用
+        return globalRecords;
+    }
+}
+
+// 处理删除记录
+async function handleDeleteRecords() {

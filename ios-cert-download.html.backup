@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS证书下载</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    <style>
+        body { 
+            padding: 20px; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .device-icon { 
+            font-size: 3rem; 
+            margin-bottom: 15px; 
+            color: #000;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <i class="bi bi-apple device-icon"></i>
+                    <h2>iOS证书下载</h2>
+                    <p class="text-muted">用于访问内网HTTPS页面的自签名证书</p>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h5><i class="bi bi-exclamation-triangle-fill me-2"></i>为什么需要安装证书？</h5>
+                    <p>由于iOS安全限制，访问内网HTTPS站点需要先安装并信任自签名证书，否则iOS会提示"不安全"并阻止访问。</p>
+                    <p class="mb-0"><strong>完成证书安装后，请访问：</strong> <a href="https://192.168.0.215">https://192.168.0.215</a></p>
+                </div>
+
+                <div class="d-grid gap-2 mb-4">
+                    <a href="/ca/rootCA.der" class="btn btn-lg btn-primary">
+                        <i class="bi bi-download me-2"></i>下载iOS证书
+                    </a>
+                    <a href="data:application/x-x509-ca-cert;base64,MIIFpDCCA4ygAwIBAgIJAO8DIPtL9iZCMA0GCSqGSIb3DQEBCwUAMGkxCzAJBgNVBAYTAkNOMQ4wDAYDVQQIDAVTdGF0ZTENMAsGA1UEBwwEQ2l0eTEUMBIGA1UECgwLT3JnYW5pemF0aW9uMRQwEgYDVQQDDAtJbnRlcm5hbCBDQTERMA8GA1UEBwwIU2hhbmdoYWkwHhcNMjUwNTA5MDgzMDM3WhcNMzUwNTA2MDgzMDM3WjBpMQswCQYDVQQGEwJDTjEOMAwGA1UECAwFU3RhdGUxDTALBgNVBAcMBENpdHkxFDASBgNVBAoMC09yZ2FuaXphdGlvbjEUMBIGA1UEAwwLSW50ZXJuYWwgQ0ExETAPBgNVBAcMCFNoYW5naGFpMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwgD94NIOvJRXR0jrVuuuRbXK0xDLdcHMM0xxtHgsIuP/FxWJmKB1hDu8x1j1jNZv2/lmI1/Pf2gxOvRTH5BsFrZc4SxlvEOBJPg/yCJBXpmVUABvxkTGtNm8iUSLJ6ZXifgdFieCzEHuT3U6WzflfGJPOx0jRZy9WRRIxrT4WvNRtj+0ZXX7H1Yb2BlHrNJ+cQNKOEAO6LXjnNLgCDGJcQ4HnI2Y9YB7xT+CvQQXcZdZNMtG+i5JCVMP9/rI+FYC7i5e+AKGjfZlBGBk22PYyeWS/PuJZw0Y8W2Gh47qBCCGxDqjk1YiUvlQ5rf7mQBAGZXzUDTjD5hZhQeY6REIwpllPCvAkgc7ESBvIFQDVSgpcqRiNVECWbwN5MQZbKmHvr27rqYW7kIrVV/t/4VAUo1Wf357jHKD22XYuUqMDXOu8fUHjVX5YWoFpB3Iv+33lKTPwl67A6wxRSA8EZsGV5m/JO+ESQKvPGQ8U4QwwBZLmJjNupkzm/+4i+RJwbxcKfVJv3jfHo/uHsZy1JL+m+fQ06FvDl+oL/ZEMiT6hO51bAWgBmQAGLfPbTz8JT9+ZF1x42EBfZlQ7v3nQSrNLp3FBz1xwqmCR0kZ+i1UF3GG7bIyCbPWBV4r12/P1w+/4Oz5yBl1IfPYwDfWXQcCAwEAAaNgMF4wCwYDVR0PBAQDAgHGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMB8GA1UdIwQYMBaAFEJGzvoHX28Q/FQ0YZEZlpwqvKBgMA0GCSqGSIb3DQEBCwUAA4ICAQB6Cx8UqSX9aj0YUVIiqVYzj4YwoLsq28bsOhhLQZaRtPJ1F2Fz7QF6hHeSGh9kO8cBfUDjOILj+/sNE9YDlFXMB7rAaU0jmmLAZXQNJ8UiKZWU3y9TRy9k60eJ3FUWZ2g55JSFPmP41KWXwHl/V9xm2U3n5KnGMR6ZHgqbH7r8p43oE1Dj/ZpgkjUPTOzznXQKEoSeR06N95EhKkr+5i4wCiucLKMHVbUCrUiSvDQZvKv+Bs8JEpCv4IPQT4a7pQz8K4zaNO8EkTUV/uQFohdGZ2bIqNZwV6lv2ygxm4zQSnOQjkbMfmGEZ3N34UxjJ+0BoqgUWBVSUqCjU8TzCObMABgZbUOcVKXdlHAQyOwX6R7wKxoXajNV+Y3LZ0WEmdflRWy2k51CNPjwPF28+pXLSW8tpC9D+Jvx+9+U32xyiOi3l3s0KfXePVdwRzxz5fKK5Q8uTt3r9RjKTTZCvmTKI5tXX7N5+v4Zu6/T79GGwcKf7vrNJeYdIvPxd7ZqnpJ4gMyX/c8jBZBTiJKSWE5QdAE/7FNqVQf+lPDXK0SSoTZXVnb2Cq7mJLH1lKa5OT4Y7cCGDrIUoSTkucj76iJ/XnnDZNEbPQcB++jLKSZ1LXH5nJHxpKnI2Ow84Q==" class="btn btn-outline-secondary" download="rootCA.der">备用下载链接</a>
+                </div>
+
+                <h4 class="mb-3">证书安装步骤</h4>
+                
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>下载证书文件</strong>
+                    <p>点击上方的"下载iOS证书"按钮，系统提示"此网站正尝试下载配置描述文件"时，点击"允许"。</p>
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>安装证书</strong>
+                    <p>打开"设置"应用，点击顶部的"已下载描述文件"通知（或转到"设置" → "通用" → "描述文件"），然后点击"安装"按钮并输入设备密码。</p>
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>信任证书</strong>
+                    <p class="text-danger fw-bold">此步骤最关键！</p>
+                    <p>转到"设置" → "通用" → "关于本机" → "证书信任设置"，开启对"Internal CA"证书的完全信任。</p>
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>访问系统</strong>
+                    <p>完成以上步骤后，请使用Safari浏览器访问: <a href="https://192.168.0.215">https://192.168.0.215</a></p>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h5><i class="bi bi-question-circle-fill me-2"></i>常见问题</h5>
+                    <p><strong>Q: 为什么一定要安装证书？</strong><br>
+                    A: iOS有严格的安全策略，必须安装并信任自签名证书才能访问内网HTTPS站点。</p>
+                    
+                    <p><strong>Q: 安装证书安全吗？</strong><br>
+                    A: 此证书仅用于内网访问，不会影响您访问公网的安全性。</p>
+                    
+                    <p class="mb-0"><strong>Q: 我找不到"证书信任设置"？</strong><br>
+                    A: 请确保完成了证书安装步骤，然后在"设置"→"通用"→"关于本机"中查找。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

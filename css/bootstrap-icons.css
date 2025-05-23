@@ -1,0 +1,63 @@
+/* Bootstrap Icons 替代样式 */
+.bi {
+  display: inline-block;
+  vertical-align: -0.125em;
+  width: 1em;
+  height: 1em;
+}
+
+.bi-person::before {
+  content: "👤";
+}
+
+.bi-qr-code-scan::before {
+  content: "📷";
+}
+
+.bi-repeat::before {
+  content: "🔄";
+}
+
+.bi-search::before {
+  content: "🔍";
+}
+
+.bi-qr-code::before {
+  content: "📱";
+}
+
+.bi-box-seam::before {
+  content: "📦";
+}
+
+.bi-trash::before {
+  content: "🗑️";
+}
+
+.bi-rotate-right::before {
+  content: "🔄";
+}
+
+.bi-cable::before {
+  content: "🔌";
+}
+
+.bi-power::before {
+  content: "⚡";
+}
+
+.bi-compress::before {
+  content: "🔨";
+}
+
+.bi-scissors::before {
+  content: "✂️";
+}
+
+.bi-droplet::before {
+  content: "💧";
+}
+
+.bi-gear::before {
+  content: "⚙️";
+} 

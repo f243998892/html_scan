@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS相机测试</title>
+    <style>
+        body {
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .camera-container {
+            margin: 20px 0;
+            position: relative;
+        }
+        video {
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0055aa;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align: left;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>iOS相机测试</h1>
+        <p>此页面用于测试浏览器相机权限。在iOS上，您需要使用<strong>HTTP</strong>访问此页面。</p>
+        
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+        
+        <div>
+            <button id="startButton">启动相机</button>
+            <button id="stopButton" disabled>停止相机</button>
+        </div>
+        
+        <div class="result" id="result">
+            <p>状态: <span id="status">未启动</span></p>
+        </div>
+
+        <div>
+            <p>请使用以下链接访问主应用：</p>
+            <p><a href="http://172.18.180.2" id="appLink">打开内网应用</a></p>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const status = document.getElementById('status');
+        let stream = null;
+
+        // 获取相机权限并显示视频流
+        startButton.addEventListener('click', async () => {
+            try {
+                status.textContent = "正在请求相机权限...";
+                status.className = "";
+                
+                // 请求相机权限
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                
+                // 显示视频流
+                video.srcObject = stream;
+                
+                // 更新按钮状态
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                
+                // 更新状态
+                status.textContent = "相机已启动！权限已获取成功！";
+                status.className = "success";
+                
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                status.textContent = `错误: ${err.message || err}`;
+                status.className = "error";
+            }
+        });
+
+        // 停止相机
+        stopButton.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+                
+                // 更新按钮状态
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                
+                // 更新状态
+                status.textContent = "相机已停止";
+                status.className = "";
+            }
+        });
+
+        // 设置链接地址
+        document.getElementById('appLink').href = window.location.protocol + '//' + window.location.hostname;
+    </script>
+</body>
+</html>

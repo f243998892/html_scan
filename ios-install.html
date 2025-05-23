@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS安装指南</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #0d6efd;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .step h3 {
+            color: #0d6efd;
+            margin-bottom: 15px;
+        }
+        .img-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            margin: 20px 0;
+            padding: 10px 20px;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>在iOS设备上添加到主屏幕</h1>
+        
+        <div class="note">
+            <p><strong>重要提示：</strong>在iOS设备上将网页添加到主屏幕后，它将作为独立应用运行，具有以下优势：</p>
+            <ul>
+                <li><strong>相机访问权限</strong>：安装后能够正常使用相机扫码功能</li>
+                <li><strong>脱机工作</strong>：即使在网络不稳定时也能使用</li>
+                <li><strong>更快的访问</strong>：从主屏幕直接打开，无需浏览器</li>
+            </ul>
+            <p><small>注意：如果您是iOS用户且尚未安装证书，请先<a href="http://192.168.0.215/ios-cert-download.html">访问此链接安装证书</a>，然后再继续。</small></p>
+        </div>
+
+        <div class="step">
+            <h3>第一步：在Safari浏览器中打开</h3>
+            <p>请确保使用Safari浏览器打开此网站。在iOS上，只有Safari浏览器支持添加到主屏幕功能。</p>
+            <p>请访问: <strong>https://192.168.0.215</strong></p>
+        </div>
+
+        <div class="step">
+            <h3>第二步：点击分享按钮</h3>
+            <p>在Safari浏览器底部找到分享按钮（方框带箭头图标）并点击。</p>
+            <div class="img-container">
+                <img src="img/ios-share.jpg" alt="Safari分享按钮" style="max-height: 300px;">
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>第三步：选择"添加到主屏幕"</h3>
+            <p>在弹出的菜单中，向下滚动并点击"添加到主屏幕"选项。</p>
+            <div class="img-container">
+                <img src="img/ios-add-home.jpg" alt="添加到主屏幕选项" style="max-height: 300px;">
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>第四步：确认添加</h3>
+            <p>您可以编辑应用名称，然后点击右上角的"添加"按钮。</p>
+            <div class="img-container">
+                <img src="img/ios-confirm.jpg" alt="确认添加" style="max-height: 300px;">
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>第五步：从主屏幕启动应用</h3>
+            <p>现在，您可以在主屏幕上看到扫码系统的图标。点击它将以全屏模式启动应用。</p>
+            <p><strong>注意：</strong>第一次启动时，系统将询问是否允许访问相机。请选择"允许"以启用扫码功能。</p>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-primary">
+                <i class="bi bi-house me-2"></i>返回主页
+            </a>
+        </div>
+    </div>
+</body>
+</html>

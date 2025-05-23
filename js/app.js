@@ -6,7 +6,9 @@ const DB_CONFIG = {
     user: 'postgres',
     password: 'postgres'
 };
-const HTTP_API_URL = 'http://www.fanghui8131.fun';
+// 使用相对路径，不再硬编码外部域名
+const HTTP_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+const API_BASE_URL = '/api'; // 添加API基础URL
 // 初始化PostgreSQL客户端
 let dbClient;
 
@@ -23,7 +25,8 @@ const scanState = {
     pendingCodes: [],
     lastScannedCode: '',
     isProcessing: false,
-    currentHtml5QrScanner: null
+    currentHtml5QrScanner: null,
+    lastScanTime: null
 };
 
 // 存储当前查询状态
@@ -42,7 +45,49 @@ const SCREENS = {
     SCAN: 'scan-screen',
     QUERY: 'query-screen',
     MODELS: 'models-screen',
-    PRODUCTS: 'products-screen'
+    PRODUCTS: 'products-screen',
+    DELETE_RECORDS: 'delete-records-screen' // 添加删除记录屏幕常量
+};
+
+// 全局缓存对象
+const dataCache = {
+    monthlyTransactions: {
+        data: null,
+        timestamp: null,
+        params: null,
+        expiresInMinutes: 5  // 缓存过期时间（分钟）
+    }
+};
+
+// 检查缓存是否有效
+function isCacheValid(cacheKey) {
+    if (!dataCache[cacheKey] || !dataCache[cacheKey].data || !dataCache[cacheKey].timestamp) {
+        return false;
+    }
+    
+    const now = new Date();
+    const cacheTime = new Date(dataCache[cacheKey].timestamp);
+    const diffInMs = now - cacheTime;
+    const diffInMinutes = diffInMs / (1000 * 60);
+    
+    return diffInMinutes < dataCache[cacheKey].expiresInMinutes;
+}
+
+// 应用初始状态
+const appState = {
+    scanner: null,
+    isScanning: false,
+    lastScannedCode: null,
+    lastScannedTime: null,
+    scannerInputReady: false,
+    isContinuousScanMode: false,
+    pendingCodes: [],
+    // 月份范围缓存
+    monthRangeCache: {
+        data: null,
+        timestamp: null,
+        maxAge: 5 * 60 * 1000  // 5分钟缓存
+    }
 };
 
 // 初始化应用
@@ -61,17 +106,39 @@ function initDbConnection() {
 
 // 初始化应用
 async function initApp() {
+    try {
+        console.log('初始化应用...');
+        
+        // 首先添加事件监听
     addEventListeners();
-    tryAutoLogin();
+        
+        // 尝试自动登录，如果失败会显示登录页面
+        await tryAutoLogin();
+    } catch (error) {
+        console.error('应用初始化失败:', error);
+        // 确保显示登录页面
+        showScreen(SCREENS.LOGIN);
+    }
 }
 
 // 尝试自动登录
 async function tryAutoLogin() {
+    try {
     const savedFullName = localStorage.getItem('user_full_name');
     if (savedFullName) {
         userState.fullName = savedFullName;
         userState.exitAfterScan = localStorage.getItem('exit_after_scan') === 'true';
         navigateToHome();
+            console.log('自动登录成功:', savedFullName);
+        } else {
+            // 没有登录信息，显示登录页面
+            showScreen(SCREENS.LOGIN);
+            console.log('未找到登录信息，显示登录页面');
+        }
+    } catch (error) {
+        console.error('自动登录失败:', error);
+        // 显示登录页面
+        showScreen(SCREENS.LOGIN);
     }
 }
 
@@ -128,6 +195,7 @@ function addEventListeners() {
 
 // 处理登录
 async function handleLogin() {
+    try {
     const nameInput = document.getElementById('username');
     const fullName = nameInput.value.trim();
     
@@ -136,21 +204,63 @@ async function handleLogin() {
         return;
     }
     
+        // 保存用户信息到状态和本地存储
     userState.fullName = fullName;
+        
+        // 确保localStorage可用
+        try {
     localStorage.setItem('user_full_name', fullName);
     
+            // 设置默认的退出设置
+            if (localStorage.getItem('exit_after_scan') === null) {
+                localStorage.setItem('exit_after_scan', 'false');
+            }
+            userState.exitAfterScan = localStorage.getItem('exit_after_scan') === 'true';
+        } catch (storageError) {
+            console.error('无法访问localStorage:', storageError);
+            // 虽然localStorage失败，但仍可继续使用，只是设置不会被保存
+            userState.exitAfterScan = false;
+        }
+        
+        // 导航到首页
     navigateToHome();
+        
+        // 显示登录成功提示
+        showToast(`欢迎，${fullName}！`, 'success');
+    } catch (error) {
+        console.error('登录过程中发生错误:', error);
+        showToast('登录失败，请重试', 'error');
+    }
 }
 
 // 导航到首页
 function navigateToHome() {
-    document.getElementById('user-fullname').textContent = `用户: ${userState.fullName}`;
-    document.getElementById('exit-after-scan').checked = userState.exitAfterScan;
+    try {
+        // 更新用户信息显示
+        const userFullnameElement = document.getElementById('user-fullname');
+        if (userFullnameElement) {
+            userFullnameElement.textContent = `用户: ${userState.fullName || '未登录'}`;
+        }
+        
+        // 设置退出选项状态
+        const exitAfterScanElement = document.getElementById('exit-after-scan');
+        if (exitAfterScanElement) {
+            exitAfterScanElement.checked = userState.exitAfterScan;
+        }
+        
+        // 显示首页
     showScreen(SCREENS.HOME);
+    } catch (error) {
+        console.error('导航到首页时发生错误:', error);
+        showToast('页面加载失败', 'error');
+    }
 }
 
 // 显示指定屏幕
 function showScreen(screenId) {
+    try {
+        console.log('切换到页面:', screenId);
+        
     // 隐藏所有屏幕
     Object.values(SCREENS).forEach(id => {
         document.getElementById(id).classList.add('d-none');
@@ -158,10 +268,41 @@ function showScreen(screenId) {
     
     // 显示目标屏幕
     document.getElementById(screenId).classList.remove('d-none');
+        
+        // 隐藏所有模态框
+        hideAllModals();
     
     // 如果切换回首页，停止扫码
     if (screenId === SCREENS.HOME && scanState.currentHtml5QrScanner) {
         stopScanner();
+        }
+    } catch (error) {
+        console.error('切换屏幕失败:', error);
+    }
+}
+
+// 隐藏所有模态框
+function hideAllModals() {
+    try {
+        // 隐藏产品详情模态框
+        const productDetailModal = document.getElementById('product-detail-modal');
+        if (productDetailModal) {
+            productDetailModal.style.display = 'none';
+            productDetailModal.classList.remove('show');
+            
+            // 移除可能存在的背景
+            const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+            modalBackdrops.forEach(backdrop => {
+                if (backdrop.parentNode) {
+                    backdrop.parentNode.removeChild(backdrop);
+                }
+            });
+            
+            // 移除body上的modal-open类
+            document.body.classList.remove('modal-open');
+        }
+    } catch (error) {
+        console.error('隐藏模态框失败:', error);
     }
 }
 
@@ -172,6 +313,11 @@ function showFeatureNotAvailable(message) {
 
 // 显示Toast提示
 function showToast(message, type = 'success', duration = 3000) {
+    // 如果类型是info并且消息包含"成功识别"，则使用较短的显示时间
+    if (type === 'info' && message.includes('成功识别')) {
+        duration = 1500; // 扫码识别成功提示仅显示1.5秒
+    }
+    
     const toastContainer = document.getElementById('toast-container');
     
     const toastElement = document.createElement('div');
@@ -191,11 +337,22 @@ function showToast(message, type = 'success', duration = 3000) {
         case 'info':
         default:
             toastElement.classList.add('bg-info', 'text-white');
+            
+            // 为扫码识别成功添加特殊样式
+            if (message.includes('成功识别')) {
+                toastElement.style.fontWeight = 'bold';
+                toastElement.style.fontSize = '1.1em';
+                toastElement.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+                toastElement.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+            }
             break;
     }
     
     toastElement.textContent = message;
     toastContainer.appendChild(toastElement);
+    
+    // 添加样式确保toast不被底部按钮遮挡
+    toastElement.style.zIndex = '1050';
     
     // 自动关闭
     setTimeout(() => {
@@ -251,7 +408,8 @@ function startScan(processType, isContinuous) {
         document.getElementById('scan-pending-list').classList.add('d-none');
     }
     
-    // 显示扫码界面
+    // 显示扫码界面前先清理
+    cleanup();
     showScreen(SCREENS.SCAN);
     
     // 初始化扫码器
@@ -269,26 +427,55 @@ function initializeScanner() {
     const html5QrCode = new Html5Qrcode("scanner-container");
     scanState.currentHtml5QrScanner = html5QrCode;
     
-    // 扫码配置
+    // 扫码配置 - 进一步优化参数
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
+        fps: 20, // 提高FPS到20以提高识别速度
+        qrbox: { width: 220, height: 220 }, // 调整扫码区域大小为更合适的尺寸
         aspectRatio: 1.0,
-        disableFlip: false,
+        disableFlip: true, // 禁用翻转以提高性能
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], // 只支持必要的码制
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // 使用浏览器原生条形码检测器（如果支持）
+        },
+        rememberLastUsedCamera: true, // 记住上次使用的摄像头
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // 只使用摄像头扫描以优化性能
+        // 设置更高的分辨率
         videoConstraints: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
             facingMode: "environment"
         }
     };
+    
+    // 根据扫码类型选择回调函数
+    const successCallback = (scanState.processType === 'query') 
+        ? onProductQueryScanSuccess
+        : onScanSuccess;
     
     // 启动扫码
     html5QrCode.start(
         { facingMode: "environment" },
         config,
-        onScanSuccess,
+        successCallback,
         onScanFailure
     ).catch(err => {
         console.error(`无法启动相机: ${err}`);
         showToast('无法启动相机，请检查权限设置', 'error');
+        
+        // 添加错误恢复机制
+        setTimeout(() => {
+            try {
+                // 如果启动失败，尝试使用更简单的配置重试
+                const simpleConfig = {
+                    fps: 10,
+                    qrbox: 250,
+                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
+                };
+                html5QrCode.start({ facingMode: "environment" }, simpleConfig, successCallback, onScanFailure);
+            } catch (retryErr) {
+                console.error('重试启动相机失败:', retryErr);
+            }
+        }, 1000);
     });
 }
 
@@ -297,71 +484,157 @@ async function onScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 忽略重复扫码
-    if (decodedText === scanState.lastScannedCode) return;
+    // 防抖处理 - 检查是否是重复扫码
+    const now = Date.now();
+    // 忽略1秒内的重复扫码
+    if (decodedText === scanState.lastScannedCode && now - scanState.lastScanTime < 1000) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
+    scanState.lastScanTime = now;
+    
+    // 立即显示成功识别提示
+    showToast(`成功识别: ${decodedText}`, 'info');
+    
+    // 播放识别成功提示音 - 使用更轻量的方式
+    playSuccessBeep();
     
     // 处理扫码结果
     if (scanState.isContinuous) {
         // 连续扫码模式，添加到待上传列表
         if (!scanState.pendingCodes.includes(decodedText)) {
             scanState.pendingCodes.push(decodedText);
-            updatePendingList();
-            showToast(`已添加到队列: ${decodedText}`, 'success');
             
-            // 播放成功提示音
-            playSuccessSound();
+            // 使用防抖方式更新UI
+            if (!window.pendingUpdateTimer) {
+                window.pendingUpdateTimer = setTimeout(() => {
+                    updatePendingList();
+                    window.pendingUpdateTimer = null;
+                }, 100);
+            }
+            
+            showToast(`已添加到队列: ${decodedText}`, 'success');
         } else {
             showToast('该产品已在队列中，请勿重复扫码', 'warning');
-            
-            // 播放错误提示音
             playErrorSound();
         }
+        
+        // 立即释放处理锁，允许下一次扫码
+        scanState.isProcessing = false;
     } else {
         // 单次扫码模式，直接上传
-        const success = await updateProductProcess(decodedText, scanState.processType, userState.fullName);
-        
-        if (success) {
-            // 播放成功提示音
-            playSuccessSound();
+        try {
+            const success = await updateProductProcess(decodedText, scanState.processType, userState.fullName);
             
-            showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
-            
-            // 如果设置了扫码成功后退出，则退出
-            if (userState.exitAfterScan) {
-                // 延迟一秒后退出
-                setTimeout(() => {
-                    stopScanner();
-                    window.close(); // 尝试关闭窗口
-                }, 1000);
+            if (success) {
+                // 播放成功提示音
+                playSuccessBeep();
+                
+                showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
+                
+                // 如果设置了扫码成功后退出，则退出
+                if (userState.exitAfterScan) {
+                    // 延迟一秒后退出
+                    setTimeout(() => {
+                        stopScanner();
+                        window.close(); // 尝试关闭窗口
+                    }, 1000);
+                } else {
+                    // 单次扫码模式，回到上一页面
+                    setTimeout(() => {
+                        stopScanner();
+                        showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
+                    }, 1000);
+                }
             } else {
-                // 单次扫码模式，回到上一页面
+                // 播放错误提示音
+                playErrorSound();
+                showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+                
+                // 失败后也释放锁，这样用户可以立即重试
                 setTimeout(() => {
-                    stopScanner();
-                    showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
-                }, 1000);
+                    scanState.isProcessing = false;
+                }, 500);
             }
-        } else {
-            // 播放错误提示音
+        } catch (error) {
+            console.error('处理扫码结果失败:', error);
             playErrorSound();
+            showToast('处理失败，请重试', 'error');
             
-            showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+            // 确保失败后也释放锁
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, 500);
         }
     }
-    
-    // 延迟重置处理状态
-    setTimeout(() => {
-        scanState.isProcessing = false;
-        scanState.lastScannedCode = '';
-    }, 1000);
+}
+
+// 更高效的成功提示音
+function playSuccessBeep() {
+    // 使用AudioContext API更高效地播放提示音
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 1800; // 使用更高的频率提高识别度
+        gainNode.gain.value = 0.1; // 保持较低的音量
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.08); // 更短的提示音时长
+        
+        // 添加渐变效果以避免爆音
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        
+        // 完成后关闭AudioContext以释放资源
+        setTimeout(() => {
+            audioCtx.close();
+        }, 100);
+    } catch (e) {
+        console.log('播放提示音失败:', e);
+    }
 }
 
 // 扫码失败回调
 function onScanFailure(error) {
-    // 不需要处理每次扫码失败，避免过多的日志
-    console.debug(`扫码过程中: ${error}`);
+    // 忽略一般的"未识别到码"错误，避免频繁提示
+    if (error && error.message && error.message.includes("No QR code found")) {
+        return;
+    }
+    
+    // 检查如果是摄像头权限错误
+    if (error && error.message && (
+        error.message.includes("permission") || 
+        error.message.includes("权限") ||
+        error.message.includes("NotAllowedError")
+    )) {
+        console.error("相机权限错误:", error);
+        showToast("请授予相机访问权限", "error");
+        return;
+    }
+    
+    // 设备问题
+    if (error && error.message && (
+        error.message.includes("device") ||
+        error.message.includes("设备") ||
+        error.message.includes("NotFoundError") ||
+        error.message.includes("NotReadableError")
+    )) {
+        console.error("设备错误:", error);
+        showToast("无法访问相机设备，请尝试重新加载或检查设备", "error");
+        return;
+    }
+    
+    // 其他错误
+    if (error) {
+        // 仅记录日志，不显示提示，以免干扰用户
+        console.error("扫码失败:", error);
+    }
 }
 
 // 停止扫码并返回
@@ -373,10 +646,23 @@ function stopScan() {
         if (confirm('是否放弃上传？')) {
             scanState.pendingCodes = [];
             stopScanner();
+            
+            // 只有在非查询模式下才移除手动输入框
+            if (scanState.processType !== 'query') {
+                const existingInputs = document.querySelectorAll('#manual-input-container');
+                existingInputs.forEach(element => element.remove());
+            }
+            
             showScreen(scanState.isContinuous ? SCREENS.CONTINUOUS_SCAN : SCREENS.SINGLE_SCAN);
         }
     } else {
         stopScanner();
+        
+        // 只有在非查询模式下才移除手动输入框
+        if (scanState.processType !== 'query') {
+            const existingInputs = document.querySelectorAll('#manual-input-container');
+            existingInputs.forEach(element => element.remove());
+        }
         
         // 根据当前扫码类型决定返回的页面
         if (scanState.processType === 'query') {
@@ -394,13 +680,41 @@ function stopScan() {
 // 停止扫码器
 function stopScanner() {
     if (scanState.currentHtml5QrScanner) {
-        scanState.currentHtml5QrScanner.stop().then(() => {
-            console.log('扫码器已停止');
-        }).catch(err => {
-            console.error('停止扫码器失败:', err);
+        // 首先清除所有捕获的流
+        try {
+            const videoElement = document.querySelector("#scanner-container video");
+            if (videoElement && videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+        } catch (e) {
+            console.log('清理视频流失败:', e);
+        }
+        
+        return new Promise((resolve, reject) => {
+            scanState.currentHtml5QrScanner.stop()
+                .then(() => {
+                    console.log('扫码器已停止');
+                    
+                    // 只有在非查询模式下才移除手动输入框
+                    if (document.getElementById(SCREENS.SCAN).classList.contains('d-none') === false && scanState.processType !== 'query') {
+                        const existingInputs = document.querySelectorAll('#manual-input-container');
+                        existingInputs.forEach(element => element.remove());
+                    }
+                    
+                    // 释放资源
+                    scanState.currentHtml5QrScanner = null;
+                    resolve();
+                })
+                .catch(err => {
+                    console.error('停止扫码器失败:', err);
+                    scanState.currentHtml5QrScanner = null;
+                    reject(err);
+                });
         });
-        scanState.currentHtml5QrScanner = null;
     }
+    return Promise.resolve(); // 如果没有扫码器，直接返回已解决的Promise
 }
 
 // 更新待上传列表
@@ -503,20 +817,55 @@ function getChineseProcessName(processType) {
 // 播放成功提示音
 function playSuccessSound() {
     try {
-        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//sQxP4ADZiVKGJsXAK+PpVoIwKESEKSEEKSEEKSEEKSEEKSEH////sQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB////sQxP8AQ6htGtGGLALcPZUoowCESEKSEEKSEEKSEEKSEEKSEH///w==');
-        audio.play();
+        // 创建简短的提示音
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 1200; // 高频提示音
+        gainNode.gain.value = 0.1; // 降低音量
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+        
+        // 短促的提示音
+        oscillator.start(context.currentTime);
+        oscillator.stop(context.currentTime + 0.15);
+        
+        // 淡出效果
+        gainNode.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.15);
     } catch (e) {
-        console.error('无法播放音频', e);
+        console.log('播放提示音失败:', e);
     }
 }
 
 // 播放错误提示音
 function playErrorSound() {
     try {
-        const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgUFBQUFDMzMzMzM0dHR0dHR1paWlpaWm5ubm5ubm5HR0dHR0dHMzMzMzMzFBQUFBQUCgAAAAAA//tAxAAAAAABLgAAAAgAAksAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAxPwAAAL0CVoQAhIBXhS5NCJVY9ToV1OUdBUColOik0ilX/6y+++KGw4IPz8IOD8IPg+tQuD72MQhCD6woH/w+D9bcH3P//f3+/lwfTg//lwfA+/lwfA+CYP/wTB8Hw//+OD7/lwfB8H4Pg+D4Pg+CEKSEEKSEEKSEEKSEEKS//wQxP8AQ7B1GtdkUYC3j6VKaMAhEhCkhBCkhBCkhBCkhBCkhB//');
-        audio.play();
+        // 创建错误提示音
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 400; // 低频警告音
+        gainNode.gain.value = 0.1; // 降低音量
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+        
+        // 短促的错误音
+        oscillator.start(context.currentTime);
+        oscillator.stop(context.currentTime + 0.3);
+        
+        // 频率变化
+        oscillator.frequency.exponentialRampToValueAtTime(200, context.currentTime + 0.3);
+        
+        // 淡出效果
+        gainNode.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.3);
     } catch (e) {
-        console.error('无法播放音频', e);
+        console.log('播放错误提示音失败:', e);
     }
 }
 
@@ -547,14 +896,42 @@ async function updateProductProcess(productCode, processType, employeeName) {
             body: JSON.stringify(updateData)
         });
         
-        const result = await response.json();
+        // 即使服务器返回400错误，我们也尝试解析响应
+        const result = await response.json().catch(e => {
+            console.error('解析响应失败:', e);
+            return { success: false, error: '网络错误' };
+        });
         
-        if (!response.ok) {
-            console.error('更新产品信息失败:', result.error);
-            return false;
+        // 不再检查response.ok，而是检查返回的result对象
+        if (result.success) {
+            return true;
         }
         
-        return result.success;
+        // 如果是404错误，说明产品不存在，应该创建新产品
+        if (response.status === 404) {
+            console.log('产品不存在，将创建新产品:', productCode);
+            
+            // 再次发送请求，这次添加一个特殊标记，表示需要创建新产品
+            updateData.createIfNotExists = true;
+            
+            const createResponse = await fetch(`${HTTP_API_URL}/api/updateProductProcess`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updateData)
+            });
+            
+            const createResult = await createResponse.json().catch(e => {
+                console.error('解析创建响应失败:', e);
+                return { success: false };
+            });
+        
+            return createResult.success === true;
+        }
+        
+        console.error('更新产品信息失败:', result.error || '未知错误');
+        return false;
     } catch (error) {
         console.error('更新产品信息失败:', error);
         return false;
@@ -590,10 +967,10 @@ async function batchUpdateProductProcess(productCodes, processType, employeeName
         }
         
         return result.results;
-    } catch (error) {
+        } catch (error) {
         console.error('批量更新产品信息失败:', error);
         return productCodes.map(code => ({ code, success: false }));
-    }
+        }
 }
 
 // 获取工序对应的字段名
@@ -664,6 +1041,27 @@ async function handleProductQuery() {
         // 显示查询屏幕
         showScreen(SCREENS.QUERY);
         
+        // 清除任何可能存在的删除按钮
+        const deleteButtonsContainer = document.getElementById('fixed-delete-buttons');
+        if (deleteButtonsContainer) {
+            deleteButtonsContainer.remove();
+        }
+        
+        // 恢复原有的返回按钮（如果已被删除）
+        const queryContent = document.getElementById('query-content');
+        if (!document.getElementById('query-back')) {
+            // 确保我们添加返回按钮
+            const originalBackButton = document.querySelector('#query-screen button#query-back');
+            if (!originalBackButton) {
+                const backButtonDiv = document.createElement('div');
+                backButtonDiv.innerHTML = '<button class="btn btn-secondary mt-3 w-100" id="query-back">返回</button>';
+                document.querySelector('#query-screen .card-body').appendChild(backButtonDiv);
+                
+                // 添加事件监听器
+                document.getElementById('query-back').addEventListener('click', () => showScreen(SCREENS.HOME));
+            }
+        }
+        
         // 确保流水账容器可见
         document.getElementById('monthly-transactions-container').style.display = 'block';
         
@@ -680,6 +1078,13 @@ async function handleProductQuery() {
 
 // 处理产品扫码查询
 async function handleProductScanQuery() {
+    // 停止可能存在的扫码器
+    if (scanState.currentHtml5QrScanner) {
+        await stopScanner();
+    }
+    
+    // 不再移除手动输入框
+    
     // 启动扫码查询
     startProductScanQuery();
 }
@@ -693,6 +1098,21 @@ function startProductScanQuery() {
     scanState.lastScannedCode = '';
     scanState.isProcessing = false;
     
+    // 清理界面并显示扫码界面
+    // 先停止已有的扫码器
+    if (scanState.currentHtml5QrScanner) {
+        scanState.currentHtml5QrScanner.stop().catch(err => {
+            console.error('停止扫码器失败:', err);
+        });
+        scanState.currentHtml5QrScanner = null;
+    }
+    
+    // 获取扫码容器
+    const scannerContainer = document.getElementById('scanner-container');
+    if (scannerContainer) {
+        scannerContainer.innerHTML = '';
+    }
+    
     // 更新UI
     document.getElementById('scan-title').textContent = '产品扫码查询';
     document.getElementById('scan-upload').classList.add('d-none');
@@ -701,32 +1121,133 @@ function startProductScanQuery() {
     // 显示扫码界面
     showScreen(SCREENS.SCAN);
     
-    // 初始化扫码器
-    const scannerContainer = document.getElementById('scanner-container');
-    scannerContainer.innerHTML = '';
+    // 移除已存在的手动输入框，确保不重复创建
+    const existingInputs = document.querySelectorAll('#manual-input-container');
+    existingInputs.forEach(container => container.remove());
     
-    const html5QrCode = new Html5Qrcode("scanner-container");
-    scanState.currentHtml5QrScanner = html5QrCode;
+    // 创建并添加手动输入框
+    const manualInputContainer = document.createElement('div');
+    manualInputContainer.className = 'mb-3';
+    manualInputContainer.id = 'manual-input-container';
+    manualInputContainer.innerHTML = `
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" id="manual-product-code" placeholder="手动输入产品编码">
+            <button class="btn btn-primary" id="submit-manual-code" type="button">查询</button>
+        </div>
+    `;
     
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        videoConstraints: {
-            facingMode: "environment"
+    // 确保找到scannerContainer及其父元素
+    if (scannerContainer && scannerContainer.parentNode) {
+    scannerContainer.parentNode.insertBefore(manualInputContainer, scannerContainer);
+        console.log('手动输入框已添加');
+    } else {
+        console.error('无法找到scannerContainer或其父元素，无法添加手动输入框');
+        // 尝试添加到扫码屏幕
+        const scanScreen = document.getElementById(SCREENS.SCAN);
+        if (scanScreen) {
+            // 查找一个合适的容器来放置输入框
+            const container = scanScreen.querySelector('.container') || scanScreen;
+            container.insertBefore(manualInputContainer, container.firstChild);
+            console.log('手动输入框已添加到扫码屏幕');
         }
-    };
+    }
     
-    html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        onProductQueryScanSuccess,
-        onScanFailure
-    ).catch(err => {
-        console.error(`无法启动相机: ${err}`);
-        showToast('无法启动相机，请检查权限设置', 'error');
-    });
+    // 添加手动输入事件
+    const submitButton = document.getElementById('submit-manual-code');
+    const inputField = document.getElementById('manual-product-code');
+    
+    if (submitButton && inputField) {
+        // 移除之前可能存在的事件监听器
+        const newSubmitButton = submitButton.cloneNode(true);
+        submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
+        
+        const newInputField = inputField.cloneNode(true);
+        inputField.parentNode.replaceChild(newInputField, inputField);
+        
+        // 点击查询按钮
+        newSubmitButton.addEventListener('click', handleManualInput);
+        
+        // 按回车查询
+        newInputField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleManualInput();
+            }
+        });
+        
+        console.log('手动输入事件已添加');
+    } else {
+        console.error('无法找到提交按钮或输入字段');
+    }
+    
+    // 初始化扫码器
+    initializeScanner();
+    
+    // 确保手动输入框可见
+    setTimeout(() => {
+        const inputContainer = document.getElementById('manual-input-container');
+        if (inputContainer) {
+            inputContainer.style.display = 'block';
+            inputContainer.style.visibility = 'visible';
+            inputContainer.style.opacity = '1';
+        }
+    }, 500);
+}
+
+// 清理函数 - 避免移除产品扫码查询的输入框
+function cleanup() {
+    // 如果当前不是扫码查询页面，才移除手动输入框
+    if (scanState.processType !== 'query') {
+        const inputContainers = document.querySelectorAll('#manual-input-container');
+        inputContainers.forEach(container => container.remove());
+    }
+    
+    // 清空扫码容器
+    const scannerContainer = document.getElementById('scanner-container');
+    if (scannerContainer) {
+        scannerContainer.innerHTML = '';
+    }
+}
+
+// 处理手动输入
+async function handleManualInput() {
+        const productCode = document.getElementById('manual-product-code').value.trim();
+        if (!productCode) {
+            showToast('请输入产品编码', 'warning');
+            return;
+        }
+        
+        try {
+            // 模拟扫码成功处理
+            scanState.isProcessing = true;
+            
+            // 查询产品详情
+            const productData = await getProductDetails(productCode);
+            
+            if (productData) {
+                // 播放成功提示音
+                playSuccessSound();
+                
+                // 显示产品详情
+                showProductDetail(productData);
+                
+                // 清空输入框
+                document.getElementById('manual-product-code').value = '';
+            } else {
+                // 播放错误提示音
+                playErrorSound();
+                
+                showToast('未找到该产品信息', 'error');
+            }
+        } catch (error) {
+            console.error('查询产品信息失败:', error);
+            showToast('查询失败，请重试', 'error');
+            playErrorSound();
+        } finally {
+            // 延迟重置处理状态
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, 1000);
+        }
 }
 
 // 产品查询扫码成功回调
@@ -734,45 +1255,110 @@ async function onProductQueryScanSuccess(decodedText, decodedResult) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
-    // 忽略重复扫码
-    if (decodedText === scanState.lastScannedCode) return;
+    // 防抖处理 - 检查是否是重复扫码
+    const now = Date.now();
+    // 忽略1秒内的重复扫码
+    if (decodedText === scanState.lastScannedCode && now - scanState.lastScanTime < 1000) return;
     
     scanState.isProcessing = true;
     scanState.lastScannedCode = decodedText;
+    scanState.lastScanTime = now;
+    
+    // 立即显示成功识别提示
+    showToast(`成功识别产品码: ${decodedText}`, 'info');
+    
+    // 播放识别成功提示音
+    playSuccessBeep();
     
     try {
-        // 查询产品详情
-        const productData = await getProductDetails(decodedText);
+        // 使用缓存机制查询产品详情
+        const productData = await getCachedProductDetails(decodedText);
         
         if (productData) {
             // 播放成功提示音
-            playSuccessSound();
+            playSuccessBeep();
             
             // 显示产品详情
             showProductDetail(productData);
+            
+            // 延迟重置处理状态，但不要太长
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, 500);
         } else {
             // 播放错误提示音
             playErrorSound();
             
             showToast('未找到该产品信息', 'error');
+            
+            // 延迟重置处理状态，但时间短一些以便用户可以快速重试
+            setTimeout(() => {
+                scanState.isProcessing = false;
+            }, 300);
         }
     } catch (error) {
         console.error('查询产品信息失败:', error);
         showToast('查询失败，请重试', 'error');
         playErrorSound();
-    } finally {
+        
         // 延迟重置处理状态
         setTimeout(() => {
             scanState.isProcessing = false;
-            scanState.lastScannedCode = '';
-        }, 1000);
+        }, 300);
+    }
+}
+
+// 带缓存的产品详情查询
+const productDetailsCache = new Map();
+
+async function getCachedProductDetails(productCode) {
+    // 检查缓存中是否有数据
+    if (productDetailsCache.has(productCode)) {
+        const cachedData = productDetailsCache.get(productCode);
+        // 检查缓存是否过期（1小时）
+        if (Date.now() - cachedData.timestamp < 3600000) {
+            return cachedData.data;
+        }
+    }
+    
+    // 缓存中没有数据或已过期，从API获取
+    try {
+        const productData = await getProductDetails(productCode);
+        if (productData) {
+            // 存入缓存
+            productDetailsCache.set(productCode, {
+                data: productData,
+                timestamp: Date.now()
+            });
+            
+            // 控制缓存大小，最多保存100条记录
+            if (productDetailsCache.size > 100) {
+                // 删除最旧的缓存记录
+                const firstKey = productDetailsCache.keys().next().value;
+                if (firstKey) {
+                    productDetailsCache.delete(firstKey);
+                }
+            }
+        }
+        return productData;
+    } catch (error) {
+        console.error('获取产品详情失败:', error);
+        return null;
     }
 }
 
 // 显示产品详情
 function showProductDetail(product) {
+    try {
+        console.log('显示产品详情:', product['产品编码']);
+        
     // 创建产品详情内容
     const productDetailContent = document.getElementById('product-detail-content');
+        if (!productDetailContent) {
+            console.error('未找到产品详情内容容器');
+            return;
+        }
+        
     productDetailContent.innerHTML = '';
     
     // 产品编码
@@ -862,12 +1448,15 @@ function showProductDetail(product) {
     }
     
     // 浸漆信息
-    if (product['浸漆时间']) {
+        if (product['浸漆时间'] || product['浸漆员工']) {
         const immersionDiv = document.createElement('div');
         immersionDiv.className = 'product-detail-item';
         immersionDiv.innerHTML = `
             <div class="product-detail-label">浸漆:</div>
-            <div>时间: ${formatDate(product['浸漆时间'])}</div>
+                <div>
+                    ${product['浸漆员工'] ? '员工: ' + product['浸漆员工'] : ''}
+                    ${product['浸漆时间'] ? '<br>时间: ' + formatDate(product['浸漆时间']) : ''}
+                </div>
         `;
         productDetailContent.appendChild(immersionDiv);
     }
@@ -893,32 +1482,102 @@ function showProductDetail(product) {
         `;
         productDetailContent.appendChild(finalInspectionDiv);
     }
+        
+        // 确保模态框元素存在
+        const modalElement = document.getElementById('product-detail-modal');
+        if (!modalElement) {
+            console.error('未找到产品详情模态框');
+            return;
+    }
     
     // 显示模态框
-    const productDetailModal = new bootstrap.Modal(document.getElementById('product-detail-modal'));
+        try {
+            // 首先确保所有其他模态框已隐藏
+            hideAllModals();
+            
+            // 使用我们自定义的Bootstrap Modal类
+            const productDetailModal = new bootstrap.Modal(modalElement);
     productDetailModal.show();
-}
-
-// 修改getMonthRange函数
-async function getMonthRange() {
-    try {
-        // 直接设置默认范围而不是从supabase获取
-        setDefaultMonthRange();
-        return true;
+        } catch (error) {
+            console.error('显示模态框失败:', error);
+            
+            // 备用方案：使用简单的显示方式
+            modalElement.style.display = 'block';
+            modalElement.classList.add('show');
+        }
     } catch (error) {
-        console.error('获取月份范围失败:', error);
-        return false;
+        console.error('显示产品详情时出错:', error);
+        showToast('显示产品详情失败', 'error');
     }
 }
 
-// 设置默认的本月范围
+// 获取月份范围
+async function getMonthRange() {
+    try {
+        // 检查缓存是否有效
+        const now = new Date().getTime();
+        if (appState.monthRangeCache.data && 
+            appState.monthRangeCache.timestamp && 
+            (now - appState.monthRangeCache.timestamp) < appState.monthRangeCache.maxAge) {
+            console.log('使用缓存的月份范围数据');
+            // 使用缓存数据
+            queryState.monthRange.startDate = new Date(appState.monthRangeCache.data.startDate);
+            queryState.monthRange.endDate = new Date(appState.monthRangeCache.data.endDate);
+            return true;
+        }
+        
+        // 缓存无效，从API获取月份范围
+        const response = await fetch(`${HTTP_API_URL}/api/getMonthRange`);
+        
+        if (!response.ok) {
+            console.error('获取月份范围失败:', response.statusText);
+            // 设置默认范围作为备用
+            setDefaultMonthRange();
+            return true;
+        }
+        
+        const result = await response.json();
+        if (result.data && result.data.startDate && result.data.endDate) {
+            // 更新应用状态
+            queryState.monthRange.startDate = new Date(result.data.startDate);
+            queryState.monthRange.endDate = new Date(result.data.endDate);
+            
+            // 保存到缓存
+            appState.monthRangeCache.data = {
+                startDate: result.data.startDate,
+                endDate: result.data.endDate
+            };
+            appState.monthRangeCache.timestamp = now;
+            
+            console.log('从API获取并缓存月份范围:', 
+                queryState.monthRange.startDate.toISOString(), '至', 
+                queryState.monthRange.endDate.toISOString());
+            return true;
+        } else {
+            // 如果API返回的数据不完整，使用默认范围
+            console.warn('API返回的月份范围不完整，使用默认范围');
+            setDefaultMonthRange();
+            return true;
+        }
+    } catch (error) {
+        console.error('获取月份范围失败:', error);
+        setDefaultMonthRange();
+        return true;
+    }
+}
+
+// 设置默认月份范围（本月第一天到最后一天）
 function setDefaultMonthRange() {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     
     queryState.monthRange.startDate = firstDay;
     queryState.monthRange.endDate = lastDay;
+    
+    console.log('使用默认月份范围:', 
+        queryState.monthRange.startDate.toISOString(), '至', 
+        queryState.monthRange.endDate.toISOString());
 }
 
 // 加载用户本月完成的产品工序统计
@@ -1274,349 +1933,6 @@ async function getUserMonthlyProducts(employeeName, startDate, endDate) {
     }
 }
 
-// 处理删除记录
-async function handleDeleteRecords() {
-    try {
-        // 显示查询屏幕
-        showScreen(SCREENS.QUERY);
-        
-        // 获取本月范围
-        await getMonthRange();
-        
-        // 隐藏流水账容器
-        document.getElementById('monthly-transactions-container').style.display = 'none';
-        
-        // 显示加载中
-        document.getElementById('process-list').innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
-        
-        // 获取当前用户全名
-        const fullName = localStorage.getItem('user_full_name');
-        if (!fullName) {
-            document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">无法获取用户信息</div>';
-            return;
-        }
-        
-        // 查询用户本月完成的产品
-        const products = await getUserMonthlyProducts(
-            fullName,
-            queryState.monthRange.startDate,
-            queryState.monthRange.endDate
-        );
-        
-        if (!products || products.length === 0) {
-            document.getElementById('process-list').innerHTML = '<div class="text-center my-3">本月暂无完成的工序</div>';
-            return;
-        }
-        
-        // 将产品数据处理成带有工序信息的列表
-        const processRecords = [];
-        
-        products.forEach(product => {
-            const productCode = product['产品编码'];
-            const productModel = product['产品型号'];
-            
-            // 检查各个工序
-            if (product['绕线员工'] === fullName && isDateInRange(product['绕线时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '绕线',
-                    '时间': product['绕线时间']
-                });
-            }
-            
-            if (product['嵌线员工'] === fullName && isDateInRange(product['嵌线时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '嵌线',
-                    '时间': product['嵌线时间']
-                });
-            }
-            
-            if (product['接线员工'] === fullName && isDateInRange(product['接线时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '接线',
-                    '时间': product['接线时间']
-                });
-            }
-            
-            if (product['压装员工'] === fullName && isDateInRange(product['压装时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '压装',
-                    '时间': product['压装时间']
-                });
-            }
-            
-            if (product['车止口员工'] === fullName && isDateInRange(product['车止口时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '车止口',
-                    '时间': product['车止口时间']
-                });
-            }
-            
-            // 浸漆工序特殊处理
-            if (isDateInRange(product['浸漆时间'])) {
-                processRecords.push({
-                    '产品编码': productCode,
-                    '产品型号': productModel,
-                    '工序': '浸漆',
-                    '时间': product['浸漆时间']
-                });
-            }
-        });
-        
-        // 按时间倒序排序
-        processRecords.sort((a, b) => new Date(b['时间']) - new Date(a['时间']));
-        
-        // 生成记录列表
-        let recordsHTML = '';
-        
-        processRecords.forEach((record, index) => {
-            recordsHTML += `
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="${index}" id="record-${index}" data-index="${index}">
-                            <label class="form-check-label" for="record-${index}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>产品编码: ${record['产品编码']}</strong><br>
-                                        <small class="text-muted">产品型号: ${record['产品型号']}</small><br>
-                                        <small class="text-muted">工序: ${record['工序']}</small><br>
-                                        <small class="text-muted">时间: ${formatDate(record['时间'])}</small>
-                                    </div>
-                                    <div class="process-icon">
-                                        ${getProcessIcon(record['工序'])}
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        // 添加删除按钮
-        recordsHTML += `
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-danger" id="delete-selected-records" disabled>
-                    删除选中记录
-                </button>
-            </div>
-        `;
-        
-        document.getElementById('process-list').innerHTML = recordsHTML;
-        
-        // 添加复选框事件监听
-        const checkboxes = document.querySelectorAll('.form-check-input');
-        const deleteButton = document.getElementById('delete-selected-records');
-        
-        // 更新删除按钮文本的函数
-        function updateDeleteButtonText() {
-            // 使用更精确的选择器，确保只获取当前页面中的选中复选框
-            const checkedCount = document.querySelectorAll('#process-list .form-check-input:checked').length;
-            deleteButton.disabled = checkedCount === 0;
-            
-            // 只有在有选中记录时才显示数字
-            if (checkedCount > 0) {
-                deleteButton.textContent = `删除选中记录 (${checkedCount})`;
-            } else {
-                deleteButton.textContent = '删除选中记录';
-            }
-            
-            console.log('当前选中的记录数:', checkedCount);
-        }
-        
-        // 在绑定事件前，先确保移除所有现有事件，避免事件重复绑定
-        checkboxes.forEach(checkbox => {
-            // 克隆并替换节点，以移除所有事件监听器
-            const newCheckbox = checkbox.cloneNode(true);
-            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
-        });
-        
-        // 重新获取复选框元素（因为上面已经替换过了）
-        const refreshedCheckboxes = document.querySelectorAll('.form-check-input');
-        
-        // 为每个复选框添加事件
-        refreshedCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateDeleteButtonText);
-        });
-        
-        // 初始化按钮状态
-        updateDeleteButtonText();
-        
-        // 将processRecords存储在按钮上，以便在点击事件中使用
-        deleteButton.processRecords = processRecords;
-        
-        // 添加删除按钮事件监听
-        deleteButton.addEventListener('click', async function() {
-            // 禁用删除按钮，防止重复点击
-            this.disabled = true;
-            
-            // 从按钮中获取processRecords
-            const processRecords = this.processRecords;
-            if (!processRecords || !Array.isArray(processRecords)) {
-                console.error('无法获取处理记录数据');
-                showToast('无法获取处理记录数据，请刷新页面重试', 'error');
-                this.disabled = false;
-                return;
-            }
-            
-            // 重新获取选中的复选框，使用与updateDeleteButtonText相同的选择器
-            const selectedRecords = [];
-            const checkedBoxes = document.querySelectorAll('#process-list .form-check-input:checked');
-            
-            checkedBoxes.forEach((checkbox) => {
-                // 安全地解析索引，确保是有效的数字
-                const indexStr = checkbox.getAttribute('data-index');
-                const index = indexStr !== null ? parseInt(indexStr, 10) : NaN;
-                
-                // 检查索引是否为有效数字且在数组范围内
-                if (!isNaN(index) && index >= 0 && index < processRecords.length) {
-                    selectedRecords.push(processRecords[index]);
-                } else {
-                    console.warn(`无效的索引: ${index}, processRecords长度: ${processRecords.length}, 原始值: ${indexStr}`);
-                }
-            });
-            
-            console.log('选中的记录:', selectedRecords);
-            
-            const selectedCount = selectedRecords.length;
-            
-            if (selectedCount === 0) {
-                showToast('请选择要删除的记录', 'warning');
-                this.disabled = false;
-                return;
-            }
-            
-            if (!confirm(`确定要删除选中的 ${selectedCount} 条记录吗？`)) {
-                this.disabled = false;
-                return;
-            }
-            
-            this.textContent = '删除中...';
-            
-            try {
-                let successCount = 0;
-                let failureCount = 0;
-                
-                for (const record of selectedRecords) {
-                    if (!record || typeof record !== 'object' || !record['产品编码']) {
-                        console.error('无效的记录数据:', record);
-                        failureCount++;
-                        continue;
-                    }
-                    
-                    const success = await deleteProductProcess(
-                        record['产品编码'],
-                        record['工序'],
-                        fullName
-                    );
-                    
-                    if (success) {
-                        successCount++;
-                    } else {
-                        failureCount++;
-                    }
-                }
-                
-                showToast(`删除完成: 成功 ${successCount} 条, 失败 ${failureCount} 条`, 'info');
-                
-                // 延迟一下再重新加载记录
-                setTimeout(() => {
-                    handleDeleteRecords();
-                }, 1000);
-            } catch (error) {
-                console.error('删除记录失败:', error);
-                showToast('删除记录失败，请重试', 'error');
-                this.disabled = false;
-                updateDeleteButtonText();
-            }
-        });
-        
-    } catch (error) {
-        console.error('加载删除记录失败:', error);
-        document.getElementById('process-list').innerHTML = '<div class="text-center my-3 text-danger">加载失败，请重试</div>';
-    }
-}
-
-// 删除产品工序信息
-async function deleteProductProcess(productCode, processType, employeeName) {
-    try {
-        // 确定字段名称
-        let employeeField = '';
-        let timeField = '';
-        
-        switch (processType) {
-            case '绕线':
-                employeeField = '绕线员工';
-                timeField = '绕线时间';
-                break;
-            case '嵌线':
-                employeeField = '嵌线员工';
-                timeField = '嵌线时间';
-                break;
-            case '接线':
-                employeeField = '接线员工';
-                timeField = '接线时间';
-                break;
-            case '压装':
-                employeeField = '压装员工';
-                timeField = '压装时间';
-                break;
-            case '车止口':
-                employeeField = '车止口员工';
-                timeField = '车止口时间';
-                break;
-            case '浸漆':
-                timeField = '浸漆时间';
-                employeeField = '浸漆员工';
-                break;
-            default:
-                console.error('未知工序类型:', processType);
-                return false;
-        }
-        
-        // 准备请求数据
-        const deleteData = {
-            productCode: productCode,
-            processType: processType,
-            employeeName: employeeName,
-            timeField: timeField,
-            employeeField: employeeField
-        };
-        
-        // 发送HTTP请求到API
-        const response = await fetch(`${HTTP_API_URL}/api/deleteProductProcess`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(deleteData)
-        });
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            console.error('删除产品工序失败:', result.error);
-            return false;
-        }
-        
-        console.log('删除产品工序成功:', productCode, processType);
-        return result.success;
-    } catch (error) {
-        console.error('删除产品工序信息失败:', error);
-        return false;
-    }
-}
-
 // 获取工序图标
 function getProcessIcon(process) {
     let iconClass = '';
@@ -1658,7 +1974,7 @@ function getProcessIcon(process) {
 // 加载本月流水账
 async function loadMonthlyTransactionList() {
     try {
-        // 获取当前用户信息 - 修复用户信息获取方式
+        // 获取当前用户信息
         const fullName = localStorage.getItem('user_full_name');
         if (!fullName) {
             console.error('无法获取用户信息');
@@ -1667,26 +1983,74 @@ async function loadMonthlyTransactionList() {
         }
 
         // 显示加载提示
-        document.getElementById('monthly-transactions-container').innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
+        const transactionsContainer = document.getElementById('monthly-transactions-container');
+        transactionsContainer.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>数据加载中...</p></div>';
+
+        // 确保容器可见
+        transactionsContainer.style.display = 'block';
 
         // 获取本月范围
         await getMonthRange();
-        
+
         // 将日期转换为ISO格式字符串
         const startDateStr = queryState.monthRange.startDate.toISOString();
         const endDateStr = queryState.monthRange.endDate.toISOString();
 
+        // 检查缓存是否有效
+        const cacheKey = 'monthlyTransactions';
+        const cacheParams = `${fullName}_${startDateStr}_${endDateStr}`;
+        
+        // 如果缓存有效并且参数匹配，直接使用缓存数据
+        if (isCacheValid(cacheKey) && dataCache[cacheKey].params === cacheParams) {
+            console.log('使用缓存的月度交易数据');
+            renderTransactionList(dataCache[cacheKey].data);
+            return;
+        }
+        
+        console.log('从API加载月度交易数据');
+
         // 使用HTTP API查询数据库获取产品记录
-        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
+        const url = `${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`;
+        
+        // 添加随机查询参数以避免潜在的缓存问题
+        const cacheBuster = `&_=${Date.now()}`;
+        
+        const response = await fetch(url + cacheBuster, {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
 
         if (!response.ok) {
             console.error('加载产品记录失败:', response.statusText);
-            document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
+            transactionsContainer.innerHTML = '<div class="alert alert-danger">加载记录失败，请重试</div>';
             return;
         }
 
         const result = await response.json();
         const userRecords = result.data || [];
+        
+        // 更新缓存
+        dataCache[cacheKey] = {
+            data: userRecords,
+            timestamp: new Date(),
+            params: cacheParams
+        };
+        
+        // 渲染交易记录列表
+        renderTransactionList(userRecords);
+
+    } catch (error) {
+        console.error('加载流水账失败:', error);
+        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
+    }
+}
+
+// 渲染交易记录列表
+function renderTransactionList(userRecords) {
+    const transactionsContainer = document.getElementById('monthly-transactions-container');
 
         // 按时间排序（最新的在前）
         userRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -1734,12 +2098,7 @@ async function loadMonthlyTransactionList() {
         }
 
         // 更新DOM
-        document.getElementById('monthly-transactions-container').innerHTML = html;
-
-    } catch (error) {
-        console.error('加载流水账失败:', error);
-        document.getElementById('monthly-transactions-container').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
-    }
+    transactionsContainer.innerHTML = html;
 }
 
 // 在showMonthlyQuery函数中添加对loadMonthlyTransactionList的调用
@@ -1748,6 +2107,299 @@ function showMonthlyQuery() {
     loadCurrentMonthRange();
     displayMonthRange();
     loadUserMonthlyProcesses();
-    // 加载本月流水账
+    // 加载本月流水账 - 直接调用优化后的函数
     loadMonthlyTransactionList();
+}
+
+// 添加获取产品记录的函数
+async function fetchRecords() {
+    try {
+        // 使用实际的API获取数据
+        const response = await fetch(`${HTTP_API_URL}/api/getRecords`);
+        
+        if (!response.ok) {
+            console.error('获取记录失败:', response.statusText);
+            showToast('获取记录失败，请重试', 'error');
+            // 如果API失败，使用全局变量中的记录作为备用
+            return globalRecords;
+        }
+        
+        const result = await response.json();
+        return result.data || [];
+    } catch (error) {
+        console.error('获取记录时出错:', error);
+        showToast('加载记录失败，请重试', 'error');
+        // 如果API失败，使用全局变量中的记录作为备用
+        return globalRecords;
+    }
+}
+
+// 处理删除记录 - 优化版本
+async function handleDeleteRecords() {
+    try {
+        // 获取本月范围
+        await getMonthRange();
+        
+        // 显示删除记录屏幕
+        showScreen(SCREENS.DELETE_RECORDS);
+        
+        // 显示加载中提示
+        const deleteContent = document.getElementById('delete-records-content');
+        deleteContent.innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 清空已有的固定按钮容器（如果存在）
+        const existingButtonsContainer = document.getElementById('fixed-delete-buttons');
+        if (existingButtonsContainer) {
+            existingButtonsContainer.remove();
+        }
+        
+        // 创建固定在屏幕底部的按钮容器
+        const fixedButtonsContainer = document.createElement('div');
+        fixedButtonsContainer.className = 'fixed-bottom bg-white border-top p-2';
+        fixedButtonsContainer.id = 'fixed-delete-buttons';
+        fixedButtonsContainer.innerHTML = `
+            <div class="container">
+                <div class="row">
+                    <div class="col-6">
+                        <button class="btn btn-secondary w-100" id="delete-back-button">返回</button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-danger w-100" id="delete-selected-records" disabled>
+                            删除选中记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 添加到页面
+        document.body.appendChild(fixedButtonsContainer);
+        
+        // 为新的返回按钮添加事件监听器
+        document.getElementById('delete-back-button').addEventListener('click', () => {
+            // 移除固定按钮容器
+            fixedButtonsContainer.remove();
+            // 返回到主屏幕
+            showScreen(SCREENS.HOME);
+            // 清除缓存，确保下次查看时重新加载数据
+            dataCache.monthlyTransactions.data = null;
+            dataCache.monthlyTransactions.timestamp = null;
+        });
+        
+        // 将日期转换为ISO格式字符串
+        const startDateStr = queryState.monthRange.startDate.toISOString();
+        const endDateStr = queryState.monthRange.endDate.toISOString();
+        
+        // 添加随机查询参数以避免潜在的缓存问题
+        const cacheBuster = `&_=${Date.now()}`;
+        
+        // 使用与本月台账查询相同的API获取记录，但不限制用户
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(userState.fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}${cacheBuster}`, {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
+        if (!response.ok) {
+            console.error('获取记录失败:', response.statusText);
+            deleteContent.innerHTML = '<div class="alert alert-danger">获取记录失败，请重试</div>';
+            return;
+        }
+        
+        const result = await response.json();
+        const records = result.data || [];
+        
+        if (records.length === 0) {
+            deleteContent.innerHTML = '<div class="alert alert-info">没有找到记录</div>';
+            return;
+        }
+        
+        // 构建HTML表格 - 与台账查询页面相同的表格样式
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col" width="40px"></th>
+                            <th scope="col">工序</th>
+                            <th scope="col">产品编码</th>
+                            <th scope="col">型号</th>
+                            <th scope="col">时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="records-tbody">
+        `;
+        
+        // 按时间排序（最新的在前）
+        records.sort((a, b) => new Date(b.time) - new Date(a.time));
+        
+        records.forEach(record => {
+            // 格式化时间
+            const recordDate = new Date(record.time);
+            const formattedDate = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordDate.getHours()).padStart(2, '0')}:${String(recordDate.getMinutes()).padStart(2, '0')}`;
+            
+            html += `
+                <tr data-id="${record.id || Math.random().toString(36).substring(2, 10)}">
+                    <td><input type="checkbox" class="record-checkbox" data-id="${record.id || Math.random().toString(36).substring(2, 10)}"></td>
+                    <td>${record.process}</td>
+                    <td>${record.productCode}</td>
+                    <td>${record.model}</td>
+                    <td>${formattedDate}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // 更新DOM
+        deleteContent.innerHTML = html;
+        
+        // 单个复选框变化时更新删除按钮状态
+        document.getElementById('records-tbody').addEventListener('change', e => {
+            if (e.target.classList.contains('record-checkbox')) {
+                updateDeleteButtonState();
+            }
+        });
+        
+        // 删除按钮点击事件
+        document.getElementById('delete-selected-records').addEventListener('click', deleteSelectedRecords);
+        
+    } catch (error) {
+        console.error('处理删除记录时出错:', error);
+        document.getElementById('delete-records-content').innerHTML = '<div class="alert alert-danger">加载数据失败，请重试</div>';
+    }
+    
+    // 更新删除按钮状态
+    function updateDeleteButtonState() {
+        const selectedCount = document.querySelectorAll('.record-checkbox:checked').length;
+        const deleteButton = document.getElementById('delete-selected-records');
+        deleteButton.disabled = selectedCount === 0;
+        deleteButton.textContent = selectedCount > 0 ? `删除选中记录 (${selectedCount})` : '删除选中记录';
+    }
+    
+    // 删除选中记录
+    function deleteSelectedRecords() {
+        const selectedCheckboxes = document.querySelectorAll('.record-checkbox:checked');
+        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
+        
+        if (selectedIds.length === 0) {
+            showToast('请先选择要删除的记录', 'warning');
+            return;
+        }
+        
+        if (!confirm(`确定要删除选中的 ${selectedIds.length} 条记录吗？此操作不可撤销。`)) {
+            return;
+        }
+        
+        const deleteButton = document.getElementById('delete-selected-records');
+        const originalText = deleteButton.textContent;
+        deleteButton.disabled = true;
+        deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 删除中...';
+        
+        // 获取选中行
+        const promises = [];
+        
+        selectedCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            const processName = row.cells[1].textContent.trim();
+            const productCode = row.cells[2].textContent.trim();
+            
+            // 根据中文工序名获取英文工序类型
+            let processType = '';
+            if (processName === '绕线') processType = 'wiring';
+            else if (processName === '嵌线') processType = 'embedding';
+            else if (processName === '接线') processType = 'wiring_connect';
+            else if (processName === '压装') processType = 'pressing';
+            else if (processName === '车止口') processType = 'stopper';
+            else if (processName === '浸漆') processType = 'immersion';
+            
+            // 根据工序类型获取字段名
+            const fields = getProcessFields(processType);
+            
+            // 调用删除API
+            const promise = fetch(`${HTTP_API_URL}/api/deleteProductProcess`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    productCode: productCode,
+                    processType: processType,
+                    employeeName: userState.fullName,
+                    timeField: fields.timeField,
+                    employeeField: fields.employeeField
+                }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            });
+            
+            promises.push(promise);
+        });
+        
+        // 等待所有删除完成
+        Promise.all(promises)
+            .then(results => {
+                const successCount = results.filter(data => data.success).length;
+                
+                // 从DOM中删除选中的行
+                selectedCheckboxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    if (row) row.remove();
+                });
+                
+                // 显示成功提示
+                showToast(`成功删除 ${successCount} 条记录`, 'success');
+                
+                // 检查是否还有剩余记录
+                handleRemainingRecords();
+                
+                // 清除缓存，确保数据刷新
+                dataCache.monthlyTransactions.data = null;
+                dataCache.monthlyTransactions.timestamp = null;
+                
+                // 恢复按钮状态
+                deleteButton.disabled = false;
+                deleteButton.textContent = originalText;
+            })
+            .catch(error => {
+                console.error('删除记录时出错:', error);
+                showToast('删除失败，请重试', 'error');
+                
+                // 恢复按钮状态
+                deleteButton.disabled = false;
+                deleteButton.textContent = originalText;
+            });
+    }
+        
+        function handleRemainingRecords() {
+            const remainingRecords = document.querySelectorAll('#records-tbody tr').length;
+            if (remainingRecords === 0) {
+                document.getElementById('delete-records-content').innerHTML = 
+                    '<div class="alert alert-info">没有找到记录</div>';
+                
+                // 如果没有剩余记录，也移除底部按钮
+                const fixedButtons = document.getElementById('fixed-delete-buttons');
+                if (fixedButtons) {
+                    fixedButtons.remove();
+                }
+                
+                // 延迟返回主屏幕
+                setTimeout(() => {
+                    showScreen(SCREENS.HOME);
+                }, 1000);
+            }
+            
+            // 更新删除按钮状态
+            updateDeleteButtonState();
+    }
 } 

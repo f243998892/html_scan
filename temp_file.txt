@@ -1,0 +1,72 @@
+async function handleDeleteRecords() {
+    try {
+        // 获取本月范围
+        await getMonthRange();
+        
+        // 显示删除记录屏幕
+        showScreen(SCREENS.DELETE_RECORDS);
+        
+        // 显示加载中提示
+        const deleteContent = document.getElementById('delete-records-content');
+        deleteContent.innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">加载中...</div></div>';
+        
+        // 清空已有的固定按钮容器（如果存在）
+        const existingButtonsContainer = document.getElementById('fixed-delete-buttons');
+        if (existingButtonsContainer) {
+            existingButtonsContainer.remove();
+        }
+        
+        // 创建固定在屏幕底部的按钮容器
+        const fixedButtonsContainer = document.createElement('div');
+        fixedButtonsContainer.className = 'fixed-bottom bg-white border-top p-2';
+        fixedButtonsContainer.id = 'fixed-delete-buttons';
+        fixedButtonsContainer.innerHTML = `
+            <div class="container">
+                <div class="row">
+                    <div class="col-6">
+                        <button class="btn btn-secondary w-100" id="delete-back-button">返回</button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-danger w-100" id="delete-selected-records" disabled>
+                            删除选中记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 添加到页面
+        document.body.appendChild(fixedButtonsContainer);
+        
+        // 为新的返回按钮添加事件监听器
+        document.getElementById('delete-back-button').addEventListener('click', () => {
+            // 移除固定按钮容器
+            fixedButtonsContainer.remove();
+            // 返回到主屏幕
+            showScreen(SCREENS.HOME);
+        });
+        
+        // 将日期转换为ISO格式字符串
+        const startDateStr = queryState.monthRange.startDate.toISOString();
+        const endDateStr = queryState.monthRange.endDate.toISOString();
+        
+        // 使用与本月台账查询相同的API获取记录，但不限制用户
+        // 获取当前登录用户的信息
+        const fullName = localStorage.getItem("user_full_name");
+        if (!fullName) {
+            console.error("无法获取用户信息");
+            deleteContent.innerHTML = "<div class="alert alert-warning">无法获取用户信息，请重新登录</div>";
+            return;
+        }
+        
+        // 使用与本月台账查询相同的API获取记录，添加用户名限制
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);startDate=${encodeURIComponent(startDateStr)}const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);endDate=${encodeURIComponent(endDateStr)}`);
+        
+        if (!response.ok) {
+            console.error('获取记录失败:', response.statusText);
+            deleteContent.innerHTML = '<div class="alert alert-danger">获取记录失败，请重试</div>';
+            return;
+        }
+        
+        const result = await response.json();
+        const records = result.data || [];

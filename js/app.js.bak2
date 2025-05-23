@@ -1529,8 +1529,15 @@ function showMonthlyQuery() {
 // 添加获取产品记录的函数
 async function fetchRecords() {
     try {
+        // 获取当前登录用户的信息
+        const fullName = localStorage.getItem("user_full_name");
+        if (!fullName) {
+            console.error("无法获取用户信息");
+            showToast("无法获取用户信息，请重新登录", "error");
+            return [];
+        }
         // 使用实际的API获取数据
-        const response = await fetch(`${HTTP_API_URL}/api/getRecords`);
+        const response = await fetch(`${HTTP_API_URL}/api/getRecords?employeeName=${encodeURIComponent(fullName)}`);
         
         if (!response.ok) {
             console.error('获取记录失败:', response.statusText);
@@ -1602,8 +1609,15 @@ async function handleDeleteRecords() {
         const startDateStr = queryState.monthRange.startDate.toISOString();
         const endDateStr = queryState.monthRange.endDate.toISOString();
         
+        // 获取当前登录用户的信息
+        const fullName = localStorage.getItem("user_full_name");
+        if (!fullName) {
+            console.error("无法获取用户信息");
+            deleteContent.innerHTML = "<div class=\"alert alert-warning\">无法获取用户信息，请重新登录</div>";
+            return;
+        }
         // 使用与本月台账查询相同的API获取记录，但不限制用户
-        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
+        const response = await fetch(`${HTTP_API_URL}/api/getUserMonthlyTransactions?employeeName=${encodeURIComponent(fullName)}&startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}`);
         
         if (!response.ok) {
             console.error('获取记录失败:', response.statusText);
@@ -1625,7 +1639,7 @@ async function handleDeleteRecords() {
                 <table class="table table-striped table-bordered table-sm">
                     <thead class="table-dark">
                         <tr>
-                            <th scope="col" width="40px"><input type="checkbox" id="select-all-records" class="checkbox-delete"></th>
+                            <th scope="col" width="40px">选择</th>
                             <th scope="col">工序</th>
                             <th scope="col">产品编码</th>
                             <th scope="col">型号</th>
@@ -1663,12 +1677,6 @@ async function handleDeleteRecords() {
         // 更新DOM
         deleteContent.innerHTML = html;
         
-        // 全选框功能
-        document.getElementById('select-all-records').addEventListener('change', e => {
-            const checkboxes = document.querySelectorAll('.record-checkbox');
-            checkboxes.forEach(checkbox => checkbox.checked = e.target.checked);
-            updateDeleteButtonState();
-        });
         
         // 单个复选框变化时更新删除按钮状态
         document.getElementById('records-tbody').addEventListener('change', e => {
@@ -1712,12 +1720,12 @@ async function handleDeleteRecords() {
         deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 删除中...';
         
         // 调用实际的删除API
-        fetch(`${HTTP_API_URL}/api/deleteRecords`, {
+        fetch(`${HTTP_API_URL}/api/deleteSelectedRecords`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ids: selectedIds }),
+            body: JSON.stringify({ id: selectedIds[0] }),
         })
         .then(response => response.json())
         .then(data => {

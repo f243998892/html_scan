@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安装公网证书</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { padding: 20px; }
+        .device-icon { font-size: 3rem; margin-bottom: 15px; }
+        .nav-pills .nav-link.active { background-color: #0d6efd; }
+        .nav-pills .nav-link { color: #0d6efd; }
+        .domain-badge {
+            font-size: 1.1rem;
+            padding: 8px 15px;
+            border-radius: 20px;
+            background-color: #f8f9fa;
+            display: inline-block;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-3">安装公网自签名证书</h3>
+                <div class="text-center mb-4">
+                    <div class="domain-badge">
+                        <i class="bi bi-globe me-2"></i>www.fanghui8131.fun
+                    </div>
+                </div>
+                <p>要通过HTTPS安全访问公网应用，请先<a href="/public-cert.html" class="fw-bold">下载适合您设备的公网证书</a>，然后按照以下说明安装：</p>
+                
+                <!-- 设备选择标签页 -->
+                <ul class="nav nav-pills mb-4 justify-content-center" id="deviceTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active d-flex align-items-center" id="android-tab" data-bs-toggle="pill" data-bs-target="#android" type="button" role="tab">
+                            <i class="bi bi-android2 me-2"></i>安卓设备
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link d-flex align-items-center" id="ios-tab" data-bs-toggle="pill" data-bs-target="#ios" type="button" role="tab">
+                            <i class="bi bi-apple me-2"></i>iOS设备
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- 标签页内容 -->
+                <div class="tab-content" id="deviceTabContent">
+                    <!-- 安卓设备安装指南 -->
+                    <div class="tab-pane fade show active" id="android" role="tabpanel">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-android2 text-success device-icon"></i>
+                            <h4>安卓设备安装步骤</h4>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-1-circle-fill me-2 text-primary"></i>下载并打开证书</h5>
+                                <ol class="mb-3">
+                                    <li>从<a href="/public-cert.html" class="fw-bold">下载证书页面</a>下载<b class="text-success">安卓公网证书(.cer格式)</b></li>
+                                    <li>下载完成后，在通知栏找到下载的证书并点击</li>
+                                    <li>如果自动打开失败，请使用文件管理器找到并打开下载的证书文件</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-2-circle-fill me-2 text-primary"></i>设置证书用途</h5>
+                                <ol class="mb-3">
+                                    <li>系统会提示为证书命名，可以使用默认名称</li>
+                                    <li class="text-danger fw-bold">重要：在弹出窗口选择"VPN和应用"作为证书用途</li>
+                                    <li>如果没有看到此选项，尝试在"证书名称"下方找到"凭据用途"选项</li>
+                                </ol>
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>如果安装时提示"无法读取证书文件"，请确保下载的是<b>.cer</b>格式的证书，并且使用文件管理器打开它。
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-3-circle-fill me-2 text-primary"></i>完成安装</h5>
+                                <ol class="mb-3">
+                                    <li>如果设备有锁屏密码或指纹，需要验证以确认安装</li>
+                                    <li>安装完成后，系统会提示证书已安装</li>
+                                    <li>现在可以通过HTTPS安全访问公网站点了</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-4-circle-fill me-2 text-primary"></i>访问公网站点</h5>
+                                <p>证书安装完成后，可以通过以下链接访问公网站点：</p>
+                                <div class="d-grid gap-2 col-md-8 mx-auto mt-3">
+                                    <a href="https://www.fanghui8131.fun" class="btn btn-outline-success">
+                                        <i class="bi bi-globe me-2"></i>访问公网站点
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- iOS设备安装指南 -->
+                    <div class="tab-pane fade" id="ios" role="tabpanel">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-apple text-dark device-icon"></i>
+                            <h4>iOS设备安装步骤</h4>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-1-circle-fill me-2 text-primary"></i>下载证书</h5>
+                                <ol class="mb-3">
+                                    <li>从<a href="/public-cert.html" class="fw-bold">下载证书页面</a>下载<b class="text-dark">iOS公网证书(.der格式)</b></li>
+                                    <li>系统将提示"此网站正尝试下载配置描述文件"，点击"允许"</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-2-circle-fill me-2 text-primary"></i>安装证书</h5>
+                                <ol class="mb-3">
+                                    <li>打开"设置"应用</li>
+                                    <li>点击顶部的"已下载描述文件"通知</li>
+                                    <li>点击"安装"，然后输入设备密码</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-3-circle-fill me-2 text-primary"></i>信任证书</h5>
+                                <ol class="mb-3">
+                                    <li>返回"设置"主页</li>
+                                    <li>转到"通用" → "关于本机" → "证书信任设置"</li>
+                                    <li class="text-danger fw-bold">开启对"PublicRootCA"证书的完全信任</li>
+                                    <li>在确认对话框中选择"继续"</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-4-circle-fill me-2 text-primary"></i>访问公网站点</h5>
+                                <p>证书安装和信任完成后，可以通过以下链接访问公网站点：</p>
+                                <div class="d-grid gap-2 col-md-8 mx-auto mt-3">
+                                    <a href="https://www.fanghui8131.fun" class="btn btn-outline-dark">
+                                        <i class="bi bi-globe me-2"></i>访问公网站点
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <strong><i class="bi bi-info-circle me-2"></i>提示：</strong>安装证书后，您可以在浏览器中安全访问 <a href="https://www.fanghui8131.fun" class="fw-bold">https://www.fanghui8131.fun</a> 而不会收到安全警告。
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="/public-cert.html" class="btn btn-primary btn-lg">
+                        <i class="bi bi-download me-2"></i>下载公网证书
+                    </a>
+                    <a href="/" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-house me-2"></i>返回首页
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
