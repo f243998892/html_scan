@@ -1995,15 +1995,13 @@ async function loadUserMonthlyProcesses() {
                 });
             }
             
-            if (isDateInRange(product['浸漆时间'])) {
+            if (product['浸漆员工'] === userState.fullName && isDateInRange(product['浸漆时间'])) {
                 processCounts['浸漆']++;
-                
                 // 按型号统计
                 if (!processModels['浸漆'][product['产品型号']]) {
                     processModels['浸漆'][product['产品型号']] = 0;
                 }
                 processModels['浸漆'][product['产品型号']]++;
-                
                 // 存储产品编码和时间
                 if (!processProducts['浸漆'][product['产品型号']]) {
                     processProducts['浸漆'][product['产品型号']] = [];

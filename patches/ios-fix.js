@@ -127,27 +127,9 @@ function patchQRScanner() {
             // 调用原始函数
             originalInitializeScanner.apply(this, arguments);
             
-            // 为iOS设备应用特定设置
-            if (isIOS() && scanState && scanState.currentHtml5QrScanner) {
-                console.log("[iOS补丁] 应用iOS扫描器特定设置");
-                
-                // 2秒后应用相机设置，确保相机已初始化
-                setTimeout(() => {
-                    try {
-                        // 应用连续自动对焦模式
-                        scanState.currentHtml5QrScanner.applyVideoConstraints({
-                            focusMode: "continuous",
-                            // 不使用缩放，因为iOS 16以下不支持
-                            // 增加分辨率
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        });
-                        console.log("[iOS补丁] 已应用iOS相机增强设置");
-                    } catch (e) {
-                        console.error("[iOS补丁] 应用相机设置时出错:", e);
-                    }
-                }, 2500);
-            }
+            // 为iOS设备应用特定设置（不再动态调整分辨率，参数与安卓一致）
+            // 这里可以根据需要保留focusMode等兼容性设置，但不再setTimeout applyVideoConstraints
+            // 如果后续有特殊iOS兼容性需求，可在此处补充
         };
     }
     
