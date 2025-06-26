@@ -45,7 +45,8 @@ const SCREENS = {
     QUERY: 'query-screen',
     MODELS: 'models-screen',
     PRODUCTS: 'products-screen',
-    DELETE_RECORDS: 'delete-records-screen' // 添加删除记录屏幕常量
+    DELETE_RECORDS: 'delete-records-screen',
+    MANUAL_SCAN: 'manual-scan-screen' // 新增扫码枪/手动录入界面
 };
 
 // 全局缓存对象
@@ -200,6 +201,9 @@ function addEventListeners() {
     // 扫码相关
     document.getElementById('scan-stop').addEventListener('click', stopScan);
     document.getElementById('scan-upload').addEventListener('click', uploadPendingCodes);
+    
+    // 添加扫码枪/手动录入按钮事件
+    addManualScanEvent();
 }
 
 // 保存工序选择到本地存储
@@ -2735,6 +2739,41 @@ function handleContinuousScan() {
     // 显示连续扫码页面
     showScreen(SCREENS.CONTINUOUS_SCAN);
     
+    // 自动聚焦多行输入框
+    setTimeout(() => {
+        const multilineInput = document.getElementById('manual-multiline-codes');
+        if (multilineInput) multilineInput.focus();
+    }, 300);
+    
+    // 绑定手动上传事件（防止重复绑定）
+    setTimeout(() => {
+        const uploadBtn = document.getElementById('manual-multiline-upload');
+        if (uploadBtn && !uploadBtn.dataset.bound) {
+            uploadBtn.addEventListener('click', function() {
+                const textarea = document.getElementById('manual-multiline-codes');
+                if (!textarea) return;
+                const codes = textarea.value.split('\n').map(line => line.trim()).filter(line => line);
+                if (codes.length === 0) {
+                    showToast('请输入至少一条产品编码', 'warning');
+                    return;
+                }
+                let successCount = 0, failCount = 0;
+                const processCode = async (code) => {
+                    // 复用扫码成功逻辑，且不影响扫码枪
+                    await onScanSuccess(code, { result: { text: code } });
+                };
+                (async () => {
+                    for (const code of codes) {
+                        await processCode(code);
+                    }
+                    showToast(`手动上传完成，共${codes.length}条`, 'success');
+                    textarea.value = '';
+                })();
+            });
+            uploadBtn.dataset.bound = '1';
+        }
+    }, 350);
+    
     // 开始扫码
     startScan(selectedProcess, true);
 }
@@ -2771,3 +2810,67 @@ function createFloatingProcess() {
     // 添加到body
     document.body.appendChild(floatingDiv);
 }
+
+// 添加扫码枪/手动录入按钮事件
+function addManualScanEvent() {
+    const manualScanBtn = document.getElementById('card-manual-scan');
+    if (manualScanBtn) {
+        manualScanBtn.addEventListener('click', function() {
+            const processSelect = document.getElementById('process-select');
+            const selectedProcess = processSelect.value;
+            const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
+            if (!selectedProcess) {
+                showToast('请先选择工序', 'warning');
+                return;
+            }
+            if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion') {
+                showToast('只有车止口和浸漆工序支持手动录入', 'error');
+                return;
+            }
+            // 显示工序提示
+            const processDisplay = document.getElementById('manual-scan-process');
+            processDisplay.innerHTML = `<strong>当前工序:</strong> <span class="process-highlight">${selectedProcessText}</span>`;
+            processDisplay.style.fontSize = '1.4rem';
+            // 切换界面
+            showScreen(SCREENS.MANUAL_SCAN);
+            // 自动聚焦
+            setTimeout(() => {
+                const textarea = document.getElementById('manual-scan-codes');
+                if (textarea) textarea.focus();
+            }, 200);
+        });
+    }
+    // 返回按钮
+    const backBtn = document.getElementById('manual-scan-back');
+    if (backBtn) {
+        backBtn.addEventListener('click', function() {
+            showScreen(SCREENS.HOME);
+        });
+    }
+    // 上传按钮
+    const uploadBtn = document.getElementById('manual-scan-upload');
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', async function() {
+            const textarea = document.getElementById('manual-scan-codes');
+            if (!textarea) return;
+            const codes = textarea.value.split('\n').map(line => line.trim()).filter(line => line);
+            if (codes.length === 0) {
+                showToast('请输入至少一条产品编码', 'warning');
+                return;
+            }
+            const processSelect = document.getElementById('process-select');
+            const selectedProcess = processSelect.value;
+            let successCount = 0, failCount = 0;
+            for (const code of codes) {
+                try {
+                    const success = await updateProductProcess(code, selectedProcess, userState.fullName);
+                    if (success) successCount++; else failCount++;
+                } catch (e) { failCount++; }
+            }
+            showToast(`上传完成，成功${successCount}条，失败${failCount}条`, 'success');
+            textarea.value = '';
+        });
+    }
+}
+// 页面初始化时调用
+setTimeout(addManualScanEvent, 500);

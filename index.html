@@ -355,6 +355,14 @@
                     </div>
                 </div>
                 <div class="col-6">
+                    <div class="card shadow-sm h-100" id="card-manual-scan">
+                        <div class="card-body text-center p-4 home-card">
+                            <i class="bi bi-keyboard text-primary"></i>
+                            <h5 class="text-primary">扫码枪/手动录入</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
                     <div class="card shadow-sm h-100" id="card-product-query">
                         <div class="card-body text-center p-4 home-card">
                             <i class="bi bi-search text-warning"></i>
@@ -404,7 +412,26 @@
                 <h3 class="text-center">连续扫码</h3>
                 <p id="continuous-scan-process" class="current-process-display"></p>
             </div>
+            <div class="mb-3" id="manual-multiline-input-container">
+                <label for="manual-multiline-codes" class="form-label">手动输入（每行一条，支持多条同时上传）</label>
+                <textarea class="form-control" id="manual-multiline-codes" rows="4" placeholder="每行输入一个产品编码"></textarea>
+                <button class="btn btn-primary mt-2 w-100" id="manual-multiline-upload" type="button">手动上传</button>
+            </div>
             <button class="btn btn-secondary mt-3 w-100" id="continuous-scan-back">返回</button>
+        </div>
+
+        <!-- 扫码枪/手动录入屏幕 -->
+        <div id="manual-scan-screen" class="d-none">
+            <div class="mb-3">
+                <h3 class="text-center">扫码枪/手动录入</h3>
+                <p id="manual-scan-process" class="current-process-display"></p>
+            </div>
+            <div class="mb-3" id="manual-scan-input-container">
+                <label for="manual-scan-codes" class="form-label">手动输入（每行一条，支持多条同时上传）</label>
+                <textarea class="form-control" id="manual-scan-codes" rows="4" placeholder="每行输入一个产品编码"></textarea>
+                <button class="btn btn-primary mt-2 w-100" id="manual-scan-upload" type="button">手动上传</button>
+            </div>
+            <button class="btn btn-secondary mt-3 w-100" id="manual-scan-back">返回</button>
         </div>
 
         <!-- 扫码屏幕 -->
