@@ -281,8 +281,7 @@ function navigateToHome() {
         showScreen(SCREENS.HOME);
         // 创建浮动工序名称框
         createFloatingProcess();
-        // 只在navigateToHome调用一次刷新
-        setTimeout(refreshTodayProcessCount, 0);
+        // 不在这里调用refreshTodayProcessCount，避免和showScreen重复
     } catch (error) {
         console.error('导航到首页失败:', error);
     }
@@ -341,12 +340,12 @@ function showScreen(screenId) {
         // 隐藏所有模态框
         hideAllModals();
         
-        // 如果切换回首页，停止扫码
+        // 如果切换回首页，停止扫码并刷新今日工序数量
         if (screenId === SCREENS.HOME) {
             if (scanState.currentHtml5QrScanner) {
                 stopScanner();
             }
-            // 不再这里调用refreshTodayProcessCount，避免重复
+            setTimeout(refreshTodayProcessCount, 0);
         }
         
         // 在查询页面隐藏浮动工序框，其他页面显示
@@ -753,7 +752,7 @@ function handleManualCodeInput() {
 }
 
 // 扫码成功回调
-async function onScanSuccess(decodedText, decodedResult) {
+async function onScanSuccess(decodedText, decodedResult, showSuccessToast = true) {
     // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
     
@@ -797,13 +796,16 @@ async function onScanSuccess(decodedText, decodedResult) {
     } else {
         // 单次扫码模式，直接上传
         try {
-            const success = await updateProductProcess(decodedText, scanState.processType, userState.fullName);
+            const success = await updateProductProcess(decodedText, scanState.processType, userState.fullName, showSuccessToast);
             
             if (success) {
                 // 播放成功提示音
                 playSuccessBeep();
                 
-                showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
+                // 只在showSuccessToast为true时弹窗
+                if (showSuccessToast) {
+                    showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
+                }
                 
                 // 修改：单次扫码成功后直接返回主页
                 setTimeout(() => {
@@ -1147,7 +1149,7 @@ function playErrorSound() {
 // ------ Supabase数据操作 ------
 
 // 更新产品信息
-async function updateProductProcess(productCode, processType, employeeName) {
+async function updateProductProcess(productCode, processType, employeeName, showSuccessToast = true) {
     try {
         // 确定字段名称
         const { employeeField, timeField } = getProcessFields(processType);
@@ -1179,6 +1181,10 @@ async function updateProductProcess(productCode, processType, employeeName) {
         
         // 不再检查response.ok，而是检查返回的result对象
         if (result.success) {
+            // 只在showSuccessToast为true时弹窗
+            if (showSuccessToast) {
+                showToast(`${getChineseProcessName(processType)}数据更新成功: ${productCode}`, 'success');
+            }
             return true;
         }
         
@@ -2762,7 +2768,7 @@ function handleContinuousScan() {
                 let successCount = 0, failCount = 0;
                 const processCode = async (code) => {
                     // 复用扫码成功逻辑，且不影响扫码枪
-                    await onScanSuccess(code, { result: { text: code } });
+                    await onScanSuccess(code, { result: { text: code } }, false); // 关闭单条弹窗
                 };
                 (async () => {
                     for (const code of codes) {
@@ -2865,7 +2871,7 @@ function addManualScanEvent() {
             let successCount = 0, failCount = 0;
             for (const code of codes) {
                 try {
-                    const success = await updateProductProcess(code, selectedProcess, userState.fullName);
+                    const success = await updateProductProcess(code, selectedProcess, userState.fullName, false); // 关闭单条弹窗
                     if (success) successCount++; else failCount++;
                 } catch (e) { failCount++; }
             }
@@ -2878,50 +2884,57 @@ function addManualScanEvent() {
 setTimeout(addManualScanEvent, 500);
 
 // 在主页用户名下方显示今日工序数量
+let refreshTodayProcessCountTimer = null;
 async function refreshTodayProcessCount() {
-    // 彻底移除所有旧的统计
-    document.querySelectorAll('#today-process-count').forEach(e => e.remove());
-    const userFullnameElement = document.getElementById('user-fullname');
-    if (!userFullnameElement) return;
-    // 获取今日日期范围
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    // 获取数据
-    let products = [];
-    try {
-        products = await getUserMonthlyProducts(userState.fullName, start, end);
-    } catch (e) {
-        return;
+    // 防抖：短时间内只允许一次
+    if (refreshTodayProcessCountTimer) {
+        clearTimeout(refreshTodayProcessCountTimer);
     }
-    // 统计各工序数量
-    const processCounts = {
-        '绕线': 0,
-        '嵌线': 0,
-        '接线': 0,
-        '压装': 0,
-        '车止口': 0,
-        '浸漆': 0
-    };
-    products.forEach(product => {
-        if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'], start, end)) processCounts['绕线']++;
-        if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'], start, end)) processCounts['嵌线']++;
-        if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'], start, end)) processCounts['接线']++;
-        if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'], start, end)) processCounts['压装']++;
-        if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'], start, end)) processCounts['车止口']++;
-        if (product['浸漆员工'] === userState.fullName && isDateInRange(product['浸漆时间'], start, end)) processCounts['浸漆']++;
-    });
-    // 生成统计文本
-    let html = '<div id="today-process-count" style="font-size:12px;color:#888;margin-top:2px;">';
-    let has = false;
-    Object.keys(processCounts).forEach(key => {
-        if (processCounts[key] > 0) {
-            html += `${key}<span style=\"color:#007bff;margin:0 2px;\">${processCounts[key]}</span> `;
-            has = true;
+    refreshTodayProcessCountTimer = setTimeout(async () => {
+        // 彻底移除所有旧的统计
+        document.querySelectorAll('#today-process-count').forEach(e => e.remove());
+        const userFullnameElement = document.getElementById('user-fullname');
+        if (!userFullnameElement) return;
+        // 获取今日日期范围
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        // 获取数据
+        let products = [];
+        try {
+            products = await getUserMonthlyProducts(userState.fullName, start, end);
+        } catch (e) {
+            return;
         }
-    });
-    if (!has) html += '无';
-    html += '</div>';
-    // 插入到用户名下方
-    userFullnameElement.insertAdjacentHTML('afterend', html);
+        // 统计各工序数量
+        const processCounts = {
+            '绕线': 0,
+            '嵌线': 0,
+            '接线': 0,
+            '压装': 0,
+            '车止口': 0,
+            '浸漆': 0
+        };
+        products.forEach(product => {
+            if (product['绕线员工'] === userState.fullName && isDateInRange(product['绕线时间'], start, end)) processCounts['绕线']++;
+            if (product['嵌线员工'] === userState.fullName && isDateInRange(product['嵌线时间'], start, end)) processCounts['嵌线']++;
+            if (product['接线员工'] === userState.fullName && isDateInRange(product['接线时间'], start, end)) processCounts['接线']++;
+            if (product['压装员工'] === userState.fullName && isDateInRange(product['压装时间'], start, end)) processCounts['压装']++;
+            if (product['车止口员工'] === userState.fullName && isDateInRange(product['车止口时间'], start, end)) processCounts['车止口']++;
+            if (product['浸漆员工'] === userState.fullName && isDateInRange(product['浸漆时间'], start, end)) processCounts['浸漆']++;
+        });
+        // 生成统计文本
+        let html = '<div id="today-process-count" style="font-size:12px;color:#888;margin-top:2px;">';
+        let has = false;
+        Object.keys(processCounts).forEach(key => {
+            if (processCounts[key] > 0) {
+                html += `${key}<span style=\"color:#007bff;margin:0 2px;\">${processCounts[key]}</span> `;
+                has = true;
+            }
+        });
+        if (!has) html += '无';
+        html += '</div>';
+        // 插入到用户名下方
+        userFullnameElement.insertAdjacentHTML('afterend', html);
+    }, 100);
 }
