@@ -343,7 +343,7 @@ function showScreen(screenId) {
         // 如果切换回首页，停止扫码并刷新今日工序数量
         if (screenId === SCREENS.HOME) {
             if (scanState.currentHtml5QrScanner) {
-                stopScanner();
+            stopScanner();
             }
             setTimeout(refreshTodayProcessCount, 0);
         }
@@ -804,7 +804,7 @@ async function onScanSuccess(decodedText, decodedResult, showSuccessToast = true
                 
                 // 只在showSuccessToast为true时弹窗
                 if (showSuccessToast) {
-                    showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
+                showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
                 }
                 
                 // 修改：单次扫码成功后直接返回主页
