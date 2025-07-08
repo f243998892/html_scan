@@ -2857,7 +2857,7 @@ function addManualScanEvent() {
     }
     // 上传按钮
     const uploadBtn = document.getElementById('manual-scan-upload');
-    if (uploadBtn) {
+    if (uploadBtn && !uploadBtn.dataset.bound) {
         uploadBtn.addEventListener('click', async function() {
             const textarea = document.getElementById('manual-scan-codes');
             if (!textarea) return;
@@ -2878,6 +2878,7 @@ function addManualScanEvent() {
             showToast(`上传完成，成功${successCount}条，失败${failCount}条`, 'success');
             textarea.value = '';
         });
+        uploadBtn.dataset.bound = '1';
     }
 }
 // 页面初始化时调用
