@@ -137,6 +137,27 @@ body {
     z-index: 1030; /* 确保按钮在其他元素之上，但低于toast */
 }
 
+/* 全局表格边框样式 */
+table {
+    border-collapse: collapse !important;
+    border: 1px solid #dee2e6 !important;
+}
+table th, table td {
+    border: 1px solid #dee2e6 !important;
+}
+
+/* 删除记录页面悬浮按钮加强样式 */
+#fixed-delete-buttons {
+    position: fixed !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1030;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* 删除记录页面样式 */
 #delete-records-content .table {
     margin-bottom: 80px; /* 增大空间，确保底部固定按钮不遮挡表格内容 */
