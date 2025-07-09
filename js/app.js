@@ -1066,7 +1066,7 @@ async function uploadPendingCodes() {
         // 延迟返回
         setTimeout(() => {
             stopScanner();
-            showScreen(SCREENS.CONTINUOUS_SCAN);
+            showScreen(SCREENS.HOME); // 修改为跳转主界面
         }, 2000);
     } catch (error) {
         console.error('上传失败:', error);
