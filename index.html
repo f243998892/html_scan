@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>扫码系统</title>
     <!-- 添加meta标签禁止缓存 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Last-Modified" content="Mon, 15 Sep 2025 13:50:00 GMT">
     
     <!-- iOS HTTPS特殊处理 -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
@@ -539,12 +540,30 @@
 
         <!-- Toast提示 -->
         <div id="toast-container"></div>
+
+        <!-- 单次扫码重复记录阻塞提示框 -->
+        <div class="modal fade" id="duplicate-record-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">提示</h5>
+                        <!-- 不提供右上角关闭，强制点击确认 -->
+                    </div>
+                    <div class="modal-body">
+                        <div id="duplicate-record-message">该产品当前工序已存在记录，请勿重复录入。</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" id="duplicate-record-confirm">我知道了</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 加载JS库 -->
     <script src="js/bootstrap/bootstrap.bundle.min.js?v=1.1"></script>
     <script src="js/html5-qrcode.min.js?v=1.1"></script>
-    <script src="js/app.js?v=1.1"></script>
+    <script src="js/app-new.js?v=1.7&t=202509151625"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>
     <!-- 加载iOS修复补丁 -->
