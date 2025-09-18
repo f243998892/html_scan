@@ -1,13 +1,14 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>扫码系统</title>
     <!-- 添加meta标签禁止缓存 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Last-Modified" content="Mon, 15 Sep 2025 13:50:00 GMT">
     
     <!-- iOS HTTPS特殊处理 -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
@@ -267,19 +268,7 @@
     </style>
 </head>
 <body>
-    <!-- 显示PWA安装提示 -->
-    <div id="pwa-install-prompt" class="alert alert-info alert-dismissible fade show m-2" role="alert" style="display:none;">
-        <strong>提示：</strong> 将应用添加到主屏幕
-        <button id="pwa-install-btn" class="btn btn-sm btn-primary ms-2">安装</button>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    
-    <!-- iOS用户证书提示 -->
-    <div id="ios-cert-prompt" class="alert alert-warning alert-dismissible fade show m-2" role="alert" style="display:none;">
-        <strong>iOS：</strong> 请先安装证书
-        <a href="http://cert.s4.vip/" class="btn btn-sm btn-warning ms-2">安装</a>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+
     
     <!-- 已删除iOS用户提示 - 因为能访问此HTTPS页面的iOS用户已经安装了证书 -->
     
@@ -479,13 +468,9 @@
 
         <!-- 删除记录屏幕 - 独立屏幕 -->
         <div id="delete-records-screen" class="d-none">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h3 class="text-center mb-3">删除记录</h3>
-                    <div id="delete-records-content">
-                        <!-- 删除记录内容将在这里动态生成 -->
-                    </div>
-                </div>
+            <h3 class="text-center mb-3">删除记录</h3>
+            <div id="delete-records-content">
+                <!-- 删除记录内容将在这里动态生成 -->
             </div>
         </div>
 
@@ -539,12 +524,30 @@
 
         <!-- Toast提示 -->
         <div id="toast-container"></div>
+
+        <!-- 单次扫码重复记录阻塞提示框 -->
+        <div class="modal fade" id="duplicate-record-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">提示</h5>
+                        <!-- 不提供右上角关闭，强制点击确认 -->
+                    </div>
+                    <div class="modal-body">
+                        <div id="duplicate-record-message">该产品当前工序已存在记录，请勿重复录入。</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" id="duplicate-record-confirm">我知道了</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 加载JS库 -->
     <script src="js/bootstrap/bootstrap.bundle.min.js?v=1.1"></script>
     <script src="js/html5-qrcode.min.js?v=1.1"></script>
-    <script src="js/app.js?v=1.1"></script>
+    <script src="js/app-new.js?v=1.7&t=202509151625"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>
     <!-- 加载iOS修复补丁 -->
@@ -608,7 +611,7 @@
     });
     
     // 在iOS设备上显示安装提示
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    // 使用已经在其他地方定义的isIOS变量
     if (isIOS && !("standalone" in window.navigator && window.navigator.standalone)) {
         promptContainer.style.display = 'block';
         
@@ -627,4 +630,4 @@
     }
     </script>
 </body>
-</html> 
+</html>

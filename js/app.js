@@ -751,92 +751,113 @@ function handleManualCodeInput() {
     inputField.value = '';
 }
 
+// 统一的编码清洗与去重
+function normalizeCode(code) {
+    return (code || '').trim();
+}
+function dedupeOrdered(list) {
+    const seen = new Set();
+    const out = [];
+    for (const raw of list || []) {
+        const c = normalizeCode(raw);
+        if (!c) continue;
+        if (seen.has(c)) continue;
+        seen.add(c);
+        out.push(c);
+    }
+    return out;
+}
+
 // 扫码成功回调
 async function onScanSuccess(decodedText, decodedResult, showSuccessToast = true) {
-    // 如果正在处理，忽略新的扫码结果
     if (scanState.isProcessing) return;
-    
-    // 防抖处理 - 检查是否是重复扫码
+    const normalized = normalizeCode(decodedText);
+    if (!normalized) return;
     const now = Date.now();
-    // 忽略1秒内的重复扫码
-    if (decodedText === scanState.lastScannedCode && now - scanState.lastScanTime < 1000) return;
-    
+    if (normalized === scanState.lastScannedCode && now - scanState.lastScanTime < 1000) return;
     scanState.isProcessing = true;
-    scanState.lastScannedCode = decodedText;
+    scanState.lastScannedCode = normalized;
     scanState.lastScanTime = now;
-    
-    // 立即显示成功识别提示
-    showToast(`成功识别: ${decodedText}`, 'info');
-    
-    // 播放识别成功提示音 - 使用更轻量的方式
+    showToast(`成功识别: ${normalized}`, 'info');
     playSuccessBeep();
-    
-    // 处理扫码结果
     if (scanState.isContinuous) {
-        // 连续扫码模式，添加到待上传列表
-        if (!scanState.pendingCodes.includes(decodedText)) {
-            scanState.pendingCodes.push(decodedText);
-            
-            // 使用防抖方式更新UI
+        const next = dedupeOrdered([...(scanState.pendingCodes || []), normalized]);
+        const added = next.length !== (scanState.pendingCodes || []).length;
+        scanState.pendingCodes = next;
+        if (added) {
             if (!window.pendingUpdateTimer) {
                 window.pendingUpdateTimer = setTimeout(() => {
                     updatePendingList();
                     window.pendingUpdateTimer = null;
                 }, 100);
             }
-            
-            showToast(`已添加到队列: ${decodedText}`, 'success');
+            showToast(`已添加到队列: ${normalized}`, 'success');
         } else {
             showToast('该产品已在队列中，请勿重复扫码', 'warning');
             playErrorSound();
         }
-        
-        // 立即释放处理锁，允许下一次扫码
         scanState.isProcessing = false;
     } else {
-        // 单次扫码模式，直接上传
         try {
-            const success = await updateProductProcess(decodedText, scanState.processType, userState.fullName, showSuccessToast);
-            
-            if (success) {
-                // 播放成功提示音
+            const result = await updateProductProcess(normalized, scanState.processType, userState.fullName, showSuccessToast);
+            if (result === true) {
                 playSuccessBeep();
-                
-                // 只在showSuccessToast为true时弹窗
                 if (showSuccessToast) {
-                showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${decodedText}`, 'success');
+                    showToast(`${getChineseProcessName(scanState.processType)}数据更新成功: ${normalized}`, 'success');
                 }
-                
-                // 修改：单次扫码成功后直接返回主页
                 setTimeout(() => {
                     stopScanner().then(() => {
-                        // 返回主页
                         showScreen(SCREENS.HOME);
-                    }).catch(error => {
-                        console.error('停止扫码器失败:', error);
-                        // 即使出错也返回主页
+                    }).catch(() => {
                         showScreen(SCREENS.HOME);
                     });
                 }, 1000);
-            } else {
-                // 播放错误提示音
+            } else if (result === 'duplicate') {
+                // 单次扫码遇到已存在记录：弹出阻塞确认模态，不返回主页
                 playErrorSound();
-                showToast('该产品的该工序已存在，请勿重复扫码', 'error');
-                
-                // 失败后也释放锁，这样用户可以立即重试
-                setTimeout(() => {
-                    scanState.isProcessing = false;
-                }, 500);
+                try {
+                    // 在模态确认之前，不可再次处理扫码
+                    scanState.isProcessing = true;
+                    const msgEl = document.getElementById('duplicate-record-message');
+                    if (msgEl) {
+                        const processName = getChineseProcessName(scanState.processType);
+                        msgEl.textContent = `${processName}已存在，编号 ${normalized} 已录入，是否知悉？`;
+                    }
+                    const modalEl = document.getElementById('duplicate-record-modal');
+                    if (modalEl) {
+                        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+                        // 绑定确认按钮关闭
+                        const confirmBtn = document.getElementById('duplicate-record-confirm');
+                        if (confirmBtn && !confirmBtn.dataset.bound) {
+                            confirmBtn.addEventListener('click', () => {
+                                modal.hide();
+                                // 确认后恢复处理能力，保持在当前页面
+                                setTimeout(() => { scanState.isProcessing = false; }, 100);
+                            });
+                            confirmBtn.dataset.bound = '1';
+                        }
+                        modal.show();
+                    } else {
+                        // 兜底：如果模态不存在，使用普通提示但不返回主页
+                        showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+                        setTimeout(() => { scanState.isProcessing = false; }, 300);
+                    }
+                } catch (e) {
+                    console.error('显示重复提示失败:', e);
+                    setTimeout(() => { scanState.isProcessing = false; }, 300);
+                }
+                // 保持在单次扫码界面
+            } else {
+                // 其他错误情况
+                playErrorSound();
+                showToast('更新失败，请重试', 'error');
+                setTimeout(() => { scanState.isProcessing = false; }, 500);
             }
         } catch (error) {
             console.error('处理扫码结果失败:', error);
             playErrorSound();
             showToast('处理失败，请重试', 'error');
-            
-            // 确保失败后也释放锁
-            setTimeout(() => {
-                scanState.isProcessing = false;
-            }, 500);
+            setTimeout(() => { scanState.isProcessing = false; }, 500);
         }
     }
 }
@@ -1029,28 +1050,24 @@ async function uploadPendingCodes() {
         showToast('没有待上传的数据', 'warning');
         return;
     }
-    
-    // 禁用上传按钮
+    // 统一去重与清洗，确保与后端一致
+    scanState.pendingCodes = dedupeOrdered(scanState.pendingCodes);
+    if (scanState.pendingCodes.length === 0) {
+        showToast('没有有效的产品编码', 'warning');
+        return;
+    }
     const uploadButton = document.getElementById('scan-upload');
     uploadButton.disabled = true;
     uploadButton.textContent = '上传中...';
-    
-    // 显示上传中提示
     showToast('上传中，请稍候...', 'info');
-    
     try {
-        // 批量更新产品信息
         const results = await batchUpdateProductProcess(
             scanState.pendingCodes,
             scanState.processType,
             userState.fullName
         );
-        
-        // 统计成功和失败的数量
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.filter(r => !r.success).length;
-        
-        // 显示结果
         if (successCount > 0 && failureCount === 0) {
             showToast(`所有${successCount}个产品更新成功`, 'success');
         } else if (successCount > 0 && failureCount > 0) {
@@ -1058,21 +1075,16 @@ async function uploadPendingCodes() {
         } else {
             showToast('所有产品更新失败', 'error');
         }
-        
-        // 清空待上传列表
         scanState.pendingCodes = [];
         updatePendingList();
-        
-        // 延迟返回
         setTimeout(() => {
             stopScanner();
-            showScreen(SCREENS.HOME); // 修改为跳转主界面
+            showScreen(SCREENS.HOME);
         }, 2000);
     } catch (error) {
         console.error('上传失败:', error);
         showToast('上传失败，请重试', 'error');
     } finally {
-        // 恢复上传按钮
         uploadButton.disabled = false;
         uploadButton.textContent = '上传';
     }
@@ -1209,6 +1221,13 @@ async function updateProductProcess(productCode, processType, employeeName, show
             });
         
             return createResult.success === true;
+        }
+        
+        // 检查是否是"已存在数据"的错误（兼容detail或error字段）
+        if ((result.error && result.error.includes('该产品的该工序已存在数据，不能覆盖')) ||
+            (result.detail && String(result.detail).includes('该产品的该工序已存在数据，不能覆盖'))) {
+            console.log('检测到重复记录错误，将触发模态框');
+            return 'duplicate'; // 返回特殊值表示重复记录
         }
         
         console.error('更新产品信息失败:', result.error || '未知错误');
@@ -2760,15 +2779,14 @@ function handleContinuousScan() {
             uploadBtn.addEventListener('click', function() {
                 const textarea = document.getElementById('manual-multiline-codes');
                 if (!textarea) return;
-                const codes = textarea.value.split('\n').map(line => line.trim()).filter(line => line);
+                // 统一去重与清洗
+                const codes = dedupeOrdered(textarea.value.split('\n'));
                 if (codes.length === 0) {
                     showToast('请输入至少一条产品编码', 'warning');
                     return;
                 }
-                let successCount = 0, failCount = 0;
                 const processCode = async (code) => {
-                    // 复用扫码成功逻辑，且不影响扫码枪
-                    await onScanSuccess(code, { result: { text: code } }, false); // 关闭单条弹窗
+                    await onScanSuccess(code, { result: { text: code } }, false);
                 };
                 (async () => {
                     for (const code of codes) {

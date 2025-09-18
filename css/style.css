@@ -141,9 +141,78 @@ body {
 table {
     border-collapse: collapse !important;
     border: 1px solid #dee2e6 !important;
+    width: 100% !important;
+    table-layout: fixed !important; /* 固定表格布局 */
 }
 table th, table td {
     border: 1px solid #dee2e6 !important;
+    padding: 8px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important; /* 允许文本换行 */
+    word-break: break-word !important;
+}
+
+/* 本月台账查询和删除记录表格样式 */
+#monthly-transactions-container table,
+#delete-records-content table {
+    font-size: 12px !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    margin-bottom: 10px !important;
+}
+
+#monthly-transactions-container table th,
+#monthly-transactions-container table td,
+#delete-records-content table th,
+#delete-records-content table td {
+    padding: 6px 4px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    border: 1px solid #ddd !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* 调整列宽 */
+#monthly-transactions-container table th:nth-child(1),
+#delete-records-content table th:nth-child(1) {
+    width: 15% !important;  /* 工序列 */
+}
+
+#monthly-transactions-container table th:nth-child(2),
+#delete-records-content table th:nth-child(2) {
+    width: 25% !important;  /* 产品编码列 */
+}
+
+#monthly-transactions-container table th:nth-child(3),
+#delete-records-content table th:nth-child(3) {
+    width: 35% !important;  /* 型号列 */
+}
+
+#monthly-transactions-container table th:nth-child(4),
+#delete-records-content table th:nth-child(4) {
+    width: 25% !important;  /* 时间列 */
+}
+
+/* 表头样式 */
+#monthly-transactions-container table th,
+#delete-records-content table th {
+    background-color: #f5f5f5 !important;
+    font-weight: bold !important;
+}
+
+/* 隔行变色 */
+#monthly-transactions-container table tr:nth-child(even),
+#delete-records-content table tr:nth-child(even) {
+    background-color: #f9f9f9 !important;
+}
+
+/* 悬停效果 */
+#monthly-transactions-container table tr:hover,
+#delete-records-content table tr:hover {
+    background-color: #f0f0f0 !important;
 }
 
 /* 删除记录页面悬浮按钮加强样式 */
@@ -281,4 +350,4 @@ table th, table td {
 /* 隐藏除主页外其他页面下的模态框 */
 .d-none .modal {
     display: none !important;
-} 
+}
