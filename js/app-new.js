@@ -171,20 +171,20 @@ async function tryAutoLogin() {
 
 // 添加事件监听
 function addEventListeners() {
-    // 登录事件
-    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    // 登录事件（安全绑定）
+    onId('login-btn', 'click', handleLogin);
     
-    // 首页功能卡片点击事件
-    document.getElementById('card-single-scan').addEventListener('click', handleSingleScan);
-    document.getElementById('card-continuous-scan').addEventListener('click', handleContinuousScan);
-    document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
-    document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
-    document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
-    document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
+    // 首页功能卡片点击事件（安全绑定）
+    onId('card-single-scan', 'click', handleSingleScan);
+    onId('card-continuous-scan', 'click', handleContinuousScan);
+    onId('card-product-query', 'click', handleProductQuery);
+    onId('card-product-scan-query', 'click', handleProductScanQuery);
+    onId('card-inventory', 'click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
+    onId('card-delete-records', 'click', handleDeleteRecords);
     
     // 工序选择下拉框变化时保存选择并立即更新浮动框
     const processSelect = document.getElementById('process-select');
-    if (processSelect) {
+    if (processSelect && typeof processSelect.addEventListener === 'function') {
         processSelect.addEventListener('change', function() {
             saveProcessSelection(this.value);
             // 立即更新浮动工序框
@@ -194,34 +194,38 @@ function addEventListeners() {
     
     // 单次扫码工序按钮
     document.querySelectorAll('.process-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const processType = this.getAttribute('data-process');
-            scanState.processType = processType;
-            scanState.isContinuous = false;
-            startScan(processType, false);
-        });
+        if (btn && typeof btn.addEventListener === 'function') {
+            btn.addEventListener('click', function() {
+                const processType = this.getAttribute('data-process');
+                scanState.processType = processType;
+                scanState.isContinuous = false;
+                startScan(processType, false);
+            });
+        }
     });
     
     // 连续扫码工序按钮
     document.querySelectorAll('.process-btn-continuous').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const processType = this.getAttribute('data-process');
-            scanState.processType = processType;
-            scanState.isContinuous = true;
-            startScan(processType, true);
-        });
+        if (btn && typeof btn.addEventListener === 'function') {
+            btn.addEventListener('click', function() {
+                const processType = this.getAttribute('data-process');
+                scanState.processType = processType;
+                scanState.isContinuous = true;
+                startScan(processType, true);
+            });
+        }
     });
     
-    // 返回按钮
-    document.getElementById('single-scan-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('continuous-scan-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('query-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('models-back').addEventListener('click', () => showScreen(SCREENS.QUERY));
-    document.getElementById('products-back').addEventListener('click', () => showScreen(SCREENS.MODELS));
+    // 返回按钮（安全绑定）
+    onId('single-scan-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('continuous-scan-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('query-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('models-back', 'click', () => showScreen(SCREENS.QUERY));
+    onId('products-back', 'click', () => showScreen(SCREENS.MODELS));
     
-    // 扫码相关
-    document.getElementById('scan-stop').addEventListener('click', stopScan);
-    document.getElementById('scan-upload').addEventListener('click', uploadPendingCodes);
+    // 扫码相关（安全绑定）
+    onId('scan-stop', 'click', stopScan);
+    onId('scan-upload', 'click', uploadPendingCodes);
     
     // 添加扫码枪/手动录入按钮事件
     addManualScanEvent();
