@@ -49,6 +49,27 @@ const SCREENS = {
     MANUAL_SCAN: 'manual-scan-screen' // 新增扫码枪/手动录入界面
 };
 
+// 统一的 DOM 安全工具
+function $(id) { return document.getElementById(id); }
+function onId(id, evt, handler) {
+    const el = $(id);
+    if (el && typeof el.addEventListener === 'function') {
+        el.addEventListener(evt, handler);
+    } else {
+        console.warn('[bind-miss]', id);
+    }
+}
+function ensureContainer(containerId) {
+    let el = $(containerId);
+    if (!el) {
+        el = document.createElement('div');
+        el.id = containerId;
+        document.body.appendChild(el);
+        console.warn('[auto-create]', containerId);
+    }
+    return el;
+}
+
 // 全局缓存对象
 const dataCache = {
     monthlyTransactions: {
