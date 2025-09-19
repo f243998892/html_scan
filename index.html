@@ -15,11 +15,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- 添加版本号参数强制刷新CSS -->
-    <link rel="stylesheet" href="css/style.css?v=1.1">
-    <!-- 使用本地资源，避免网络问题 -->
+    <!-- 使用本地资源，避免网络问题：先加载 Bootstrap，再加载自定义样式 -->
     <link href="css/bootstrap.min.css?v=1.1" rel="stylesheet">
     <link rel="stylesheet" href="css/bootstrap-icons.css?v=1.1">
+    <link rel="stylesheet" href="css/style.css?v=1.1">
     
     <!-- PWA支持 -->
     <link rel="manifest" href="./manifest.json?v=1.1">
@@ -69,6 +68,26 @@
         .row.g-3 > .col-6 {
             padding-left: 8px;
             padding-right: 8px;
+        }
+        /* 保证首页图标为两列布局（即使栅格失效也能生效） */
+        #home-screen .row.g-3 {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 16px;
+            row-gap: 16px;
+            margin-left: 0;  /* 由gap接管间距 */
+            margin-right: 0;
+        }
+        #home-screen .row.g-3 > [class^="col-"],
+        #home-screen .row.g-3 > [class*=" col-"] {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        /* 响应式：大屏改为三列 */
+        @media (min-width: 992px) {
+            #home-screen .row.g-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
         }
         .card-body i {
             font-size: 2.2rem !important;
@@ -265,6 +284,18 @@
             z-index: 9999;
             pointer-events: none;
         }
+        /* 避免多层卡片嵌套产生双重边框/阴影 */
+        .card .card {
+            border: 0 !important;
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
+        }
+        /* 列表项内长文本友好换行，避免挤压布局 */
+        .list-group-item {
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+        }
     </style>
 </head>
 <body>
@@ -386,7 +417,7 @@
             </div>
         </div>
 
-        <!-- 单个扫码屏幕 -->
+        <!-- 下面保持不变 -->
         <div id="single-scan-screen" class="d-none">
             <div class="mb-3">
                 <h3 class="text-center">单个扫码</h3>
@@ -590,41 +621,54 @@
         e.preventDefault();
         // 存储事件以便稍后触发
         deferredPrompt = e;
-        // 显示我们的自定义"添加到主屏幕"提示
-        promptContainer.style.display = 'block';
+        // 显示我们的自定义"添加到主屏幕"提示（存在时）
+        if (promptContainer) {
+            promptContainer.style.display = 'block';
+        }
         
-        addBtn.addEventListener('click', (e) => {
-            // 隐藏我们的用户界面，显示"添加到主屏幕"对话框
-            promptContainer.style.display = 'none';
-            // 显示安装提示
-            deferredPrompt.prompt();
-            // 等待用户回应提示
-            deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('用户接受了安装提示');
-                } else {
-                    console.log('用户拒绝了安装提示');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                // 隐藏我们的用户界面，显示"添加到主屏幕"对话框
+                if (promptContainer) {
+                    promptContainer.style.display = 'none';
                 }
-                deferredPrompt = null;
+                // 显示安装提示
+                deferredPrompt.prompt();
+                // 等待用户回应提示
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('用户接受了安装提示');
+                    } else {
+                        console.log('用户拒绝了安装提示');
+                    }
+                    deferredPrompt = null;
+                });
             });
-        });
+        }
     });
     
     // 在iOS设备上显示安装提示
-    // 使用已经在其他地方定义的isIOS变量
-    if (isIOS && !("standalone" in window.navigator && window.navigator.standalone)) {
-        promptContainer.style.display = 'block';
+    // 使用已经在其他地方定义的isIOS变量（需存在时才使用）
+    if (typeof isIOS !== 'undefined' && isIOS && !("standalone" in window.navigator && window.navigator.standalone)) {
+        if (promptContainer) {
+            promptContainer.style.display = 'block';
+        }
         
         // 如果是iOS设备且当前是HTTPS页面，则可能需要证书
         if (isIOS && window.location.protocol === 'https:') {
             // 检查是否已经关闭过提示（保存在本地存储中）
             if (localStorage.getItem('ios_cert_dismissed') !== 'true') {
-                document.getElementById('ios-cert-prompt').style.display = 'block';
-                
-                // 添加关闭按钮事件
-                document.querySelector('#ios-cert-prompt .btn-close').addEventListener('click', function() {
-                    localStorage.setItem('ios_cert_dismissed', 'true');
-                });
+                const iosCertPrompt = document.getElementById('ios-cert-prompt');
+                if (iosCertPrompt) {
+                    iosCertPrompt.style.display = 'block';
+                    // 添加关闭按钮事件
+                    const closeBtn = iosCertPrompt.querySelector('.btn-close');
+                    if (closeBtn) {
+                        closeBtn.addEventListener('click', function() {
+                            localStorage.setItem('ios_cert_dismissed', 'true');
+                        });
+                    }
+                }
             }
         }
     }
