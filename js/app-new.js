@@ -46,7 +46,12 @@ const SCREENS = {
     MODELS: 'models-screen',
     PRODUCTS: 'products-screen',
     DELETE_RECORDS: 'delete-records-screen',
-    MANUAL_SCAN: 'manual-scan-screen' // 新增扫码枪/手动录入界面
+    MANUAL_SCAN: 'manual-scan-screen', // 新增扫码枪/手动录入界面
+    LEADER_SUMMARY: 'leader-summary-screen', // 组长汇总查询界面
+    GROUP_PRODUCTS: 'group-products-screen', // 小组产品数量查询
+    EMPLOYEE_PRODUCTS: 'employee-products-screen', // 员工产品数量查询
+    ASSIGN_GROUP: 'assign-group-screen', // 为新产品分配小组
+    ASSIGN_SECURE: 'assign-secure-screen'
 };
 
 // 统一的 DOM 安全工具
@@ -182,6 +187,26 @@ function addEventListeners() {
     onId('card-inventory', 'click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
     onId('card-delete-records', 'click', handleDeleteRecords);
     
+    // 组长功能相关事件
+    onId('leader-card', 'click', handleLeaderFunctions);
+    onId('leader-back-btn', 'click', () => showScreen(SCREENS.HOME));
+    
+    // 小组产品数量查询
+    onId('group-products-btn', 'click', handleGroupProducts);
+    onId('group-products-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('query-group-products-btn', 'click', queryGroupProducts);
+    
+    // 员工产品数量查询
+    onId('employee-products-btn', 'click', handleEmployeeProducts);
+    onId('employee-products-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('query-employee-products-btn', 'click', queryEmployeeProducts);
+    
+    // 为新产品分配小组
+    onId('assign-group-btn', 'click', handleAssignGroup);
+    onId('assign-group-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('process-type-select', 'change', loadProductModelsAndGroups);
+    onId('assign-group-submit-btn', 'click', submitGroupAssignment);
+    
     // 工序选择下拉框变化时保存选择并立即更新浮动框
     const processSelect = document.getElementById('process-select');
     if (processSelect && typeof processSelect.addEventListener === 'function') {
@@ -192,7 +217,570 @@ function addEventListeners() {
         });
     }
     
-    // 单次扫码工序按钮
+    // 组长功能实现
+// 处理组长功能入口
+function handleLeaderFunctions() {
+    showScreen(SCREENS.LEADER_SUMMARY);
+}
+
+// 处理小组产品数量查询
+function handleGroupProducts() {
+    // 加载小组数据
+    loadGroups();
+    // 设置默认日期范围（当月）
+    setDefaultDateRange('start-date', 'end-date');
+    showScreen(SCREENS.GROUP_PRODUCTS);
+}
+
+// 加载小组数据
+async function loadGroups() {
+    try {
+        // 从API获取所有组别
+        const response = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!response.ok) {
+            throw new Error('获取组别数据失败');
+        }
+        
+        const data = await response.json();
+        const groups = data.groups || [];
+        
+        const groupSelect = document.getElementById('group-select');
+        if (!groupSelect) {
+            console.error('找不到group-select元素');
+            return;
+        }
+        
+        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        
+        // 只显示当前登录用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        groups.forEach(group => {
+            // 检查当前用户是否是该组的组长
+            const isLeader = userGroups.some(ug => ug.group_id === group.id);
+            if (isLeader) {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.setAttribute('data-group-name', group.group_name);
+                option.setAttribute('data-process-name', group.process_name);
+                option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
+                groupSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('加载小组数据失败:', error);
+        showToast('获取小组数据失败: ' + error.message, 'error');
+    }
+}
+
+// 获取当前用户作为组长的所有小组
+async function getLeaderGroups() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/group-leaders?leader_name=${encodeURIComponent(userState.fullName)}`);
+        if (!response.ok) {
+            // 如果接口不存在,返回空数组
+            if (response.status === 404) {
+                return [];
+            }
+            throw new Error('获取组长信息失败');
+        }
+        
+        const data = await response.json();
+        return data.groups || [];
+    } catch (error) {
+        console.error('获取组长信息失败:', error);
+        // 返回空数组以防止页面崩溃
+        return [];
+    }
+}
+
+// 设置默认日期范围（当月）
+function setDefaultDateRange(startId, endId) {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    document.getElementById(startId).valueAsDate = startDate;
+    document.getElementById(endId).valueAsDate = endDate;
+}
+
+// 查询小组产品数量
+async function queryGroupProducts() {
+    const groupSelect = document.getElementById('group-select');
+    const groupId = groupSelect.value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    
+    if (!groupId) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        showToast('请选择日期范围', 'warning');
+        return;
+    }
+    
+    try {
+        // 获取选中的小组名称和工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const groupName = selectedOption.getAttribute('data-group-name');
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!groupName || !processName) {
+            showToast('小组信息不完整', 'error');
+            return;
+        }
+        
+        // 调用组长汇总API
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: `${startDate}T00:00:00Z`,
+            end_date: `${endDate}T23:59:59Z`,
+            employee_name: null  // 不筛选特定员工
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '查询数据失败');
+        }
+        
+        const data = await response.json();
+        
+        // 显示结果
+        displayGroupProductsResult(data, groupName, processName, startDate, endDate);
+    } catch (error) {
+        console.error('查询失败:', error);
+        showToast('查询失败: ' + error.message, 'error');
+    }
+}
+
+// 显示小组产品数量结果
+function displayGroupProductsResult(data, groupName, processName, startDate, endDate) {
+    const resultContainer = document.getElementById('group-products-result');
+    
+    if (!data || !data.items || data.items.length === 0) {
+        resultContainer.innerHTML = '<div class="alert alert-info">该时间范围内没有找到产品数据</div>';
+        return;
+    }
+    
+    let html = `
+        <h4 class="mb-3">查询结果</h4>
+        <p><strong>小组:</strong> ${groupName} (${getProcessDisplayName(processName)})</p>
+        <p><strong>日期范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}</p>
+        <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th class="long-text">产品型号</th>
+                    <th class="number-cell">完成数量</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    let totalCount = 0;
+    
+    data.items.forEach(item => {
+        html += `
+            <tr>
+                <td class="long-text">${item.product_model}</td>
+                <td class="number-cell">${item.total_completed}</td>
+            </tr>
+        `;
+        totalCount += item.total_completed;
+    });
+    
+    html += `
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="long-text">总计</th>
+                    <th class="number-cell">${totalCount}</th>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+    `;
+    
+    resultContainer.innerHTML = html;
+}
+
+// 处理员工产品数量查询
+async function handleEmployeeProducts() {
+    // 加载小组数据到employee-group-select
+    await loadEmployeeGroups();
+    // 设置默认日期范围（当月）
+    setDefaultDateRange('employee-start-date', 'employee-end-date');
+    showScreen(SCREENS.EMPLOYEE_PRODUCTS);
+}
+
+// 加载员工查询的小组数据
+async function loadEmployeeGroups() {
+    try {
+        // 从API获取所有组别
+        const response = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!response.ok) {
+            throw new Error('获取组别数据失败');
+        }
+        
+        const data = await response.json();
+        const groups = data.groups || [];
+        
+        const groupSelect = document.getElementById('employee-group-select');
+        if (!groupSelect) {
+            console.error('找不到employee-group-select元素');
+            return;
+        }
+        
+        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        
+        // 只显示当前登录用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        groups.forEach(group => {
+            // 检查当前用户是否是该组的组长
+            const isLeader = userGroups.some(ug => ug.group_id === group.id);
+            if (isLeader) {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.setAttribute('data-group-name', group.group_name);
+                option.setAttribute('data-process-name', group.process_name);
+                option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
+                groupSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('加载小组数据失败:', error);
+        showToast('获取小组数据失败: ' + error.message, 'error');
+    }
+}
+
+// 查询员工产品数量
+async function queryEmployeeProducts() {
+    const groupSelect = document.getElementById('employee-group-select');
+    const groupId = groupSelect.value;
+    const employeeName = document.getElementById('employee-name').value.trim();
+    const startDate = document.getElementById('employee-start-date').value;
+    const endDate = document.getElementById('employee-end-date').value;
+    
+    if (!groupId) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        showToast('请选择日期范围', 'warning');
+        return;
+    }
+    
+    try {
+        // 获取选中的小组名称和工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const groupName = selectedOption.getAttribute('data-group-name');
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!groupName || !processName) {
+            showToast('小组信息不完整', 'error');
+            return;
+        }
+        
+        // 调用组长汇总API
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: `${startDate}T00:00:00Z`,
+            end_date: `${endDate}T23:59:59Z`,
+            employee_name: employeeName || null  // 如果留空则查询全部
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '查询数据失败');
+        }
+        
+        const data = await response.json();
+        
+        // 显示结果
+        displayEmployeeProductsResult(data, employeeName, groupName, processName, startDate, endDate);
+    } catch (error) {
+        console.error('查询失败:', error);
+        showToast('查询失败: ' + error.message, 'error');
+    }
+}
+
+// 显示员工产品数量结果
+function displayEmployeeProductsResult(data, employeeName, groupName, processName, startDate, endDate) {
+    const resultContainer = document.getElementById('employee-products-result');
+    
+    if (!data || !data.items || data.items.length === 0) {
+        resultContainer.innerHTML = '<div class="alert alert-info">该时间范围内没有找到产品数据</div>';
+        return;
+    }
+    
+    let html = `
+        <h4 class="mb-3">查询结果</h4>
+        <p><strong>小组:</strong> ${groupName} (${getProcessDisplayName(processName)})</p>
+        ${employeeName ? `<p><strong>员工:</strong> ${employeeName}</p>` : '<p><strong>范围:</strong> 全部员工</p>'}
+        <p><strong>日期范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}</p>
+        <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th class="long-text">产品型号</th>
+                    ${employeeName ? '<th class="number-cell">该员工完成</th>' : ''}
+                    <th class="number-cell">小组总完成</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    let totalEmployeeCount = 0;
+    let totalGroupCount = 0;
+    
+    data.items.forEach(item => {
+        html += `
+            <tr>
+                <td class="long-text">${item.product_model}</td>
+                ${employeeName ? `<td class="number-cell">${item.employee_completed}</td>` : ''}
+                <td class="number-cell">${item.total_completed}</td>
+            </tr>
+        `;
+        totalEmployeeCount += item.employee_completed;
+        totalGroupCount += item.total_completed;
+    });
+    
+    html += `
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="long-text">总计</th>
+                    ${employeeName ? `<th class="number-cell">${totalEmployeeCount}</th>` : ''}
+                    <th class="number-cell">${totalGroupCount}</th>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+    `;
+    
+    resultContainer.innerHTML = html;
+}
+
+// 处理为新产品分配小组
+function handleAssignGroup() {
+    showScreen(SCREENS.ASSIGN_GROUP);
+}
+
+// 加载产品型号和小组数据
+async function loadProductModelsAndGroups() {
+    const processType = document.getElementById('process-type-select').value;
+    
+    if (!processType) {
+        return;
+    }
+    
+    try {
+        // 加载未分配小组的产品型号
+        const productResponse = await fetch(`${API_BASE_URL}/group-management/unassigned-products?process=${encodeURIComponent(processType)}`);
+        if (!productResponse.ok) {
+            throw new Error('获取产品型号数据失败');
+        }
+        
+        const products = await productResponse.json();
+        const productSelect = document.getElementById('product-model-select');
+        productSelect.innerHTML = '';
+        
+        if (!products || products.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '该工序暂无未分配的产品型号';
+            option.disabled = true;
+            productSelect.appendChild(option);
+        } else {
+            products.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.model;
+                option.textContent = product.model;
+                productSelect.appendChild(option);
+            });
+        }
+        
+        // 加载该工序下所有小组（只显示当前用户作为组长的小组）
+        const groupResponse = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!groupResponse.ok) {
+            throw new Error('获取小组数据失败');
+        }
+        
+        const groupData = await groupResponse.json();
+        const allGroups = groupData.groups || [];
+        
+        // 获取当前用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        const groupSelect = document.getElementById('assign-group-select');
+        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        
+        // 只显示该工序下，且当前用户是组长的小组
+        allGroups.forEach(group => {
+            if (group.process_name === processType) {
+                const isLeader = userGroups.some(ug => ug.group_id === group.id);
+                if (isLeader) {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.setAttribute('data-group-name', group.group_name);
+                    option.textContent = group.group_name;
+                    groupSelect.appendChild(option);
+                }
+            }
+        });
+        
+        if (groupSelect.options.length === 1) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '您不是该工序任何小组的组长';
+            option.disabled = true;
+            groupSelect.appendChild(option);
+        }
+    } catch (error) {
+        console.error('加载数据失败:', error);
+        showToast('加载数据失败: ' + error.message, 'error');
+    }
+}
+
+// 提交小组分配
+async function submitGroupAssignment() {
+    const productSelect = document.getElementById('product-model-select');
+    const groupSelect = document.getElementById('assign-group-select');
+    const processType = document.getElementById('process-type-select').value;
+    
+    // 获取所有选中的产品型号
+    const selectedOptions = Array.from(productSelect.selectedOptions);
+    const productModels = selectedOptions.map(opt => opt.value).filter(v => v);
+    
+    if (productModels.length === 0) {
+        showToast('请选择至少一个产品型号', 'warning');
+        return;
+    }
+    
+    const groupId = groupSelect.value;
+    if (!groupId) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+    const groupName = selectedOption.getAttribute('data-group-name');
+    
+    try {
+        // 使用严格分配API
+        const requestBody = {
+            group_name: groupName,
+            process: processType,
+            product_models: productModels,
+            requester_name: userState.fullName
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/assign-secure`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '分配失败');
+        }
+        
+        const data = await response.json();
+        
+        // 显示分配结果
+        const resultElement = document.getElementById('assign-group-result');
+        resultElement.classList.remove('d-none');
+        
+        let html = '<div class="alert alert-success"><h5>分配结果</h5><ul>';
+        let successCount = 0;
+        let failCount = 0;
+        
+        data.results.forEach(result => {
+            if (result.success) {
+                successCount++;
+                html += `<li class="text-success">✓ ${result.product_model}: ${result.action === 'created' ? '新分配' : '更新分配'}</li>`;
+            } else {
+                failCount++;
+                html += `<li class="text-danger">✗ ${result.product_model}: ${result.error}</li>`;
+            }
+        });
+        
+        html += `</ul><p><strong>成功: ${successCount}, 失败: ${failCount}</strong></p></div>`;
+        resultElement.innerHTML = html;
+        
+        // 重新加载产品型号列表
+        await loadProductModelsAndGroups();
+        
+        if (successCount > 0) {
+            showToast(`成功分配 ${successCount} 个产品型号`, 'success');
+        }
+    } catch (error) {
+        console.error('分配失败:', error);
+        const resultElement = document.getElementById('assign-group-result');
+        resultElement.innerHTML = `<div class="alert alert-danger">分配失败: ${error.message}</div>`;
+        resultElement.classList.remove('d-none');
+        showToast('分配失败: ' + error.message, 'error');
+    }
+}
+
+// 辅助函数
+function getProcessDisplayName(processName) {
+    const processMap = {
+        'wiring': '绕线',
+        'embedding': '嵌线',
+        'connecting': '接线',
+        'pressing': '压装',
+        'turning': '车止口',
+        'dipping': '浸漆'
+    };
+    return processMap[processName] || processName;
+}
+
+function getEmployeeFieldByProcess(processName) {
+    const fieldMap = {
+        'wiring': '绕线员工',
+        'embedding': '嵌线员工',
+        'connecting': '接线员工',
+        'pressing': '压装员工',
+        'turning': '车止口员工',
+        'dipping': '浸漆员工'
+    };
+    return fieldMap[processName] || '';
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+}
+
+// 单次扫码工序按钮
     document.querySelectorAll('.process-btn').forEach(btn => {
         if (btn && typeof btn.addEventListener === 'function') {
             btn.addEventListener('click', function() {
@@ -353,41 +941,55 @@ function showProcessWarning() {
 function showScreen(screenId) {
     try {
         console.log('切换到页面:', screenId);
-        
-        // 隐藏所有屏幕
+
+        // 隐藏所有屏幕（容错：屏幕不存在则跳过）
         Object.values(SCREENS).forEach(id => {
-            document.getElementById(id).classList.add('d-none');
+            const el = document.getElementById(id);
+            if (el && el.classList) {
+                el.classList.add('d-none');
+            } else {
+                console.warn('[screen-miss]', id);
+            }
         });
-        
-        // 显示目标屏幕
-        document.getElementById(screenId).classList.remove('d-none');
-        
+
+        // 显示目标屏幕（容错：目标不存在则回退首页）
+        const targetEl = document.getElementById(screenId);
+        if (targetEl && targetEl.classList) {
+            targetEl.classList.remove('d-none');
+        } else {
+            console.error('[screen-target-miss]', screenId);
+            const homeEl = document.getElementById(SCREENS.HOME);
+            if (homeEl && homeEl.classList) {
+                homeEl.classList.remove('d-none');
+            }
+        }
+
         // 隐藏所有模态框
         hideAllModals();
-        
+
         // 如果切换回首页，停止扫码并刷新今日工序数量
         if (screenId === SCREENS.HOME) {
             if (scanState.currentHtml5QrScanner) {
-            stopScanner();
+                stopScanner();
             }
             setTimeout(refreshTodayProcessCount, 0);
         }
-        
+
         // 在查询页面隐藏浮动工序框，其他页面显示
         const floatingProcessEl = document.getElementById('floating-process');
         if (floatingProcessEl) {
-            if (screenId === SCREENS.QUERY || 
-                screenId === SCREENS.MODELS || 
+            if (screenId === SCREENS.QUERY ||
+                screenId === SCREENS.MODELS ||
                 screenId === SCREENS.PRODUCTS ||
                 screenId === SCREENS.DELETE_RECORDS) {
                 floatingProcessEl.style.display = 'none';
             } else {
                 floatingProcessEl.style.display = 'block';
             }
-        } else if (screenId !== SCREENS.QUERY && 
-                  screenId !== SCREENS.MODELS && 
-                  screenId !== SCREENS.PRODUCTS &&
-                  screenId !== SCREENS.DELETE_RECORDS) {
+        } else if (screenId !== SCREENS.QUERY &&
+                   screenId !== SCREENS.MODELS &&
+                   screenId !== SCREENS.PRODUCTS &&
+                   screenId !== SCREENS.DELETE_RECORDS) {
             // 创建浮动工序名称框（如果不存在）
             createFloatingProcess();
         }
@@ -395,6 +997,7 @@ function showScreen(screenId) {
         console.error('切换屏幕失败:', error);
     }
 }
+
 
 // 隐藏所有模态框
 function hideAllModals() {
