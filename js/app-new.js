@@ -195,6 +195,7 @@ function addEventListeners() {
     onId('group-products-btn', 'click', handleGroupProducts);
     onId('group-products-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
     onId('query-group-products-btn', 'click', queryGroupProducts);
+    onId('group-select', 'change', loadEmployeeList);
     
     // 员工产品数量查询
     onId('employee-products-btn', 'click', handleEmployeeProducts);
@@ -224,11 +225,15 @@ function handleLeaderFunctions() {
 }
 
 // 处理小组产品数量查询
-function handleGroupProducts() {
+async function handleGroupProducts() {
     // 加载小组数据
-    loadGroups();
-    // 设置默认日期范围（当月）
-    setDefaultDateRange('start-date', 'end-date');
+    await loadGroups();
+    // 设置默认日期为当天
+    setDefaultDateToToday('start-date', 'end-date');
+    // 设置默认时间为全天
+    setDefaultTimeRange('start-time', 'end-time');
+    // 加载员工列表
+    await loadEmployeeList();
     showScreen(SCREENS.GROUP_PRODUCTS);
 }
 
@@ -250,23 +255,34 @@ async function loadGroups() {
             return;
         }
         
-        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        groupSelect.innerHTML = '';
         
         // 只显示当前登录用户作为组长的小组
         const userGroups = await getLeaderGroups();
         
-        groups.forEach(group => {
+        let firstGroup = null;
+        groups.forEach((group, index) => {
             // 检查当前用户是否是该组的组长
-            const isLeader = userGroups.some(ug => ug.group_id === group.id);
+            const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
             if (isLeader) {
                 const option = document.createElement('option');
-                option.value = group.id;
+                option.value = group.group_name;  // 使用group_name作为value
                 option.setAttribute('data-group-name', group.group_name);
                 option.setAttribute('data-process-name', group.process_name);
                 option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
                 groupSelect.appendChild(option);
+                
+                // 记录第一个小组
+                if (!firstGroup) {
+                    firstGroup = group;
+                }
             }
         });
+        
+        // 默认选中第一个小组
+        if (firstGroup) {
+            groupSelect.value = firstGroup.group_name;
+        }
     } catch (error) {
         console.error('加载小组数据失败:', error);
         showToast('获取小组数据失败: ' + error.message, 'error');
@@ -304,14 +320,129 @@ function setDefaultDateRange(startId, endId) {
     document.getElementById(endId).valueAsDate = endDate;
 }
 
+// 设置默认日期为当天
+function setDefaultDateToToday(startId, endId) {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    document.getElementById(startId).value = today;
+    document.getElementById(endId).value = today;
+}
+
+// 设置默认时间范围（全天）
+function setDefaultTimeRange(startTimeId, endTimeId) {
+    document.getElementById(startTimeId).value = '00:00:00';
+    document.getElementById(endTimeId).value = '23:59:59';
+}
+
+// 加载员工列表
+async function loadEmployeeList() {
+    try {
+        const groupSelect = document.getElementById('group-select');
+        const employeeFilter = document.getElementById('employee-filter');
+        
+        if (!groupSelect || !employeeFilter) {
+            return;
+        }
+        
+        const groupName = groupSelect.value;
+        if (!groupName) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+            return;
+        }
+        
+        // 获取选中小组的工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!processName) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+            return;
+        }
+        
+        // 获取一个较大的时间范围来获取所有员工（最近30天）
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        
+        const startDateTime = startDate.toISOString().split('T')[0] + 'T00:00:00Z';
+        const endDateTime = endDate.toISOString().split('T')[0] + 'T23:59:59Z';
+        
+        // 调用API获取该小组该工序的员工列表
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                group_name: groupName,
+                process: processName,
+                start_date: startDateTime,
+                end_date: endDateTime,
+                requester_name: userState.fullName,
+                employee_name: null
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取员工列表失败');
+        }
+        
+        const data = await response.json();
+        const employees = new Set();
+        
+        // 从返回的数据中提取员工名字
+        if (data.items) {
+            data.items.forEach(item => {
+                if (item.employees && Array.isArray(item.employees)) {
+                    item.employees.forEach(emp => {
+                        if (emp.employee_name && emp.employee_name.trim()) {
+                            employees.add(emp.employee_name.trim());
+                        }
+                    });
+                }
+            });
+        }
+        
+        // 填充员工下拉框
+        employeeFilter.innerHTML = '<option value="">全体员工</option>';
+        const empArray = Array.from(employees).sort();
+        
+        if (empArray.length === 0) {
+            // 如果没有找到员工，显示提示
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '(暂无员工记录)';
+            option.disabled = true;
+            employeeFilter.appendChild(option);
+        } else {
+            empArray.forEach(empName => {
+                const option = document.createElement('option');
+                option.value = empName;
+                option.textContent = empName;
+                employeeFilter.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载员工列表失败:', error);
+        const employeeFilter = document.getElementById('employee-filter');
+        if (employeeFilter) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+        }
+    }
+}
+
 // 查询小组产品数量
 async function queryGroupProducts() {
     const groupSelect = document.getElementById('group-select');
-    const groupId = groupSelect.value;
+    const groupName = groupSelect.value;
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
+    const startTime = document.getElementById('start-time').value || '00:00:00';
+    const endTime = document.getElementById('end-time').value || '23:59:59';
+    const employeeFilter = document.getElementById('employee-filter').value;
     
-    if (!groupId) {
+    if (!groupName) {
         showToast('请选择小组', 'warning');
         return;
     }
@@ -322,24 +453,27 @@ async function queryGroupProducts() {
     }
     
     try {
-        // 获取选中的小组名称和工序
+        // 获取选中的工序
         const selectedOption = groupSelect.options[groupSelect.selectedIndex];
-        const groupName = selectedOption.getAttribute('data-group-name');
         const processName = selectedOption.getAttribute('data-process-name');
         
-        if (!groupName || !processName) {
+        if (!processName) {
             showToast('小组信息不完整', 'error');
             return;
         }
+        
+        // 组合日期和时间
+        const startDateTime = `${startDate}T${startTime}Z`;
+        const endDateTime = `${endDate}T${endTime}Z`;
         
         // 调用组长汇总API
         const requestBody = {
             group_name: groupName,
             process: processName,
             requester_name: userState.fullName,
-            start_date: `${startDate}T00:00:00Z`,
-            end_date: `${endDate}T23:59:59Z`,
-            employee_name: null  // 不筛选特定员工
+            start_date: startDateTime,
+            end_date: endDateTime,
+            employee_name: employeeFilter || null  // 如果选择了员工则筛选
         };
         
         const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
@@ -358,7 +492,7 @@ async function queryGroupProducts() {
         const data = await response.json();
         
         // 显示结果
-        displayGroupProductsResult(data, groupName, processName, startDate, endDate);
+        displayGroupProductsResult(data, groupName, processName, startDate, endDate, startTime, endTime, employeeFilter);
     } catch (error) {
         console.error('查询失败:', error);
         showToast('查询失败: ' + error.message, 'error');
@@ -366,7 +500,7 @@ async function queryGroupProducts() {
 }
 
 // 显示小组产品数量结果
-function displayGroupProductsResult(data, groupName, processName, startDate, endDate) {
+function displayGroupProductsResult(data, groupName, processName, startDate, endDate, startTime, endTime, employeeFilter) {
     const resultContainer = document.getElementById('group-products-result');
     
     if (!data || !data.items || data.items.length === 0) {
@@ -374,15 +508,35 @@ function displayGroupProductsResult(data, groupName, processName, startDate, end
         return;
     }
     
+    // 如果筛选了员工，显示该员工的完成数；否则显示所有员工的总数
+    const isEmployeeFiltered = employeeFilter && employeeFilter.trim() !== '';
+    
+    // 只显示数量大于0的产品（根据筛选条件选择合适的字段）
+    const filteredItems = data.items.filter(item => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        return count > 0;
+    });
+    
+    if (filteredItems.length === 0) {
+        const msg = isEmployeeFiltered 
+            ? `员工 ${employeeFilter} 在该时间范围内没有完成任何产品`
+            : '该时间范围内没有完成数量大于0的产品';
+        resultContainer.innerHTML = `<div class="alert alert-info">${msg}</div>`;
+        return;
+    }
+    
+    const timeRangeStr = startTime && endTime ? ` ${startTime} - ${endTime}` : '';
+    const employeeStr = isEmployeeFiltered ? ` (员工: ${employeeFilter})` : '';
+    
     let html = `
         <h4 class="mb-3">查询结果</h4>
         <p><strong>小组:</strong> ${groupName} (${getProcessDisplayName(processName)})</p>
-        <p><strong>日期范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}</p>
+        <p><strong>时间范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}${timeRangeStr}${employeeStr}</p>
         <div class="table-responsive">
-        <table class="table table-striped table-bordered">
+        <table class="table table-striped table-bordered" id="group-products-table">
             <thead>
                 <tr>
-                    <th class="long-text">产品型号</th>
+                    <th class="long-text">产品型号 (点击查看详情)</th>
                     <th class="number-cell">完成数量</th>
                 </tr>
             </thead>
@@ -391,14 +545,57 @@ function displayGroupProductsResult(data, groupName, processName, startDate, end
     
     let totalCount = 0;
     
-    data.items.forEach(item => {
+    filteredItems.forEach((item, index) => {
+        // 根据是否筛选员工，显示对应的数量
+        const displayCount = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        
         html += `
-            <tr>
+            <tr class="product-row" data-index="${index}" style="cursor: pointer;">
                 <td class="long-text">${item.product_model}</td>
-                <td class="number-cell">${item.total_completed}</td>
+                <td class="number-cell">${displayCount}</td>
+            </tr>
+            <tr class="product-detail-row" id="detail-${index}" style="display: none;">
+                <td colspan="2">
+                    <div class="card mt-2 mb-2">
+                        <div class="card-body">
+                            <h6>员工完成详情：</h6>
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>员工姓名</th>
+                                        <th>完成数量</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+        `;
+        
+        // 显示员工详情
+        if (item.employees && item.employees.length > 0) {
+            item.employees.forEach(emp => {
+                html += `
+                    <tr>
+                        <td>${emp.employee_name}</td>
+                        <td>${emp.count}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            html += `
+                <tr>
+                    <td colspan="2" class="text-center text-muted">暂无员工详情</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
             </tr>
         `;
-        totalCount += item.total_completed;
+        totalCount += displayCount;
     });
     
     html += `
@@ -414,6 +611,25 @@ function displayGroupProductsResult(data, groupName, processName, startDate, end
     `;
     
     resultContainer.innerHTML = html;
+    
+    // 添加点击事件
+    filteredItems.forEach((item, index) => {
+        const row = document.querySelector(`.product-row[data-index="${index}"]`);
+        const detailRow = document.getElementById(`detail-${index}`);
+        
+        if (row && detailRow) {
+            row.addEventListener('click', () => {
+                // 切换显示/隐藏
+                if (detailRow.style.display === 'none') {
+                    detailRow.style.display = '';
+                    row.style.backgroundColor = '#e7f3ff';
+                } else {
+                    detailRow.style.display = 'none';
+                    row.style.backgroundColor = '';
+                }
+            });
+        }
+    });
 }
 
 // 处理员工产品数量查询
@@ -450,10 +666,10 @@ async function loadEmployeeGroups() {
         
         groups.forEach(group => {
             // 检查当前用户是否是该组的组长
-            const isLeader = userGroups.some(ug => ug.group_id === group.id);
+            const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
             if (isLeader) {
                 const option = document.createElement('option');
-                option.value = group.id;
+                option.value = group.group_name;  // 使用group_name作为value
                 option.setAttribute('data-group-name', group.group_name);
                 option.setAttribute('data-process-name', group.process_name);
                 option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
@@ -469,12 +685,12 @@ async function loadEmployeeGroups() {
 // 查询员工产品数量
 async function queryEmployeeProducts() {
     const groupSelect = document.getElementById('employee-group-select');
-    const groupId = groupSelect.value;
+    const groupName = groupSelect.value;
     const employeeName = document.getElementById('employee-name').value.trim();
     const startDate = document.getElementById('employee-start-date').value;
     const endDate = document.getElementById('employee-end-date').value;
     
-    if (!groupId) {
+    if (!groupName) {
         showToast('请选择小组', 'warning');
         return;
     }
@@ -485,12 +701,11 @@ async function queryEmployeeProducts() {
     }
     
     try {
-        // 获取选中的小组名称和工序
+        // 获取选中的工序
         const selectedOption = groupSelect.options[groupSelect.selectedIndex];
-        const groupName = selectedOption.getAttribute('data-group-name');
         const processName = selectedOption.getAttribute('data-process-name');
         
-        if (!groupName || !processName) {
+        if (!processName) {
             showToast('小组信息不完整', 'error');
             return;
         }
@@ -516,7 +731,7 @@ async function queryEmployeeProducts() {
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.detail || '查询数据失败');
-        }
+                    }
         
         const data = await response.json();
         
@@ -620,8 +835,8 @@ async function loadProductModelsAndGroups() {
                 const option = document.createElement('option');
                 option.value = product.model;
                 option.textContent = product.model;
-                productSelect.appendChild(option);
-            });
+            productSelect.appendChild(option);
+        });
         }
         
         // 加载该工序下所有小组（只显示当前用户作为组长的小组）
@@ -642,13 +857,13 @@ async function loadProductModelsAndGroups() {
         // 只显示该工序下，且当前用户是组长的小组
         allGroups.forEach(group => {
             if (group.process_name === processType) {
-                const isLeader = userGroups.some(ug => ug.group_id === group.id);
+                const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
                 if (isLeader) {
-                    const option = document.createElement('option');
-                    option.value = group.id;
+            const option = document.createElement('option');
+            option.value = group.group_name;  // 使用group_name作为value
                     option.setAttribute('data-group-name', group.group_name);
                     option.textContent = group.group_name;
-                    groupSelect.appendChild(option);
+            groupSelect.appendChild(option);
                 }
             }
         });
@@ -681,14 +896,11 @@ async function submitGroupAssignment() {
         return;
     }
     
-    const groupId = groupSelect.value;
-    if (!groupId) {
+    const groupName = groupSelect.value;
+    if (!groupName) {
         showToast('请选择小组', 'warning');
         return;
     }
-    
-    const selectedOption = groupSelect.options[groupSelect.selectedIndex];
-    const groupName = selectedOption.getAttribute('data-group-name');
     
     try {
         // 使用严格分配API
@@ -715,7 +927,7 @@ async function submitGroupAssignment() {
         const data = await response.json();
         
         // 显示分配结果
-        const resultElement = document.getElementById('assign-group-result');
+            const resultElement = document.getElementById('assign-group-result');
         resultElement.classList.remove('d-none');
         
         let html = '<div class="alert alert-success"><h5>分配结果</h5><ul>';
@@ -726,7 +938,7 @@ async function submitGroupAssignment() {
             if (result.success) {
                 successCount++;
                 html += `<li class="text-success">✓ ${result.product_model}: ${result.action === 'created' ? '新分配' : '更新分配'}</li>`;
-            } else {
+        } else {
                 failCount++;
                 html += `<li class="text-danger">✗ ${result.product_model}: ${result.error}</li>`;
             }
@@ -887,6 +1099,11 @@ function navigateToHome() {
         const userFullnameElement = document.getElementById('user-fullname');
         if (userFullnameElement) {
             userFullnameElement.textContent = `用户: ${userState.fullName || '未登录'}`;
+        }
+        // 清空用户角色显示（不需要显示任何内容）
+        const userRoleElement = document.getElementById('user-role');
+        if (userRoleElement) {
+            userRoleElement.textContent = '';
         }
         // 在主页上方添加工序提醒条
         showProcessWarning();

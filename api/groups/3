@@ -1,0 +1,60 @@
+<?php
+// 设置响应头
+header('Content-Type: application/json');
+
+// 引入数据库连接
+require_once '../backend/db_connect.php';
+
+// 获取数据库连接
+$conn = getDBConnection();
+
+try {
+    // 获取组ID
+    $group_id = 3;
+    
+    // 查询组数据
+    $sql = "SELECT id, name, description FROM groups WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $group_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $group = $result->fetch_assoc();
+        
+        // 查询组成员
+        $sql_members = "SELECT name FROM group_members WHERE group_id = ?";
+        $stmt_members = $conn->prepare($sql_members);
+        $stmt_members->bind_param("i", $group_id);
+        $stmt_members->execute();
+        $result_members = $stmt_members->get_result();
+        
+        $members = [];
+        while($member = $result_members->fetch_assoc()) {
+            $members[] = $member['name'];
+        }
+        
+        // 返回组数据
+        echo json_encode([
+            'group' => [
+                'id' => $group['id'],
+                'name' => $group['name'],
+                'process_name' => $group['description'],
+                'members' => $members
+            ]
+        ]);
+    } else {
+        // 组不存在
+        http_response_code(404);
+        echo json_encode(['error' => '组不存在']);
+    }
+    
+} catch (Exception $e) {
+    // 返回错误信息
+    http_response_code(500);
+    echo json_encode(['error' => '获取组数据失败: ' . $e->getMessage()]);
+} finally {
+    // 关闭数据库连接
+    closeDBConnection($conn);
+}
+?>

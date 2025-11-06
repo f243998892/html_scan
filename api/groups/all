@@ -1,0 +1,22 @@
+{
+  "groups": [
+    {
+      "id": 1,
+      "name": "小组A",
+      "process_name": "组装",
+      "members": ["张三", "李四", "王五"]
+    },
+    {
+      "id": 2,
+      "name": "小组B",
+      "process_name": "测试",
+      "members": ["赵六", "钱七", "孙八"]
+    },
+    {
+      "id": 3,
+      "name": "小组C",
+      "process_name": "包装",
+      "members": ["周九", "吴十", "郑十一"]
+    }
+  ]
+}

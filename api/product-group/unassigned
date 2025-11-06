@@ -1,0 +1,37 @@
+<?php
+// 设置响应头
+header('Content-Type: application/json');
+
+// 引入数据库连接
+require_once '../backend/db_connect.php';
+
+// 获取数据库连接
+$conn = getDBConnection();
+
+try {
+    // 查询未分配产品数据
+    $sql = "SELECT p.id, p.name, p.model FROM products p 
+            LEFT JOIN group_products gp ON p.id = gp.product_id 
+            WHERE gp.product_id IS NULL";
+    $result = $conn->query($sql);
+    
+    $products = [];
+    
+    if ($result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $products[] = $row;
+        }
+    }
+    
+    // 返回JSON格式的产品数据
+    echo json_encode(['products' => $products]);
+    
+} catch (Exception $e) {
+    // 返回错误信息
+    http_response_code(500);
+    echo json_encode(['error' => '获取未分配产品数据失败: ' . $e->getMessage()]);
+} finally {
+    // 关闭数据库连接
+    closeDBConnection($conn);
+}
+?>
