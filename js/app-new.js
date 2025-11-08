@@ -278,6 +278,9 @@ async function handleExportExcel() {
         modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
     }
     
+    // 过滤掉空值（"全部型号"选项的value是空字符串）
+    modelFilter = modelFilter.filter(v => v && v.trim() !== '');
+    
     if (!groupName) {
         showToast('请先选择小组', 'warning');
         return;
@@ -1044,14 +1047,7 @@ async function loadModelList() {
             employee_name: employeeName
         };
         
-        console.log('==== 刷新型号列表 ====');
-        console.log('筛选条件:', {
-            小组: groupName,
-            工序: processName,
-            时间范围: `${startDate || '默认'} ${startTime} ~ ${endDate || '默认'} ${endTime}`,
-            员工: employeeName || '全体员工'
-        });
-        console.log('发送的请求体:', JSON.stringify(requestBody, null, 2));
+        // 发送请求获取型号列表
         
         const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
             method: 'POST',
@@ -1066,8 +1062,6 @@ async function loadModelList() {
         }
         
         const data = await response.json();
-        console.log('API返回的数据项数:', data.items ? data.items.length : 0);
-        
         const models = new Set();
         
         // 从返回的数据中提取型号
@@ -1087,17 +1081,11 @@ async function loadModelList() {
                     
                     // 只添加有完成数的型号（在当前时间范围和员工条件下有数据）
                     if (completedCount > 0) {
-                    models.add(item.product_model.trim());
-                        console.log(`  ✓ 型号: ${item.product_model}, 完成数: ${completedCount}${employeeName ? ` (员工: ${employeeName})` : ''}`);
-                    } else {
-                        console.log(`  ✗ 跳过型号: ${item.product_model}, 完成数: ${completedCount}${employeeName ? ` (员工: ${employeeName})` : ''}`);
+                        models.add(item.product_model.trim());
                     }
                 }
             });
         }
-        
-        console.log('提取到的型号:', Array.from(models).sort());
-        console.log('型号数量:', models.size);
         
         // 填充型号下拉框
         const modelArray = Array.from(models).sort();
@@ -1134,7 +1122,6 @@ async function loadModelList() {
                 }
                 modelFilter.appendChild(option);
             });
-            console.log(`型号列表已更新，共${modelArray.length}个型号`);
             showToast(`型号列表已刷新，共${modelArray.length}个型号`, 'success');
         }
         
@@ -1185,6 +1172,9 @@ async function queryGroupProducts() {
         // 使用原生方式获取多选值
         modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
     }
+    
+    // 过滤掉空值（"全部型号"选项的value是空字符串）
+    modelFilter = modelFilter.filter(v => v && v.trim() !== '');
     
     if (!groupName) {
         showToast('请选择小组', 'warning');
