@@ -656,8 +656,8 @@
 
     <!-- 小组产品数量查询界面 -->
     <div id="group-products-screen" class="d-none">
-        <div class="container mt-3">
-            <div class="card mb-3">
+        <div class="container mt-3 mb-3">
+            <div class="card" style="margin-bottom: 70px;">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">小组产品数量查询</h5>
                 </div>
@@ -748,11 +748,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="card-footer">
-                    <button class="btn btn-secondary" id="group-products-back-btn">
-                        <i class="bi bi-arrow-left"></i> 返回
-                    </button>
-                </div>
+            </div>
+        </div>
+        
+        <!-- 固定在屏幕底部的返回按钮 -->
+        <div style="position: fixed; bottom: 0; left: 0; right: 0; background-color: white; border-top: 2px solid #dee2e6; padding: 0.75rem; z-index: 9999; box-shadow: 0 -3px 15px rgba(0,0,0,0.15);">
+            <div class="container">
+                <button class="btn btn-secondary w-100" id="group-products-back-btn" style="font-size: 0.9rem;">
+                    <i class="bi bi-arrow-left"></i> 返回
+                </button>
             </div>
         </div>
     </div>

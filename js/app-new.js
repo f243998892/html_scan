@@ -209,6 +209,14 @@ function addEventListeners() {
     onId('assign-group-submit-btn', 'click', submitGroupAssignment);
     onId('view-assigned-btn', 'click', handleViewAssigned);
     
+    // 小组选择改变时，如果已显示已分配列表，则自动刷新
+    onId('assign-group-select', 'change', () => {
+        const container = document.getElementById('assigned-list-container');
+        if (container && !container.classList.contains('d-none')) {
+            handleViewAssigned();
+        }
+    });
+    
     // 工序选择下拉框变化时保存选择并立即更新浮动框
     const processSelect = document.getElementById('process-select');
     if (processSelect && typeof processSelect.addEventListener === 'function') {
@@ -1109,7 +1117,14 @@ async function loadModelList() {
             modelFilter.appendChild(option);
             showToast('当前筛选条件下没有数据', 'warning');
         } else {
-        modelArray.forEach(model => {
+            // 添加"全部型号"选项作为第一项
+            const allOption = document.createElement('option');
+            allOption.value = '';
+            allOption.textContent = '全部型号';
+            modelFilter.appendChild(allOption);
+            
+            // 添加具体型号
+            modelArray.forEach(model => {
                 const option = document.createElement('option');
                 option.value = model;
                 option.textContent = model;
@@ -1118,7 +1133,7 @@ async function loadModelList() {
                     option.selected = true;
                 }
                 modelFilter.appendChild(option);
-        });
+            });
             console.log(`型号列表已更新，共${modelArray.length}个型号`);
             showToast(`型号列表已刷新，共${modelArray.length}个型号`, 'success');
         }
@@ -1876,6 +1891,8 @@ async function submitGroupAssignment() {
 async function handleViewAssigned() {
     const processSelect = document.getElementById('process-type-select');
     const processName = processSelect.value;
+    const groupSelect = document.getElementById('assign-group-select');
+    const groupName = groupSelect.value; // 可能为空
     
     if (!processName) {
         showToast('请先选择工序', 'warning');
@@ -1893,7 +1910,7 @@ async function handleViewAssigned() {
         }
         
         const assignments = await response.json();
-        displayAssignedList({assignments: assignments}, processName);
+        displayAssignedList({assignments: assignments}, processName, groupName);
         
     } catch (error) {
         console.error('获取已分配列表失败:', error);
@@ -1902,7 +1919,7 @@ async function handleViewAssigned() {
 }
 
 // 显示已分配列表
-function displayAssignedList(data, processName) {
+function displayAssignedList(data, processName, groupName = '') {
     const container = document.getElementById('assigned-list-container');
     const listDiv = document.getElementById('assigned-list');
     
@@ -1912,20 +1929,34 @@ function displayAssignedList(data, processName) {
         return;
     }
     
+    // 如果选择了小组，则筛选该小组的数据
+    let filteredAssignments = data.assignments;
+    if (groupName && groupName.trim() !== '') {
+        filteredAssignments = data.assignments.filter(item => item.group_name === groupName);
+    }
+    
+    if (filteredAssignments.length === 0) {
+        const message = groupName ? `小组 ${groupName} 暂无已分配的产品型号` : '该工序暂无已分配的产品型号';
+        listDiv.innerHTML = `<div class="alert alert-info">${message}</div>`;
+        container.classList.remove('d-none');
+        return;
+    }
+    
     // 添加全选操作区域（移除批量删除按钮，将移到底部）
+    const groupInfo = groupName ? ` - ${groupName}` : '';
     let html = `
         <div class="d-flex justify-content-between align-items-center mb-2" style="padding: 0.5rem; background-color: #f8f9fa; border-radius: 0.25rem;">
             <div class="form-check" style="margin: 0;">
                 <input class="form-check-input" type="checkbox" id="select-all-assignments" style="margin-top: 0;">
                 <label class="form-check-label" for="select-all-assignments" style="font-size: 0.9rem;">
-                    全选
+                    全选${groupInfo}
                 </label>
             </div>
             <span id="selected-count-display" style="font-size: 0.85rem; color: #6c757d;">已选: <span id="selected-count">0</span></span>
         </div>
     `;
     
-    data.assignments.forEach(item => {
+    filteredAssignments.forEach(item => {
         const timeStr = new Date(item.assigned_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         html += `
             <div class="list-group-item" style="padding: 0.4rem 0.5rem;">
