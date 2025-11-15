@@ -5062,8 +5062,8 @@ function addManualScanEvent() {
                 showToast('请先选择工序', 'warning');
                 return;
             }
-            if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion') {
-                showToast('只有车止口和浸漆工序支持手动录入', 'error');
+            if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion' && selectedProcess !== 'embedding') {
+                showToast('只有嵌线、车止口和浸漆工序支持手动录入', 'error');
                 return;
             }
             // 显示工序提示
