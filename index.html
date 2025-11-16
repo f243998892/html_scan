@@ -16,7 +16,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <!-- 使用本地资源，避免网络问题：先加载 Bootstrap，再加载自定义样式 -->
-    <link href="css/bootstrap.min.css?v=1.1" rel="stylesheet">
+    <link href="css/bootstrap.min.css?v=5.3.0" rel="stylesheet">
     <link rel="stylesheet" href="css/bootstrap-icons.css?v=1.1">
     <link rel="stylesheet" href="css/style.css?v=1.1">
     <link rel="stylesheet" href="css/mobile-optimize.css?v=1.0">
@@ -360,16 +360,86 @@
     
     <div class="container mt-3" id="app">
         <div id="login-screen" class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-            <div class="card shadow-sm" style="width: 100%; max-width: 400px;">
+            <div class="card shadow-sm" style="width: 100%; max-width: 500px;">
                 <div class="card-body p-4">
-                    <h3 class="text-center mb-4">欢迎使用</h3>
+                    <h3 class="text-center mb-4">👤 人脸识别登录</h3>
                     
-                    <div class="form-group mb-3">
-                        <label for="username" class="form-label">姓名</label>
-                        <input type="text" class="form-control" id="username" placeholder="请输入姓名">
+                    <!-- 选项卡导航 -->
+                    <ul class="nav nav-tabs mb-3" id="loginTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="face-login-tab" data-bs-toggle="tab" data-bs-target="#face-login" type="button" role="tab">
+                                <i class="bi bi-person-check"></i> 人脸登录
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="face-register-tab" data-bs-toggle="tab" data-bs-target="#face-register" type="button" role="tab">
+                                <i class="bi bi-person-plus"></i> 新用户注册
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <!-- 选项卡内容 -->
+                    <div class="tab-content" id="loginTabsContent">
+                        <!-- 人脸登录标签页 -->
+                        <div class="tab-pane fade show active" id="face-login" role="tabpanel">
+                            <div class="text-center mb-3">
+                                <p class="text-muted">请正视摄像头进行人脸识别</p>
+                            </div>
+                            
+                            <!-- 摄像头预览 -->
+                            <div class="position-relative mb-3">
+                                <video id="face-login-video" width="100%" height="300" autoplay muted playsinline class="border rounded" style="background-color: #000;"></video>
+                                <canvas id="face-login-canvas" class="position-absolute top-0 start-0 w-100 h-100" style="display:none;"></canvas>
+                                <div id="face-login-status" class="position-absolute bottom-0 start-0 w-100 text-center py-2 bg-dark bg-opacity-75 text-white" style="display:none;">
+                                    初始化中...
+                                </div>
+                            </div>
+                            
+                            <button id="face-login-btn" class="btn btn-primary w-100 py-2 mb-2">
+                                <i class="bi bi-camera"></i> 开始人脸识别登录
+                            </button>
+                            <button id="stop-face-login-btn" class="btn btn-secondary w-100 py-2" style="display:none;">
+                                <i class="bi bi-stop-circle"></i> 停止识别
+                            </button>
+                        </div>
+                        
+                        <!-- 注册标签页 -->
+                        <div class="tab-pane fade" id="face-register" role="tabpanel">
+                            <div class="text-center mb-3">
+                                <p class="text-muted">首次使用请先注册</p>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label for="register-username" class="form-label">请输入您的真实姓名</label>
+                                <input type="text" class="form-control" id="register-username" placeholder="例如：张三" maxlength="10">
+                                <small class="form-text text-muted">2-10个字符</small>
+                            </div>
+                            
+                            <!-- 摄像头预览 -->
+                            <div class="position-relative mb-3">
+                                <video id="face-register-video" width="100%" height="300" autoplay muted playsinline class="border rounded" style="background-color: #000;"></video>
+                                <canvas id="face-register-canvas" class="position-absolute top-0 start-0 w-100 h-100" style="display:none;"></canvas>
+                                <div id="face-register-status" class="position-absolute bottom-0 start-0 w-100 text-center py-2 bg-dark bg-opacity-75 text-white" style="display:none;">
+                                    初始化中...
+                                </div>
+                            </div>
+                            
+                            <button id="face-register-btn" class="btn btn-success w-100 py-2 mb-2">
+                                <i class="bi bi-camera"></i> 开始人脸注册
+                            </button>
+                            <button id="stop-face-register-btn" class="btn btn-secondary w-100 py-2" style="display:none;">
+                                <i class="bi bi-stop-circle"></i> 停止注册
+                            </button>
+                        </div>
                     </div>
                     
-                    <button id="login-btn" class="btn btn-primary w-100 py-2">登录</button>
+                    <!-- 加载提示 -->
+                    <div id="face-loading" class="text-center mt-3" style="display:none;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                        <small class="text-muted ms-2">正在加载人脸识别模型...</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -913,8 +983,10 @@
     </div>
 
     <!-- 加载JS库 -->
-    <script src="js/bootstrap/bootstrap.bundle.min.js?v=1.1"></script>
+    <script src="js/bootstrap/bootstrap.bundle.min.js?v=5.3.0"></script>
     <script src="js/html5-qrcode.min.js?v=1.1"></script>
+    <!-- face-api.js - 人脸识别库 -->
+    <script src="js/libs/face-api.min.js?v=1.0"></script>
     <!-- SheetJS - Excel导出库 -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- jQuery和Select2可选加载，如果失败会使用原生多选框 -->
@@ -922,7 +994,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     -->
-    <script src="js/app-new.js?v=3.10&t=202511151827">
+    <script src="js/app-new.js?v=3.14&t=202511161450"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>
     <!-- 加载iOS修复补丁 -->
@@ -1017,5 +1089,21 @@
         }
     }
     </script>
+    
+    <!-- Bootstrap 验证 -->
+    <script>
+    // 验证Bootstrap加载
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof bootstrap !== 'undefined') {
+            console.log('✅ Bootstrap 5.3.0 已加载');
+            console.log('✅ Bootstrap Tab功能可用:', typeof bootstrap.Tab);
+        } else {
+            console.error('❌ Bootstrap未加载');
+        }
+    });
+    </script>
+    
+    <!-- 人脸识别模块 - 最后加载，确保所有依赖都已准备好 -->
+    <script src="js/face-recognition.js?v=1.2"></script>
 </body>
 </html>

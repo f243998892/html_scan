@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试Bootstrap Tabs</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* 强制确保tab-pane正确切换 */
+        .tab-pane {
+            display: none !important;
+        }
+        .tab-pane.active {
+            display: block !important;
+        }
+        
+        body {
+            padding: 50px;
+        }
+        .test-content {
+            min-height: 200px;
+            background: #f8f9fa;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Bootstrap Tabs 测试</h2>
+        <p class="text-muted">测试选项卡是否正常工作</p>
+        
+        <ul class="nav nav-tabs mb-3" id="testTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab1-btn" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab">
+                    选项卡1
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab2-btn" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab">
+                    选项卡2
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="testTabsContent">
+            <div class="tab-pane fade show active" id="tab1" role="tabpanel">
+                <div class="test-content">
+                    <h4>这是选项卡1的内容</h4>
+                    <p>如果你能看到这个内容，并且点击"选项卡2"后这个内容消失，说明tabs正常工作。</p>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="tab2" role="tabpanel">
+                <div class="test-content">
+                    <h4>这是选项卡2的内容</h4>
+                    <p>如果你能看到这个内容，并且点击"选项卡1"后这个内容消失，说明tabs正常工作。</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <h5>诊断信息</h5>
+            <div id="diagnostic"></div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap/bootstrap.bundle.min.js"></script>
+    <script>
+        // 显示诊断信息
+        const diagnostic = document.getElementById('diagnostic');
+        diagnostic.innerHTML = `
+            <p><strong>Bootstrap加载状态:</strong> ${typeof bootstrap !== 'undefined' ? '✅ 已加载' : '❌ 未加载'}</p>
+            <p><strong>Tab1可见性:</strong> <span id="tab1-visible"></span></p>
+            <p><strong>Tab2可见性:</strong> <span id="tab2-visible"></span></p>
+        `;
+        
+        function updateVisibility() {
+            const tab1 = document.getElementById('tab1');
+            const tab2 = document.getElementById('tab2');
+            const tab1Visible = document.getElementById('tab1-visible');
+            const tab2Visible = document.getElementById('tab2-visible');
+            
+            const isTab1Visible = window.getComputedStyle(tab1).display !== 'none';
+            const isTab2Visible = window.getComputedStyle(tab2).display !== 'none';
+            
+            tab1Visible.textContent = isTab1Visible ? '✅ 可见' : '❌ 隐藏';
+            tab2Visible.textContent = isTab2Visible ? '✅ 可见' : '❌ 隐藏';
+            
+            if (isTab1Visible && isTab2Visible) {
+                tab1Visible.innerHTML += ' <strong style="color:red;">⚠️ 两个都可见，有问题！</strong>';
+            }
+        }
+        
+        // 初始检查
+        setTimeout(updateVisibility, 100);
+        
+        // 监听tab切换
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(button => {
+            button.addEventListener('shown.bs.tab', function() {
+                console.log('Tab切换:', this.id);
+                setTimeout(updateVisibility, 100);
+            });
+        });
+        
+        // 显式初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            const triggerTabList = document.querySelectorAll('#testTabs button[data-bs-toggle="tab"]');
+            triggerTabList.forEach(triggerEl => {
+                const tabTrigger = new bootstrap.Tab(triggerEl);
+                
+                triggerEl.addEventListener('click', event => {
+                    event.preventDefault();
+                    tabTrigger.show();
+                });
+            });
+            
+            console.log('✅ Bootstrap tabs 已初始化');
+        });
+    </script>
+</body>
+</html>

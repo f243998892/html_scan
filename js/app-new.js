@@ -1,16 +1,7 @@
 // 全局变量
-const DB_CONFIG = {
-    host: 's5.gnip.vip',
-    port: 33946,
-    database: 'postgres',
-    user: 'postgres',
-    password: 'postgres'
-};
 // 使用相对路径，不再硬编码外部域名
 const HTTP_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
 const API_BASE_URL = '/api'; // 添加API基础URL
-// 初始化PostgreSQL客户端
-let dbClient;
 
 // 存储当前用户信息
 const userState = {
@@ -5169,4 +5160,68 @@ async function refreshTodayProcessCount() {
         // 插入到用户名下方
         userFullnameElement.insertAdjacentHTML('afterend', html);
     }, 100);
+}
+
+// =============================================================================
+// 人脸识别登录回调
+// =============================================================================
+
+/**
+ * 人脸识别登录成功的回调函数
+ * 由face-recognition.js模块调用
+ */
+window.onFaceLoginSuccess = function(fullName) {
+    console.log('====================================');
+    console.log('🎉 onFaceLoginSuccess 被调用');
+    console.log('用户名称:', fullName);
+    console.log('====================================');
+    
+    try {
+        // 设置用户状态
+        console.log('1. 设置用户状态...');
+        userState.fullName = fullName;
+        console.log('   ✅ 用户状态已设置:', userState.fullName);
+        
+        // 更新UI显示
+        console.log('2. 更新UI显示...');
+        updateUserDisplay();
+        console.log('   ✅ UI已更新');
+        
+        // 加载保存的工序设置
+        console.log('3. 加载工序设置...');
+        loadSavedProcessSelection();
+        console.log('   ✅ 工序设置已加载');
+        
+        // 导航到主页
+        console.log('4. 导航到主页...');
+        console.log('   SCREENS.HOME:', SCREENS.HOME);
+        navigateToHome();
+        console.log('   ✅ 已调用navigateToHome');
+        
+        // 显示欢迎提示
+        console.log('5. 显示欢迎提示...');
+        showToast(`欢迎回来，${fullName}！`, 'success');
+        console.log('   ✅ 欢迎提示已显示');
+        
+        console.log('====================================');
+        console.log('✅ onFaceLoginSuccess 执行完成');
+        console.log('====================================');
+    } catch (error) {
+        console.error('❌ onFaceLoginSuccess 执行出错:', error);
+        console.error('错误堆栈:', error.stack);
+        // 如果出错，至少尝试刷新页面
+        alert('登录成功，但跳转出错。页面将刷新。');
+        location.reload();
+    }
+};
+
+/**
+ * 提供一个全局的showToast函数供face-recognition.js使用
+ */
+if (typeof showToast === 'function') {
+    window.showToast = showToast;
+} else {
+    window.showToast = function(message, type) {
+        alert(message);
+    };
 }
