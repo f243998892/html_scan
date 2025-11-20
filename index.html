@@ -8,7 +8,32 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta http-equiv="Last-Modified" content="Mon, 15 Sep 2025 13:50:00 GMT">
+    <meta http-equiv="Last-Modified" content="Tue, 19 Nov 2025 20:50:00 GMT">
+    
+    <!-- Critical polyfill - must be first! -->
+    <script>
+        // setImmediate polyfill (CRITICAL - needed by face-api.js)
+        if (typeof setImmediate === 'undefined') {
+            window.setImmediate = function(fn) { return setTimeout(fn, 0); };
+        }
+        if (typeof clearImmediate === 'undefined') {
+            window.clearImmediate = function(id) { clearTimeout(id); };
+        }
+        
+        // 缓存检测：如果30秒后polyfill仍未定义，说明加载了旧缓存，自动刷新
+        window.__POLYFILL_VERSION__ = '2025111901';
+        setTimeout(function() {
+            if (typeof setImmediate === 'undefined' || typeof clearImmediate === 'undefined') {
+                console.error('⚠️ 检测到浏览器缓存了旧版本，正在强制刷新...');
+                // 显示提示
+                document.body.innerHTML = '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-family:Arial;"><h2 style="color:#d9534f;">⚠️ 检测到浏览器缓存问题</h2><p>正在自动刷新...</p><div style="border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto;"></div><style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style></div>';
+                // 1秒后强制刷新
+                setTimeout(function() {
+                    location.href = location.pathname + '?t=' + Date.now();
+                }, 1000);
+            }
+        }, 30000);
+    </script>
     
     <!-- iOS HTTPS特殊处理 -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
@@ -18,7 +43,7 @@
     <!-- 使用本地资源，避免网络问题：先加载 Bootstrap，再加载自定义样式 -->
     <link href="css/bootstrap.min.css?v=5.3.0" rel="stylesheet">
     <link rel="stylesheet" href="css/bootstrap-icons.css?v=1.1">
-    <link rel="stylesheet" href="css/style.css?v=1.1">
+    <link rel="stylesheet" href="css/style.css?v=1.2">
     <link rel="stylesheet" href="css/mobile-optimize.css?v=1.0">
     <!-- Select2 用于可搜索的多选框 - 可选加载，如果失败会使用原生多选框 -->
     <!-- 注释掉CDN资源，减少移动端加载时间
@@ -361,6 +386,24 @@
     <div class="container mt-3" id="app">
         <div id="login-screen" class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
             <div class="card shadow-sm" style="width: 100%; max-width: 500px;">
+                <!-- 页面加载状态提示 -->
+                <div id="page-loading-indicator" class="alert alert-info m-3 mb-0" role="alert">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>系统初始化中...</strong>
+                            <div class="small mt-1" id="loading-status-text">正在加载应用资源</div>
+                        </div>
+                    </div>
+                    <!-- 加载进度条 -->
+                    <div class="progress mt-2" style="height: 4px;">
+                        <div id="loading-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
                 <div class="card-body p-4">
                     <h3 class="text-center mb-4">👤 人脸识别登录</h3>
                     
@@ -711,12 +754,167 @@
                                 <button id="assign-group-btn" class="btn btn-lg btn-warning">
                                     <i class="bi bi-diagram-3"></i> 为产品分配组别
                                 </button>
+                                <button id="push-settings-btn" class="btn btn-lg btn-info">
+                                    <i class="bi bi-bell"></i> 推送通知设置
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-footer">
                     <button class="btn btn-secondary" id="leader-back-btn">
+                        <i class="bi bi-arrow-left"></i> 返回
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 推送通知设置界面 -->
+    <div id="push-settings-screen" class="d-none">
+        <div class="container mt-3 mb-3">
+            <div class="card" style="margin-bottom: 70px;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-bell"></i> 推送通知设置</h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- 推送说明 -->
+                    <div class="alert alert-info" id="push-status-alert">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+                            <div>
+                                <strong>钉钉推送通知</strong>
+                                <p class="mb-0 mt-1 small">
+                                    任务完成后将通过钉钉应用消息通知组长，您可以在下方设置中控制是否接收通知。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 推送设置 -->
+                    <div id="push-settings-form" class="d-none">
+                        <h6 class="mb-3"><i class="bi bi-gear"></i> 通知设置</h6>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable-push" checked>
+                                <label class="form-check-label fw-bold" for="enable-push">
+                                    推送总开关
+                                </label>
+                            </div>
+                            <small class="text-muted">关闭后将不会收到任何推送通知</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable-task-complete" checked>
+                                <label class="form-check-label" for="enable-task-complete">
+                                    任务完成通知
+                                </label>
+                            </div>
+                            <small class="text-muted">小组成员完成任务时推送</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable-daily-summary">
+                                <label class="form-check-label" for="enable-daily-summary">
+                                    每日汇总通知
+                                </label>
+                            </div>
+                            <small class="text-muted">每天下午6点推送当日汇总（暂未开放）</small>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable-abnormal-alert" checked>
+                                <label class="form-check-label" for="enable-abnormal-alert">
+                                    异常提醒
+                                </label>
+                            </div>
+                            <small class="text-muted">发生异常情况时推送（暂未开放）</small>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6 class="mb-3"><i class="bi bi-moon"></i> 免打扰时间</h6>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label for="quiet-start-hour" class="form-label">开始时间</label>
+                                <select id="quiet-start-hour" class="form-select">
+                                    <option value="0">00:00</option>
+                                    <option value="1">01:00</option>
+                                    <option value="2">02:00</option>
+                                    <option value="3">03:00</option>
+                                    <option value="4">04:00</option>
+                                    <option value="5">05:00</option>
+                                    <option value="6">06:00</option>
+                                    <option value="7">07:00</option>
+                                    <option value="8">08:00</option>
+                                    <option value="9">09:00</option>
+                                    <option value="10">10:00</option>
+                                    <option value="11">11:00</option>
+                                    <option value="12">12:00</option>
+                                    <option value="13">13:00</option>
+                                    <option value="14">14:00</option>
+                                    <option value="15">15:00</option>
+                                    <option value="16">16:00</option>
+                                    <option value="17">17:00</option>
+                                    <option value="18">18:00</option>
+                                    <option value="19">19:00</option>
+                                    <option value="20">20:00</option>
+                                    <option value="21">21:00</option>
+                                    <option value="22" selected>22:00</option>
+                                    <option value="23">23:00</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label for="quiet-end-hour" class="form-label">结束时间</label>
+                                <select id="quiet-end-hour" class="form-select">
+                                    <option value="0">00:00</option>
+                                    <option value="1">01:00</option>
+                                    <option value="2">02:00</option>
+                                    <option value="3">03:00</option>
+                                    <option value="4">04:00</option>
+                                    <option value="5">05:00</option>
+                                    <option value="6">06:00</option>
+                                    <option value="7">07:00</option>
+                                    <option value="8" selected>08:00</option>
+                                    <option value="9">09:00</option>
+                                    <option value="10">10:00</option>
+                                    <option value="11">11:00</option>
+                                    <option value="12">12:00</option>
+                                    <option value="13">13:00</option>
+                                    <option value="14">14:00</option>
+                                    <option value="15">15:00</option>
+                                    <option value="16">16:00</option>
+                                    <option value="17">17:00</option>
+                                    <option value="18">18:00</option>
+                                    <option value="19">19:00</option>
+                                    <option value="20">20:00</option>
+                                    <option value="21">21:00</option>
+                                    <option value="22">22:00</option>
+                                    <option value="23">23:00</option>
+                                </select>
+                            </div>
+                        </div>
+                        <small class="text-muted">在免打扰时间内不会收到推送通知（默认 22:00 - 08:00）</small>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button id="save-push-settings-btn" class="btn btn-primary">
+                                <i class="bi bi-save"></i> 保存设置
+                            </button>
+                            <button id="test-push-btn" class="btn btn-outline-secondary">
+                                <i class="bi bi-send"></i> 发送测试通知
+                            </button>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-secondary" id="push-settings-back-btn">
                         <i class="bi bi-arrow-left"></i> 返回
                     </button>
                 </div>
@@ -985,7 +1183,7 @@
     <!-- 加载JS库 -->
     <script src="js/bootstrap/bootstrap.bundle.min.js?v=5.3.0"></script>
     <script src="js/html5-qrcode.min.js?v=1.1"></script>
-    <!-- face-api.js - 人脸识别库 -->
+    <!-- face-api.js - 人脸识别库 (polyfill已在head中加载) -->
     <script src="js/libs/face-api.min.js?v=1.0"></script>
     <!-- SheetJS - Excel导出库 -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -994,7 +1192,12 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     -->
-    <script src="js/app-new.js?v=3.14&t=202511161450"></script>
+    <!-- 加载状态指示器 -->
+    <script src="js/loading-indicator.js?v=1.0"></script>
+    <!-- 推送设置管理模块 -->
+    <script src="js/push-manager.js?v=1.6"></script>
+    <script src="js/app-new.js?v=3.29"></script>
+    <script src="js/push-settings-ui.js?v=4.4"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>
     <!-- 加载iOS修复补丁 -->
@@ -1004,28 +1207,8 @@
     
     <!-- PWA安装脚本 -->
     <script>
-    // 注册Service Worker
-    if ('serviceWorker' in navigator) {
-        // 先注销所有旧的 Service Worker
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-                registration.unregister();
-                console.log('Service Worker 已注销');
-            }
-            // 暂时禁用Service Worker注册
-            console.log('Service Worker 已禁用');
-            /*
-            // 然后注册新的 Service Worker
-            navigator.serviceWorker.register('./service-worker.js?v='+new Date().getTime())
-            .then(function(registration) {
-                console.log('ServiceWorker 注册成功:', registration.scope);
-            })
-            .catch(function(error) {
-                console.log('ServiceWorker 注册失败:', error);
-            });
-            */
-        });
-    }
+    // Service Worker由push-manager.js统一管理
+    console.log('[PWA] Service Worker由推送管理器统一管理');
 
     // 添加"添加到主屏幕"提示
     let deferredPrompt;
@@ -1104,6 +1287,6 @@
     </script>
     
     <!-- 人脸识别模块 - 最后加载，确保所有依赖都已准备好 -->
-    <script src="js/face-recognition.js?v=1.2"></script>
+    <script src="js/face-recognition.js?v=1.3"></script>
 </body>
 </html>

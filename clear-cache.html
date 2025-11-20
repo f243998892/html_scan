@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>清除缓存指南</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        h1 { color: #d9534f; }
+        h2 { color: #5bc0de; margin-top: 30px; }
+        .method {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #5cb85c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .method h3 {
+            margin-top: 0;
+            color: #5cb85c;
+        }
+        .shortcut {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
+            margin: 5px 2px;
+        }
+        .warning {
+            background: #fcf8e3;
+            border: 1px solid #faebcc;
+            color: #8a6d3b;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        button {
+            background: #5cb85c;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #449d44; }
+        .danger { background: #d9534f; }
+        .danger:hover { background: #c9302c; }
+    </style>
+</head>
+<body>
+    <h1>🔧 清除浏览器缓存指南</h1>
+    
+    <div class="warning">
+        <strong>⚠️ 重要：</strong>如果你在主页面仍然看到 <code>setImmediate is not defined</code> 错误，
+        这是因为浏览器缓存了旧的 HTML 文件。请按照下面的方法清除缓存。
+    </div>
+
+    <h2>方法一：强制刷新（最简单）</h2>
+    <div class="method">
+        <h3>Windows / Linux:</h3>
+        <p>按 <span class="shortcut">Ctrl + Shift + R</span> 或 <span class="shortcut">Ctrl + F5</span></p>
+        
+        <h3>Mac:</h3>
+        <p>按 <span class="shortcut">Cmd + Shift + R</span></p>
+    </div>
+
+    <h2>方法二：清除所有缓存</h2>
+    <div class="method">
+        <h3>Windows / Linux:</h3>
+        <p>1. 按 <span class="shortcut">Ctrl + Shift + Delete</span></p>
+        <p>2. 选择 "缓存的图片和文件"</p>
+        <p>3. 时间范围选择 "全部"</p>
+        <p>4. 点击 "清除数据"</p>
+        
+        <h3>Mac:</h3>
+        <p>1. 按 <span class="shortcut">Cmd + Shift + Delete</span></p>
+        <p>2. 选择 "缓存的图片和文件"</p>
+        <p>3. 时间范围选择 "全部"</p>
+        <p>4. 点击 "清除数据"</p>
+    </div>
+
+    <h2>方法三：使用无痕模式测试</h2>
+    <div class="method">
+        <p>打开无痕/隐私浏览窗口：</p>
+        <p><span class="shortcut">Ctrl + Shift + N</span> (Chrome/Edge)</p>
+        <p><span class="shortcut">Ctrl + Shift + P</span> (Firefox)</p>
+        <p><span class="shortcut">Cmd + Shift + N</span> (Mac)</p>
+    </div>
+
+    <h2>快速操作</h2>
+    <button onclick="window.location.href='/test-polyfill.html'">
+        🧪 测试 Polyfill 是否工作
+    </button>
+    <button onclick="window.location.href='/'">
+        🏠 返回主页
+    </button>
+    <button class="danger" onclick="clearAndReload()">
+        🗑️ 清除缓存并重载
+    </button>
+
+    <script>
+        function clearAndReload() {
+            if (confirm('这将清除所有缓存并重新加载页面，确定继续吗？')) {
+                // 尝试清除Service Worker缓存
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+                
+                // 尝试清除localStorage
+                try {
+                    localStorage.clear();
+                } catch(e) {}
+                
+                // 强制重新加载
+                setTimeout(() => {
+                    window.location.href = window.location.href + '?t=' + Date.now();
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>

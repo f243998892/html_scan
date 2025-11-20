@@ -42,8 +42,12 @@ const SCREENS = {
     GROUP_PRODUCTS: 'group-products-screen', // 小组产品数量查询
     EMPLOYEE_PRODUCTS: 'employee-products-screen', // 员工产品数量查询
     ASSIGN_GROUP: 'assign-group-screen', // 为新产品分配小组
-    ASSIGN_SECURE: 'assign-secure-screen'
+    ASSIGN_SECURE: 'assign-secure-screen',
+    PUSH_SETTINGS: 'push-settings-screen' // 推送通知设置界面
 };
+
+// 暴露给全局使用
+window.SCREENS = SCREENS;
 
 // 统一的 DOM 安全工具
 function $(id) { return document.getElementById(id); }
@@ -126,15 +130,27 @@ async function initApp() {
     try {
         console.log('初始化应用...');
         
+        // 触发应用初始化开始事件
+        window.dispatchEvent(new CustomEvent('app:init:start'));
+        
         // 首先添加事件监听
         addEventListeners();
         
+        // 触发UI准备事件
+        window.dispatchEvent(new CustomEvent('app:init:ui'));
+        
         // 尝试自动登录，如果失败会显示登录页面
         await tryAutoLogin();
+        
+        // 触发初始化完成事件
+        window.dispatchEvent(new CustomEvent('app:init:complete'));
+        
     } catch (error) {
         console.error('应用初始化失败:', error);
         // 确保显示登录页面
         showScreen(SCREENS.LOGIN);
+        // 即使失败也触发完成事件，隐藏加载指示器
+        window.dispatchEvent(new CustomEvent('app:init:complete'));
     }
 }
 
@@ -4518,7 +4534,7 @@ async function handleDeleteRecords() {
                     box-shadow: 0 2px 10px rgba(0,0,0,0.08);
                     margin-bottom: 0;
                     width: 100%;
-                    table-layout: fixed;
+                    table-layout: auto;
                 }
                 
                 .delete-records-table thead th {
@@ -4527,8 +4543,8 @@ async function handleDeleteRecords() {
                     font-weight: 600;
                     text-align: center;
                     border: none;
-                    padding: 12px 8px;
-                    font-size: 0.95rem;
+                    padding: 8px 6px;
+                    font-size: 0.9rem;
                     white-space: nowrap;
                 }
                 
@@ -4548,7 +4564,7 @@ async function handleDeleteRecords() {
                 }
                 
                 .delete-records-table td {
-                    padding: 12px 8px;
+                    padding: 8px 6px;
                     vertical-align: middle;
                     text-align: center;
                     border: none;
@@ -4556,35 +4572,39 @@ async function handleDeleteRecords() {
                     word-wrap: break-word;
                 }
                 
-                /* 列宽度分配 */
+                /* 列宽度动态自适应（根据内容） */
                 .delete-records-table th:nth-child(1),
                 .delete-records-table td:nth-child(1) {
-                    width: 8%;
-                    min-width: 50px;
+                    width: auto;
+                    min-width: 40px;
                 }
                 
+                /* 工序列 - 最小宽度，根据内容 */
                 .delete-records-table th:nth-child(2),
                 .delete-records-table td:nth-child(2) {
-                    width: 15%;
-                    min-width: 80px;
+                    width: 1%;
+                    min-width: 1px;
+                    white-space: nowrap;
                 }
                 
                 .delete-records-table th:nth-child(3),
                 .delete-records-table td:nth-child(3) {
-                    width: 25%;
-                    min-width: 120px;
+                    width: auto;
+                    min-width: 90px;
                 }
                 
+                /* 型号列 - 最小宽度，根据内容 */
                 .delete-records-table th:nth-child(4),
                 .delete-records-table td:nth-child(4) {
-                    width: 20%;
-                    min-width: 100px;
+                    width: 1%;
+                    min-width: 1px;
+                    white-space: nowrap;
                 }
                 
                 .delete-records-table th:nth-child(5),
                 .delete-records-table td:nth-child(5) {
-                    width: 32%;
-                    min-width: 140px;
+                    width: auto;
+                    min-width: 110px;
                 }
                 
                 .delete-records-table .record-checkbox {
@@ -4604,9 +4624,10 @@ async function handleDeleteRecords() {
                     color: #495057;
                     background-color: #f8f9fa;
                     border-radius: 4px;
-                    padding: 6px 8px;
-                    margin: 2px 0;
+                    padding: 4px 6px;
+                    margin: 1px 0;
                     display: inline-block;
+                    white-space: nowrap;
                 }
                 
                 /* 产品编码列样式 */
@@ -4614,7 +4635,9 @@ async function handleDeleteRecords() {
                     font-family: 'Courier New', monospace;
                     font-weight: 500;
                     color: #0d6efd;
-                    word-break: break-all;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 
                 /* 型号列样式 */
@@ -4632,6 +4655,15 @@ async function handleDeleteRecords() {
                     font-family: 'Courier New', monospace;
                 }
                 
+                /* PC端显示完整时间，隐藏简短时间 */
+                .delete-records-table .time-short {
+                    display: none;
+                }
+                
+                .delete-records-table .time-full {
+                    display: inline;
+                }
+                
                 /* 响应式设计优化 */
                 @media (max-width: 768px) {
                     .delete-records-container {
@@ -4640,72 +4672,153 @@ async function handleDeleteRecords() {
                     }
                     
                     .delete-records-table {
-                        font-size: 0.85rem;
-                    }
-                    
-                    .delete-records-table thead th {
                         font-size: 0.8rem;
-                        padding: 8px 4px;
-                    }
-                    
-                    .delete-records-table td {
-                        font-size: 0.75rem;
-                        padding: 8px 4px;
-                    }
-                    
-                    .delete-records-table .time-cell {
-                        font-size: 0.7rem;
-                    }
-                    
-                    .delete-records-table .record-checkbox {
-                        transform: scale(1.1);
-                    }
-                }
-                
-                @media (max-width: 576px) {
-                    .delete-records-container {
-                        padding: 10px;
-                        border-radius: 8px;
                     }
                     
                     .delete-records-table thead th {
                         font-size: 0.75rem;
-                        padding: 6px 2px;
+                        padding: 6px 3px;
                     }
                     
                     .delete-records-table td {
                         font-size: 0.7rem;
-                        padding: 6px 2px;
+                        padding: 6px 3px;
                     }
                     
                     .delete-records-table .time-cell {
                         font-size: 0.65rem;
                     }
                     
-                    /* 在超小屏幕上调整列宽 */
+                    .delete-records-table .record-checkbox {
+                        transform: scale(1.0);
+                    }
+                }
+                
+                @media (max-width: 576px) {
+                    .delete-records-container {
+                        padding: 8px;
+                        border-radius: 8px;
+                    }
+                    
+                    /* 启用横向滚动，显示所有列 */
+                    .table-responsive {
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                        position: relative;
+                    }
+                    
+                    /* 横向滚动提示阴影 */
+                    .table-responsive::after {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        right: 0;
+                        bottom: 0;
+                        width: 20px;
+                        background: linear-gradient(to left, rgba(0,0,0,0.1), transparent);
+                        pointer-events: none;
+                    }
+                    
+                    .delete-records-table {
+                        font-size: 0.7rem;
+                        table-layout: auto;
+                        min-width: 450px;
+                        width: max-content;
+                    }
+                    
+                    .delete-records-table thead th {
+                        font-size: 0.65rem;
+                        padding: 4px 2px;
+                        white-space: nowrap;
+                    }
+                    
+                    .delete-records-table td {
+                        font-size: 0.65rem;
+                        padding: 4px 2px;
+                    }
+                    
+                    .delete-records-table .time-cell {
+                        font-size: 0.6rem;
+                    }
+                    
+                    /* 移动端隐藏完整时间，显示简短时间 */
+                    .delete-records-table .time-full {
+                        display: none;
+                    }
+                    
+                    .delete-records-table .time-short {
+                        display: inline;
+                    }
+                    
+                    .delete-records-table .process-cell {
+                        padding: 2px 4px;
+                        font-size: 0.6rem;
+                        white-space: nowrap;
+                        margin: 0;
+                    }
+                    
+                    /* 使用动态列宽，根据内容自适应（启用横向滚动） */
+                    
+                    /* 复选框列 - 固定最小宽度 */
                     .delete-records-table th:nth-child(1),
                     .delete-records-table td:nth-child(1) {
-                        width: 10%;
+                        width: auto;
+                        min-width: 30px;
+                        padding: 4px 3px;
                     }
                     
+                    /* 工序列 - 极小padding，根据文字宽度 */
                     .delete-records-table th:nth-child(2),
                     .delete-records-table td:nth-child(2) {
-                        width: 18%;
+                        width: 1%;
+                        min-width: 1px;
+                        padding: 4px 2px;
+                        white-space: nowrap;
                     }
                     
+                    /* 产品编码列 - 保证足够宽度 */
                     .delete-records-table th:nth-child(3),
                     .delete-records-table td:nth-child(3) {
-                        width: 28%;
+                        width: auto;
+                        min-width: 80px;
+                        padding: 4px 5px;
                     }
                     
+                    /* 型号列 - 极小padding，根据文字宽度 */
                     .delete-records-table th:nth-child(4),
                     .delete-records-table td:nth-child(4) {
-                        width: 20%;
+                        width: 1%;
+                        min-width: 1px;
+                        padding: 4px 2px;
+                        white-space: nowrap;
                     }
                     
+                    /* 时间列 - 固定显示简短格式 */
                     .delete-records-table th:nth-child(5),
                     .delete-records-table td:nth-child(5) {
-                        width: 24%;
+                        width: auto;
+                        min-width: 75px;
+                        padding: 4px 5px;
+                    }
+                    
+                    .delete-records-table .record-checkbox {
+                        transform: scale(0.9);
+                        width: 16px;
+                        height: 16px;
+                    }
+                    
+                    /* 确保产品编码列不换行 */
+                    .delete-records-table .product-code-cell {
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    /* 型号列也不要太宽 */
+                    .delete-records-table .model-cell {
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
                     }
                 }
                 
@@ -4728,7 +4841,7 @@ async function handleDeleteRecords() {
                             <tr>
                                  <th scope="col"></th>
                                  <th scope="col">工序</th>
-                                 <th scope="col">产品编码</th>
+                                 <th scope="col">编码</th>
                                  <th scope="col">型号</th>
                                  <th scope="col">时间</th>
                              </tr>
@@ -4742,7 +4855,16 @@ async function handleDeleteRecords() {
         records.forEach(record => {
             // 格式化时间
             const recordDate = new Date(record.time);
-            const formattedDate = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')} ${String(recordDate.getHours()).padStart(2, '0')}:${String(recordDate.getMinutes()).padStart(2, '0')}`;
+            const year = recordDate.getFullYear();
+            const month = String(recordDate.getMonth() + 1).padStart(2, '0');
+            const day = String(recordDate.getDate()).padStart(2, '0');
+            const hours = String(recordDate.getHours()).padStart(2, '0');
+            const minutes = String(recordDate.getMinutes()).padStart(2, '0');
+            
+            // 完整格式（PC端）
+            const formattedDateFull = `${year}-${month}-${day} ${hours}:${minutes}`;
+            // 简短格式（移动端）
+            const formattedDateShort = `${month}-${day} ${hours}:${minutes}`;
             
             html += `
                 <tr data-id="${record.id || Math.random().toString(36).substring(2, 10)}">
@@ -4750,7 +4872,10 @@ async function handleDeleteRecords() {
                     <td><span class="process-cell">${record.process}</span></td>
                     <td class="product-code-cell">${record.productCode}</td>
                     <td class="model-cell">${record.model}</td>
-                    <td class="time-cell">${formattedDate}</td>
+                    <td class="time-cell" data-full-time="${formattedDateFull}">
+                        <span class="time-full">${formattedDateFull}</span>
+                        <span class="time-short">${formattedDateShort}</span>
+                    </td>
                 </tr>
             `;
         });
@@ -4842,9 +4967,25 @@ async function handleDeleteRecords() {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    return response.text().then(text => {
+                        throw new Error(`HTTP error! Status: ${response.status}, ${text}`);
+                    });
                 }
-                return response.json();
+                return response.text().then(text => {
+                    // 先获取文本，再尝试解析JSON
+                    if (!text || text.trim() === '') {
+                        // 空响应，但HTTP状态是200，认为删除成功
+                        console.warn('删除API返回空响应，但状态码为200，认为删除成功');
+                        return {success: true};
+                    }
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        // JSON解析失败，但HTTP状态是200，认为删除成功
+                        console.warn('JSON解析失败，但状态码为200，认为删除成功。响应内容:', text.substring(0, 100));
+                        return {success: true};
+                    }
+                });
             });
             
             promises.push(promise);
@@ -4864,16 +5005,28 @@ async function handleDeleteRecords() {
                 // 显示成功提示
                 showToast(`成功删除 ${successCount} 条记录`, 'success');
                 
-                // 检查是否还有剩余记录
-                handleRemainingRecords();
-                
                 // 清除缓存，确保数据刷新
                 dataCache.monthlyTransactions.data = null;
                 dataCache.monthlyTransactions.timestamp = null;
                 
-                // 恢复按钮状态
-                deleteButton.disabled = false;
-                deleteButton.textContent = originalText;
+                // 检查是否还有剩余记录
+                const remainingRecords = document.querySelectorAll('#records-tbody tr').length;
+                
+                // 恢复按钮状态（必须在handleRemainingRecords之前，因为它可能会移除按钮）
+                if (deleteButton && deleteButton.parentElement) {
+                    deleteButton.disabled = false;
+                    deleteButton.textContent = originalText;
+                }
+                
+                // 处理剩余记录
+                if (remainingRecords === 0) {
+                    try {
+                        handleRemainingRecords();
+                    } catch (e) {
+                        console.error('处理剩余记录时出错:', e);
+                        // 不显示错误提示，因为删除已经成功
+                    }
+                }
             })
             .catch(error => {
                 console.error('删除记录时出错:', error);
@@ -5126,7 +5279,11 @@ async function refreshTodayProcessCount() {
         let products = [];
         try {
             products = await getUserMonthlyProducts(userState.fullName, start, end);
+            if (!products || !Array.isArray(products)) {
+                products = [];
+            }
         } catch (e) {
+            console.error('获取今日工序数量失败:', e);
             return;
         }
         // 统计各工序数量

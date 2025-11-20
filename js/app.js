@@ -1,16 +1,7 @@
 // 全局变量
-const DB_CONFIG = {
-    host: 's5.gnip.vip',
-    port: 33946,
-    database: 'postgres',
-    user: 'postgres',
-    password: 'postgres'
-};
 // 使用相对路径，不再硬编码外部域名
 const HTTP_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
 const API_BASE_URL = '/api'; // 添加API基础URL
-// 初始化PostgreSQL客户端
-let dbClient;
 
 // 存储当前用户信息
 const userState = {

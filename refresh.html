@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>强制刷新 - 清除缓存</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            max-width: 500px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .spinner {
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            font-size: 18px;
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+        .step {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 强制刷新系统</h1>
+        <div class="spinner"></div>
+        <div class="message" id="message">
+            正在清除缓存...
+        </div>
+        <div id="steps"></div>
+        <button id="manualBtn" style="display:none;" onclick="manualRefresh()">
+            手动刷新
+        </button>
+    </div>
+
+    <script>
+        const steps = [
+            '✓ 正在清除Service Worker缓存...',
+            '✓ 正在清除localStorage...',
+            '✓ 正在清除sessionStorage...',
+            '✓ 准备重新加载页面...'
+        ];
+
+        let currentStep = 0;
+        const stepsContainer = document.getElementById('steps');
+        const messageEl = document.getElementById('message');
+
+        function showStep(index) {
+            if (index < steps.length) {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'step success';
+                stepDiv.textContent = steps[index];
+                stepsContainer.appendChild(stepDiv);
+                
+                currentStep++;
+                setTimeout(() => showStep(currentStep), 500);
+            } else {
+                finishClearCache();
+            }
+        }
+
+        async function finishClearCache() {
+            messageEl.innerHTML = '<span class="success">✅ 缓存已清除！</span><br>正在跳转到主页...';
+            
+            // 清除所有缓存
+            try {
+                // 清除Service Worker缓存
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                }
+                
+                // 清除localStorage
+                try {
+                    localStorage.clear();
+                } catch(e) {
+                    console.log('localStorage清除失败:', e);
+                }
+                
+                // 清除sessionStorage
+                try {
+                    sessionStorage.clear();
+                } catch(e) {
+                    console.log('sessionStorage清除失败:', e);
+                }
+            } catch(e) {
+                console.log('缓存清除时出错:', e);
+            }
+            
+            // 跳转到主页，带时间戳参数强制刷新
+            setTimeout(() => {
+                window.location.href = '/index.html?nocache=' + Date.now();
+            }, 2000);
+        }
+
+        function manualRefresh() {
+            window.location.href = '/index.html?nocache=' + Date.now();
+        }
+
+        // 显示手动刷新按钮（防止自动刷新失败）
+        setTimeout(() => {
+            document.getElementById('manualBtn').style.display = 'inline-block';
+        }, 5000);
+
+        // 开始清除流程
+        setTimeout(() => showStep(0), 1000);
+    </script>
+</body>
+</html>

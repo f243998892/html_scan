@@ -57,6 +57,10 @@
         }
         
         console.log('开始加载人脸识别模型...');
+        
+        // 触发模型加载开始事件
+        window.dispatchEvent(new CustomEvent('app:init:models'));
+        
         const startTime = performance.now();
         
         try {
@@ -69,6 +73,9 @@
             modelsLoaded = true;
             const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
             console.log(`✅ 模型加载完成，耗时: ${loadTime}秒`);
+            
+            // 触发模型加载完成事件
+            window.dispatchEvent(new CustomEvent('app:models:loaded'));
             
         } catch (error) {
             console.error('模型加载失败:', error);
