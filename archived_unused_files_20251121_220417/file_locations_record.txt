@@ -1,0 +1,75 @@
+========================================
+文件归档记录 - product_system_dev
+创建时间: 2025-11-21 22:04:17
+原始目录: /var/www/product_system_dev
+========================================
+
+此文件记录了所有被归档文件的原始位置
+如需还原，请按照以下格式执行：
+mv archived_unused_files_*/[文件名] [原始路径]
+
+========================================
+文件列表:
+========================================
+
+[日志文件] /var/www/product_system_dev/connection_keepalive.log
+[文档] /var/www/product_system_dev/CHANGELOG.md
+[文档] /var/www/product_system_dev/CRITICAL_FIX.md
+[文档] /var/www/product_system_dev/DEBUG_LOGIN_REDIRECT.md
+[文档] /var/www/product_system_dev/DEPLOYMENT_COMPLETE.md
+[文档] /var/www/product_system_dev/FACE_RECOGNITION_TEST_GUIDE.md
+[文档] /var/www/product_system_dev/FIX_VERIFICATION.md
+[文档] /var/www/product_system_dev/README.md
+[文档] /var/www/product_system_dev/型号智能筛选优化说明.md
+[文档] /var/www/product_system_dev/型号筛选和Excel导出功能说明.md
+[文档] /var/www/product_system_dev/移动端优化说明.md
+[文档] /var/www/product_system_dev/移动端加载和型号筛选修复说明.md
+[文档] /var/www/product_system_dev/组长功能使用说明.md
+[文档] /var/www/product_system_dev/问题修复说明.md
+[测试/演示文件] /var/www/product_system_dev/bootstrap_demo.html
+[测试文件] /var/www/product_system_dev/test.html
+[测试文件] /var/www/product_system_dev/test-notification.html
+[测试文件] /var/www/product_system_dev/test-polyfill.html
+[测试文件] /var/www/product_system_dev/test-tabs.html
+[工具页面] /var/www/product_system_dev/cert-info.html
+[工具页面] /var/www/product_system_dev/clear-cache.html
+[工具页面] /var/www/product_system_dev/download-cert.html
+[工具页面] /var/www/product_system_dev/install-ca.html
+[工具页面] /var/www/product_system_dev/install-public-ca.html
+[工具页面] /var/www/product_system_dev/ios-camera.html
+[工具页面] /var/www/product_system_dev/ios-cert-download.html
+[工具页面] /var/www/product_system_dev/ios-install.html
+[工具页面] /var/www/product_system_dev/public-cert.html
+[工具页面] /var/www/product_system_dev/pwa-install.html
+[工具页面] /var/www/product_system_dev/refresh.html
+[重定向页面] /var/www/product_system_dev/index-new.html
+[备份文件] /var/www/product_system_dev/ios-cert-download.html.backup
+[临时文件] /var/www/product_system_dev/temp_file.txt
+[临时文件] /var/www/product_system_dev/missing_functions.txt
+[域名验证文件] /var/www/product_system_dev/0740f2994a8d17427aa56b1920ce34e2.txt
+[Let's Encrypt测试] /var/www/product_system_dev/.well-known/acme-challenge/test-file
+[Let's Encrypt测试] /var/www/product_system_dev/.well-known/acme-challenge/testfile
+[下载脚本] /var/www/product_system_dev/download_face_api.sh
+[数据库连接脚本副本] /var/www/product_system_dev/keep_connection_alive.py
+[旧PHP后端] /var/www/product_system_dev/api/backend/ (目录)
+[旧PHP API] /var/www/product_system_dev/api/groups/ (目录)
+[旧PHP API] /var/www/product_system_dev/api/product-group/ (目录)
+[空文件] /var/www/product_system_dev/patches/scan-integration.js
+[空文件] /var/www/product_system_dev/assets/css/bootstrap-icons.css
+[空文件] /var/www/product_system_dev/assets/css/bootstrap.min.css
+[空目录] /var/www/product_system_dev/assets/fonts/ (目录)
+[空目录] /var/www/product_system_dev/assets/js/ (目录)
+[空目录] /var/www/product_system_dev/cert/ (目录)
+[空目录] /var/www/product_system_dev/certs/ (目录)
+[空目录] /var/www/product_system_dev/img/ (目录)
+[空目录] /var/www/product_system_dev/install-cert/ (目录)
+
+========================================
+补充归档 - 自签名证书 (2025-11-21 22:10)
+========================================
+
+[自签名证书] /var/www/product_system_dev/ca/rootCA.cer
+[自签名证书] /var/www/product_system_dev/ca/rootCA.der
+[自签名证书目录] /var/www/product_system_dev/ca/internal/ (目录)
+[自签名证书目录] /var/www/product_system_dev/ca/ (空目录已删除)
+[公共自签名证书目录] /var/www/product_system_dev/public-ca/ (目录)

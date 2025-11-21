@@ -1,0 +1,79 @@
+========================================
+自签名证书归档说明
+========================================
+归档时间: 2025-11-21 22:10
+操作原因: 用户不再使用自签名证书
+
+========================================
+已归档的证书文件
+========================================
+
+1. ca/rootCA.cer - 自签名根证书（安卓格式）
+2. ca/rootCA.der - 自签名根证书（iOS格式）
+3. ca/internal/internal.crt - 内部证书
+4. public-ca/public_rootCA.cer - 公共根证书（.cer格式）
+5. public-ca/public_rootCA.crt - 公共根证书（.crt格式）
+6. public-ca/public_rootCA.der - 公共根证书（.der格式）
+7. public-ca/public_rootCA.srl - 证书序列号文件
+
+总计: 7个证书文件 + 2个目录
+
+========================================
+证书用途说明
+========================================
+
+这些证书原本用于：
+- 提供HTTPS自签名证书支持
+- 移动端（安卓/iOS）证书安装
+- 内部网络HTTPS访问
+
+引用位置：
+- 这些证书仅在已归档的工具页面中被引用
+  （cert-info.html, download-cert.html, install-ca.html等）
+- 主程序 index.html 不依赖这些证书
+- 如果网站使用Let's Encrypt证书，则不需要自签名证书
+
+========================================
+如何还原证书
+========================================
+
+如果需要重新使用自签名证书：
+
+方法1: 还原整个ca和public-ca目录
+-----------------------------------
+cd /var/www/product_system_dev
+sudo mkdir -p ca/internal
+sudo mv archived_unused_files_20251121_220417/rootCA.cer ca/
+sudo mv archived_unused_files_20251121_220417/rootCA.der ca/
+sudo mv archived_unused_files_20251121_220417/internal/* ca/internal/
+sudo mv archived_unused_files_20251121_220417/public-ca public-ca
+
+方法2: 使用还原脚本
+-----------------------------------
+sudo ./restore_archived_files.sh archived_unused_files_20251121_220417
+# 在提示时选择还原特定文件
+
+========================================
+注意事项
+========================================
+
+1. 如果网站已使用Let's Encrypt等正规证书，无需还原自签名证书
+2. 如果需要内网HTTPS访问且没有正规证书，才需要还原
+3. 还原后需要重新配置nginx以使用这些证书
+4. 移动端用户需要重新安装证书才能访问HTTPS
+
+========================================
+相关工具页面（已归档）
+========================================
+
+如需使用证书安装工具，以下页面也在归档中：
+- cert-info.html - 证书信息查看
+- download-cert.html - 证书下载页面
+- install-ca.html - CA安装指南
+- install-public-ca.html - 公共CA安装
+- ios-cert-download.html - iOS证书下载
+- public-cert.html - 公共证书页面
+
+可根据需要从归档目录还原这些工具页面。
+
+========================================
