@@ -7,7 +7,7 @@ const DB_CONFIG = {
     password: 'postgres'
 };
 // 使用相对路径，不再硬编码外部域名
-const HTTP_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+const HTTP_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
 const API_BASE_URL = '/api'; // 添加API基础URL
 // 初始化PostgreSQL客户端
 let dbClient;
@@ -46,8 +46,34 @@ const SCREENS = {
     MODELS: 'models-screen',
     PRODUCTS: 'products-screen',
     DELETE_RECORDS: 'delete-records-screen',
-    MANUAL_SCAN: 'manual-scan-screen' // 新增扫码枪/手动录入界面
+    MANUAL_SCAN: 'manual-scan-screen', // 新增扫码枪/手动录入界面
+    LEADER_SUMMARY: 'leader-summary-screen', // 组长汇总查询界面
+    GROUP_PRODUCTS: 'group-products-screen', // 小组产品数量查询
+    EMPLOYEE_PRODUCTS: 'employee-products-screen', // 员工产品数量查询
+    ASSIGN_GROUP: 'assign-group-screen', // 为新产品分配小组
+    ASSIGN_SECURE: 'assign-secure-screen'
 };
+
+// 统一的 DOM 安全工具
+function $(id) { return document.getElementById(id); }
+function onId(id, evt, handler) {
+    const el = $(id);
+    if (el && typeof el.addEventListener === 'function') {
+        el.addEventListener(evt, handler);
+    } else {
+        console.warn('[bind-miss]', id);
+    }
+}
+function ensureContainer(containerId) {
+    let el = $(containerId);
+    if (!el) {
+        el = document.createElement('div');
+        el.id = containerId;
+        document.body.appendChild(el);
+        console.warn('[auto-create]', containerId);
+    }
+    return el;
+}
 
 // 全局缓存对象
 const dataCache = {
@@ -150,20 +176,50 @@ async function tryAutoLogin() {
 
 // 添加事件监听
 function addEventListeners() {
-    // 登录事件
-    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    // 登录事件（安全绑定）
+    onId('login-btn', 'click', handleLogin);
     
-    // 首页功能卡片点击事件
-    document.getElementById('card-single-scan').addEventListener('click', handleSingleScan);
-    document.getElementById('card-continuous-scan').addEventListener('click', handleContinuousScan);
-    document.getElementById('card-product-query').addEventListener('click', handleProductQuery);
-    document.getElementById('card-product-scan-query').addEventListener('click', handleProductScanQuery);
-    document.getElementById('card-inventory').addEventListener('click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
-    document.getElementById('card-delete-records').addEventListener('click', handleDeleteRecords);
+    // 首页功能卡片点击事件（安全绑定）
+    onId('card-single-scan', 'click', handleSingleScan);
+    onId('card-continuous-scan', 'click', handleContinuousScan);
+    onId('card-product-query', 'click', handleProductQuery);
+    onId('card-product-scan-query', 'click', handleProductScanQuery);
+    onId('card-inventory', 'click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
+    onId('card-delete-records', 'click', handleDeleteRecords);
+    
+    // 组长功能相关事件
+    onId('leader-card', 'click', handleLeaderFunctions);
+    onId('leader-back-btn', 'click', () => showScreen(SCREENS.HOME));
+    
+    // 小组产品数量查询
+    onId('group-products-btn', 'click', handleGroupProducts);
+    onId('group-products-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('query-group-products-btn', 'click', queryGroupProducts);
+    onId('export-excel-btn', 'click', handleExportExcel);
+    
+    // 员工产品数量查询
+    onId('employee-products-btn', 'click', handleEmployeeProducts);
+    onId('employee-products-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('query-employee-products-btn', 'click', queryEmployeeProducts);
+    
+    // 为新产品分配小组
+    onId('assign-group-btn', 'click', handleAssignGroup);
+    onId('assign-group-back-btn', 'click', () => showScreen(SCREENS.LEADER_SUMMARY));
+    onId('process-type-select', 'change', loadProductModelsAndGroups);
+    onId('assign-group-submit-btn', 'click', submitGroupAssignment);
+    onId('view-assigned-btn', 'click', handleViewAssigned);
+    
+    // 小组选择改变时，如果已显示已分配列表，则自动刷新
+    onId('assign-group-select', 'change', () => {
+        const container = document.getElementById('assigned-list-container');
+        if (container && !container.classList.contains('d-none')) {
+            handleViewAssigned();
+        }
+    });
     
     // 工序选择下拉框变化时保存选择并立即更新浮动框
     const processSelect = document.getElementById('process-select');
-    if (processSelect) {
+    if (processSelect && typeof processSelect.addEventListener === 'function') {
         processSelect.addEventListener('change', function() {
             saveProcessSelection(this.value);
             // 立即更新浮动工序框
@@ -171,36 +227,1901 @@ function addEventListeners() {
         });
     }
     
-    // 单次扫码工序按钮
-    document.querySelectorAll('.process-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const processType = this.getAttribute('data-process');
-            scanState.processType = processType;
-            scanState.isContinuous = false;
-            startScan(processType, false);
+    // 组长功能实现
+// 处理组长功能入口
+function handleLeaderFunctions() {
+    showScreen(SCREENS.LEADER_SUMMARY);
+}
+
+// 处理小组产品数量查询
+async function handleGroupProducts() {
+    // 加载小组数据
+    await loadGroups();
+    // 设置默认日期为当天
+    setDefaultDateToToday('start-date', 'end-date');
+    // 设置默认时间为全天
+    setDefaultTimeRange('start-time', 'end-time');
+    // 加载员工列表
+    await loadEmployeeList();
+    // 初始化型号筛选框（使用Select2）
+    initModelFilter();
+    showScreen(SCREENS.GROUP_PRODUCTS);
+    // 在显示界面后立即刷新型号列表（此时日期已设置好）
+    setTimeout(() => {
+        if (document.getElementById('group-select').value) {
+            console.log('页面打开完成，自动刷新型号列表');
+            loadModelList();
+        }
+    }, 100);
+}
+
+// 处理导出Excel
+async function handleExportExcel() {
+    const groupSelect = document.getElementById('group-select');
+    const groupName = groupSelect.value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const startTime = document.getElementById('start-time').value || '00:00:00';
+    const endTime = document.getElementById('end-time').value || '23:59:59';
+    const employeeFilter = document.getElementById('employee-filter').value;
+    
+    // 获取选中的型号
+    let modelFilter = [];
+    const modelFilterElement = document.getElementById('model-filter');
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+        try {
+            modelFilter = jQuery('#model-filter').val() || [];
+        } catch (e) {
+            modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
+        }
+    } else {
+        modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
+    }
+    
+    // 过滤掉空值（"全部型号"选项的value是空字符串）
+    modelFilter = modelFilter.filter(v => v && v.trim() !== '');
+    
+    if (!groupName) {
+        showToast('请先选择小组', 'warning');
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        showToast('请选择日期范围', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('正在生成Excel文件...', 'info');
+        
+        // 获取选中的工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        // 组合日期和时间
+        const startDateTime = `${startDate}T${startTime}Z`;
+        const endDateTime = `${endDate}T${endTime}Z`;
+        
+        // 调用组长汇总API获取数据
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: startDateTime,
+            end_date: endDateTime,
+            employee_name: employeeFilter || null
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
         });
+        
+        if (!response.ok) {
+            throw new Error('获取数据失败');
+        }
+        
+        const data = await response.json();
+        
+        console.log('API返回的完整数据:', data);
+        console.log('API返回的items[0]:', data.items ? data.items[0] : 'no items');
+        
+        // 生成Excel
+        await generateExcelReport(data, {
+            groupName,
+            processName,
+            startDate,
+            endDate,
+            startTime,
+            endTime,
+            employeeFilter,
+            modelFilter
+        });
+        
+        showToast('Excel文件已生成并下载', 'success');
+        
+    } catch (error) {
+        console.error('导出失败:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    }
+}
+
+// 生成Excel报告
+async function generateExcelReport(data, filters) {
+    if (!data || !data.items || data.items.length === 0) {
+        showToast('没有数据可以导出', 'warning');
+        return;
+    }
+    
+    // 检查XLSX库是否加载
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel库未加载，请刷新页面重试', 'error');
+        return;
+    }
+    
+    // 过滤数据 - 注意：不要丢失employee_details字段
+    let filteredItems = data.items;
+    const isEmployeeFiltered = filters.employeeFilter && filters.employeeFilter.trim() !== '';
+    const isModelFiltered = filters.modelFilter && Array.isArray(filters.modelFilter) && filters.modelFilter.length > 0;
+    
+    console.log('原始数据样例:', data.items[0]);
+    
+    // 应用型号筛选
+    if (isModelFiltered) {
+        filteredItems = filteredItems.filter(item => 
+            filters.modelFilter.includes(item.product_model)
+        );
+    }
+    
+    // 只保留有完成数的项
+    filteredItems = filteredItems.filter(item => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        return count > 0;
+    });
+    
+    console.log('过滤后数据样例:', filteredItems[0]);
+    
+    if (filteredItems.length === 0) {
+        showToast('筛选后没有数据可以导出', 'warning');
+        return;
+    }
+    
+    // 创建工作簿
+    const wb = XLSX.utils.book_new();
+    
+    // 1. 生成概览页
+    const summarySheet = generateSummarySheet(filteredItems, filters, isEmployeeFiltered);
+    XLSX.utils.book_append_sheet(wb, summarySheet, '概览');
+    
+    // 2. 生成按型号汇总页
+    const modelSheet = generateModelSummarySheet(filteredItems, filters, isEmployeeFiltered);
+    XLSX.utils.book_append_sheet(wb, modelSheet, '按型号汇总');
+    
+    // 3. 生成按员工汇总页
+    console.log('准备生成按员工汇总页，filteredItems:', filteredItems);
+    const employeeSheet = generateEmployeeSummarySheet(filteredItems, filters);
+    XLSX.utils.book_append_sheet(wb, employeeSheet, '按员工汇总');
+    
+    // 4. 生成详细流水账（获取详细记录）
+    const detailsSheet = await generateDetailsSheet(filters);
+    XLSX.utils.book_append_sheet(wb, detailsSheet, '详细流水账');
+    
+    // 生成文件名
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const fileName = `${filters.groupName}_${filters.processName}_${filters.startDate}_${timestamp}.xlsx`;
+    
+    // 下载文件
+    XLSX.writeFile(wb, fileName);
+}
+
+// 生成概览页
+function generateSummarySheet(items, filters, isEmployeeFiltered) {
+    const data = [];
+    
+    // 标题
+    data.push(['生产汇总报告']);
+    data.push([]);
+    
+    // 基本信息
+    data.push(['报告信息']);
+    data.push(['生成时间', new Date().toLocaleString('zh-CN')]);
+    data.push(['小组名称', filters.groupName]);
+    data.push(['工序', filters.processName]);
+    data.push(['时间范围', `${filters.startDate} ${filters.startTime} ~ ${filters.endDate} ${filters.endTime}`]);
+    data.push(['员工筛选', filters.employeeFilter || '全体员工']);
+    data.push(['型号筛选', filters.modelFilter && filters.modelFilter.length > 0 ? filters.modelFilter.join(', ') : '全部型号']);
+    data.push([]);
+    
+    // 汇总统计
+    data.push(['汇总统计']);
+    const totalProducts = items.reduce((sum, item) => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        return sum + count;
+    }, 0);
+    const totalModels = items.length;
+    const totalEmployees = new Set();
+    items.forEach(item => {
+        // 注意：后端字段名是 employees 不是 employee_details
+        const empList = item.employees || item.employee_details;
+        if (empList) {
+            empList.forEach(emp => totalEmployees.add(emp.employee_name));
+        }
+    });
+    
+    data.push(['完成总数', totalProducts]);
+    data.push(['涉及型号数', totalModels]);
+    data.push(['参与员工数', totalEmployees.size]);
+    data.push([]);
+    
+    // 型号排行榜（前10）
+    data.push(['产量TOP10型号']);
+    data.push(['排名', '型号', '完成数量', '占比']);
+    const sortedItems = [...items].sort((a, b) => {
+        const countA = isEmployeeFiltered ? a.employee_completed : a.total_completed;
+        const countB = isEmployeeFiltered ? b.employee_completed : b.total_completed;
+        return countB - countA;
+    });
+    
+    sortedItems.slice(0, 10).forEach((item, index) => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        const percentage = ((count / totalProducts) * 100).toFixed(2) + '%';
+        data.push([index + 1, item.product_model, count, percentage]);
+    });
+    
+    data.push([]);
+    
+    // 员工排行榜（前10）
+    if (!isEmployeeFiltered) {
+        data.push(['产量TOP10员工']);
+        data.push(['排名', '员工姓名', '完成数量', '涉及型号数']);
+        
+        const employeeStats = new Map();
+        items.forEach(item => {
+            // 注意：后端字段名是 employees 不是 employee_details
+            const empList = item.employees || item.employee_details;
+            if (empList) {
+                empList.forEach(emp => {
+                    if (!employeeStats.has(emp.employee_name)) {
+                        employeeStats.set(emp.employee_name, { count: 0, models: new Set() });
+                    }
+                    const stats = employeeStats.get(emp.employee_name);
+                    stats.count += emp.count;
+                    stats.models.add(item.product_model);
+                });
+            }
+        });
+        
+        const employeeArray = Array.from(employeeStats.entries())
+            .map(([name, stats]) => ({ name, count: stats.count, models: stats.models.size }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+        
+        employeeArray.forEach((emp, index) => {
+            data.push([index + 1, emp.name, emp.count, emp.models]);
+        });
+    }
+    
+    return XLSX.utils.aoa_to_sheet(data);
+}
+
+// 生成按型号汇总页
+function generateModelSummarySheet(items, filters, isEmployeeFiltered) {
+    const data = [];
+    
+    // 标题行
+    data.push(['型号', '完成数量', '参与员工数', '平均每人完成数']);
+    
+    // 数据行
+    items.forEach(item => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        // 注意：后端字段名是 employees 不是 employee_details
+        const empList = item.employees || item.employee_details;
+        const employeeCount = empList ? empList.length : 0;
+        const avgPerEmployee = employeeCount > 0 ? (count / employeeCount).toFixed(2) : 0;
+        
+        data.push([
+            item.product_model,
+            count,
+            employeeCount,
+            avgPerEmployee
+        ]);
+    });
+    
+    return XLSX.utils.aoa_to_sheet(data);
+}
+
+// 生成按员工汇总页
+function generateEmployeeSummarySheet(items, filters) {
+    const data = [];
+    
+    // 标题行
+    data.push(['员工姓名', '完成数量', '涉及型号数', '型号列表']);
+    
+    console.log('生成按员工汇总页，items数量:', items.length);
+    
+    // 收集员工统计
+    const employeeStats = new Map();
+    items.forEach(item => {
+        // 注意：后端字段名是 employees 不是 employee_details
+        const empList = item.employees || item.employee_details;
+        console.log('处理型号:', item.product_model, 'employees:', empList);
+        
+        if (empList && Array.isArray(empList)) {
+            empList.forEach(emp => {
+                // 确保员工名称存在且不为空
+                const empName = emp.employee_name || emp.name;
+                if (empName && empName.trim()) {
+                    if (!employeeStats.has(empName)) {
+                        employeeStats.set(empName, { count: 0, models: new Set() });
+                    }
+                    const stats = employeeStats.get(empName);
+                    stats.count += (emp.count || 0);
+                    stats.models.add(item.product_model);
+                }
+            });
+        }
+    });
+    
+    console.log('员工统计结果:', employeeStats);
+    
+    // 如果没有员工数据，添加提示行
+    if (employeeStats.size === 0) {
+        data.push(['(暂无员工数据)', '-', '-', '-']);
+        console.warn('警告：没有找到员工数据');
+    } else {
+        // 排序并输出
+        const employeeArray = Array.from(employeeStats.entries())
+            .map(([name, stats]) => ({
+                name,
+                count: stats.count,
+                modelCount: stats.models.size,
+                models: Array.from(stats.models).join(', ')
+            }))
+            .sort((a, b) => b.count - a.count);
+        
+        employeeArray.forEach(emp => {
+            data.push([emp.name, emp.count, emp.modelCount, emp.models]);
+        });
+        
+        console.log('按员工汇总数据行数:', employeeArray.length);
+    }
+    
+    return XLSX.utils.aoa_to_sheet(data);
+}
+
+// 生成详细流水账页
+async function generateDetailsSheet(filters) {
+    // 调用API获取详细记录
+    const response = await fetch(`${API_BASE_URL}/getProductsByGroup`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            group_name: filters.groupName,
+            process_name: filters.processName,
+            start_date: `${filters.startDate}T${filters.startTime}Z`,
+            end_date: `${filters.endDate}T${filters.endTime}Z`
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('获取详细记录失败');
+    }
+    
+    const records = await response.json();
+    
+    const data = [];
+    
+    // 标题行 - 包含所有字段
+    const headers = [
+        '序号', '产品编码', '产品型号',
+        '绕线员工', '绕线时间',
+        '嵌线员工', '嵌线时间',
+        '接线员工', '接线时间',
+        '压装员工', '压装时间',
+        '车止口员工', '车止口时间',
+        '浸漆员工', '浸漆时间',
+        '扫码时间', '备注'
+    ];
+    data.push(headers);
+    
+    // 数据行
+    let filteredRecords = records;
+    
+    // 应用员工筛选
+    if (filters.employeeFilter) {
+        const employeeField = getEmployeeFieldName(filters.processName);
+        filteredRecords = filteredRecords.filter(r => r[employeeField] === filters.employeeFilter);
+    }
+    
+    // 应用型号筛选
+    if (filters.modelFilter && filters.modelFilter.length > 0) {
+        filteredRecords = filteredRecords.filter(r => filters.modelFilter.includes(r['产品型号']));
+    }
+    
+    filteredRecords.forEach((record, index) => {
+        // 格式化时间的辅助函数
+        const formatTime = (timeStr) => {
+            if (!timeStr) return '';
+            try {
+                return new Date(timeStr).toLocaleString('zh-CN');
+            } catch (e) {
+                return timeStr;
+            }
+        };
+        
+        data.push([
+            index + 1,
+            record['产品编码'] || '',
+            record['产品型号'] || '',
+            record['绕线员工'] || '',
+            formatTime(record['绕线时间']),
+            record['嵌线员工'] || '',
+            formatTime(record['嵌线时间']),
+            record['接线员工'] || '',
+            formatTime(record['接线时间']),
+            record['压装员工'] || '',
+            formatTime(record['压装时间']),
+            record['车止口员工'] || '',
+            formatTime(record['车止口时间']),
+            record['浸漆员工'] || '',
+            formatTime(record['浸漆时间']),
+            formatTime(record['扫码时间']),
+            record['备注'] || ''
+        ]);
+    });
+    
+    return XLSX.utils.aoa_to_sheet(data);
+}
+
+// 辅助函数：根据工序获取员工字段名
+function getEmployeeFieldName(processName) {
+    const fieldMap = {
+        '绕线': '绕线员工',
+        '嵌线': '嵌线员工',
+        '接线': '接线员工',
+        '压装': '压装员工',
+        '车止口': '车止口员工',
+        '浸漆': '浸漆员工'
+    };
+    return fieldMap[processName] || '员工';
+}
+
+// 辅助函数：根据工序获取时间字段名
+function getTimeFieldName(processName) {
+    const fieldMap = {
+        '绕线': '绕线时间',
+        '嵌线': '嵌线时间',
+        '接线': '接线时间',
+        '压装': '压装时间',
+        '车止口': '车止口时间',
+        '浸漆': '浸漆时间'
+    };
+    return fieldMap[processName] || '时间';
+}
+
+// 加载小组数据
+async function loadGroups() {
+    try {
+        // 从API获取所有组别
+        const response = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!response.ok) {
+            throw new Error('获取组别数据失败');
+        }
+        
+        const data = await response.json();
+        const groups = data.groups || [];
+        
+        const groupSelect = document.getElementById('group-select');
+        if (!groupSelect) {
+            console.error('找不到group-select元素');
+            return;
+        }
+        
+        groupSelect.innerHTML = '';
+        
+        // 只显示当前登录用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        let firstGroup = null;
+        groups.forEach((group, index) => {
+            // 检查当前用户是否是该组的组长
+            const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
+            if (isLeader) {
+            const option = document.createElement('option');
+                option.value = group.group_name;  // 使用group_name作为value
+                option.setAttribute('data-group-name', group.group_name);
+                option.setAttribute('data-process-name', group.process_name);
+                option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
+            groupSelect.appendChild(option);
+                
+                // 记录第一个小组
+                if (!firstGroup) {
+                    firstGroup = group;
+                }
+            }
+        });
+        
+        // 默认选中第一个小组
+        if (firstGroup) {
+            groupSelect.value = firstGroup.group_name;
+        }
+    } catch (error) {
+        console.error('加载小组数据失败:', error);
+        showToast('获取小组数据失败: ' + error.message, 'error');
+    }
+}
+
+// 获取当前用户作为组长的所有小组
+async function getLeaderGroups() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/group-leaders?leader_name=${encodeURIComponent(userState.fullName)}`);
+        if (!response.ok) {
+            // 如果接口不存在,返回空数组
+            if (response.status === 404) {
+                return [];
+            }
+            throw new Error('获取组长信息失败');
+        }
+        
+        const data = await response.json();
+        return data.groups || [];
+    } catch (error) {
+        console.error('获取组长信息失败:', error);
+        // 返回空数组以防止页面崩溃
+        return [];
+    }
+}
+
+// 设置默认日期范围（当月）
+function setDefaultDateRange(startId, endId) {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    document.getElementById(startId).valueAsDate = startDate;
+    document.getElementById(endId).valueAsDate = endDate;
+}
+
+// 设置默认日期为当天
+function setDefaultDateToToday(startId, endId) {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    document.getElementById(startId).value = today;
+    document.getElementById(endId).value = today;
+}
+
+// 设置默认时间范围（全天）
+function setDefaultTimeRange(startTimeId, endTimeId) {
+    document.getElementById(startTimeId).value = '00:00:00';
+    document.getElementById(endTimeId).value = '23:59:59';
+}
+
+// 加载员工列表
+async function loadEmployeeList() {
+    try {
+        const groupSelect = document.getElementById('group-select');
+        const employeeFilter = document.getElementById('employee-filter');
+        
+        if (!groupSelect || !employeeFilter) {
+            return;
+        }
+        
+        const groupName = groupSelect.value;
+        if (!groupName) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+            return;
+        }
+        
+        // 获取选中小组的工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!processName) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+            return;
+        }
+        
+        // 获取一个较大的时间范围来获取所有员工（最近30天）
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        
+        const startDateTime = startDate.toISOString().split('T')[0] + 'T00:00:00Z';
+        const endDateTime = endDate.toISOString().split('T')[0] + 'T23:59:59Z';
+        
+        // 调用API获取该小组该工序的员工列表
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                group_name: groupName,
+                process: processName,
+                start_date: startDateTime,
+                end_date: endDateTime,
+                requester_name: userState.fullName,
+                employee_name: null
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取员工列表失败');
+        }
+        
+        const data = await response.json();
+        const employees = new Set();
+        
+        // 从返回的数据中提取员工名字
+        if (data.items) {
+            data.items.forEach(item => {
+                if (item.employees && Array.isArray(item.employees)) {
+                    item.employees.forEach(emp => {
+                        if (emp.employee_name && emp.employee_name.trim()) {
+                            employees.add(emp.employee_name.trim());
+                        }
+                    });
+                }
+            });
+        }
+        
+        // 填充员工下拉框
+        employeeFilter.innerHTML = '<option value="">全体员工</option>';
+        const empArray = Array.from(employees).sort();
+        
+        if (empArray.length === 0) {
+            // 如果没有找到员工，显示提示
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '(暂无员工记录)';
+            option.disabled = true;
+            employeeFilter.appendChild(option);
+        } else {
+            empArray.forEach(empName => {
+                const option = document.createElement('option');
+                option.value = empName;
+                option.textContent = empName;
+                employeeFilter.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载员工列表失败:', error);
+        const employeeFilter = document.getElementById('employee-filter');
+        if (employeeFilter) {
+            employeeFilter.innerHTML = '<option value="">全体员工</option>';
+        }
+    }
+}
+
+// 用于标记是否已初始化监听器
+let modelFilterListenersInitialized = false;
+
+// 初始化型号筛选器（使用Select2或原生多选框）
+function initModelFilter() {
+    // 尝试使用Select2（如果可用）
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+        try {
+            // 先销毁已存在的Select2实例
+            if (jQuery('#model-filter').data('select2')) {
+                jQuery('#model-filter').select2('destroy');
+            }
+        jQuery('#model-filter').select2({
+            theme: 'bootstrap-5',
+            placeholder: '全部型号（可多选）',
+            allowClear: true,
+            width: '100%',
+            language: {
+                noResults: function() {
+                    return '未找到匹配的型号';
+                },
+                searching: function() {
+                    return '搜索中...';
+                }
+            }
+        });
+            console.log('Select2初始化成功');
+        } catch (error) {
+            console.warn('Select2初始化失败，使用原生多选框:', error);
+        }
+    } else {
+        console.warn('jQuery或Select2未加载，使用原生多选框');
+    }
+    
+    // 只在第一次初始化时添加监听器，避免重复添加
+    if (!modelFilterListenersInitialized) {
+        console.log('初始化型号筛选自动刷新监听器');
+        
+        // 监听所有影响型号列表的筛选条件变化
+        const groupSelect = document.getElementById('group-select');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        const startTimeInput = document.getElementById('start-time');
+        const endTimeInput = document.getElementById('end-time');
+        const employeeFilterSelect = document.getElementById('employee-filter');
+        
+        // 监听小组变化
+        if (groupSelect) {
+            groupSelect.addEventListener('change', function() {
+                console.log('小组变化，自动刷新型号列表和员工列表');
+            loadEmployeeList();
+                loadModelList();
+        });
+        }
+        
+        // 监听日期时间变化 - 延迟刷新避免频繁请求
+        let dateTimeChangeTimer;
+        const handleDateTimeChange = function() {
+            clearTimeout(dateTimeChangeTimer);
+            dateTimeChangeTimer = setTimeout(() => {
+                if (groupSelect && groupSelect.value) {
+                    console.log('时间区间变化，自动刷新型号列表');
+        loadModelList();
+                }
+            }, 800); // 800ms延迟，避免用户还在调整时就刷新
+        };
+        
+        if (startDateInput) startDateInput.addEventListener('change', handleDateTimeChange);
+        if (endDateInput) endDateInput.addEventListener('change', handleDateTimeChange);
+        if (startTimeInput) startTimeInput.addEventListener('change', handleDateTimeChange);
+        if (endTimeInput) endTimeInput.addEventListener('change', handleDateTimeChange);
+        
+        // 监听员工筛选变化
+        if (employeeFilterSelect) {
+            employeeFilterSelect.addEventListener('change', function() {
+                if (groupSelect && groupSelect.value) {
+                    console.log('员工筛选变化，自动刷新型号列表');
+                    loadModelList();
+                }
+            });
+        }
+        
+        modelFilterListenersInitialized = true;
+    }
+}
+
+// 加载型号列表（根据当前筛选条件动态加载）
+async function loadModelList() {
+    const groupSelect = document.getElementById('group-select');
+    const modelFilter = document.getElementById('model-filter');
+    const groupName = groupSelect.value;
+    
+    if (!groupName) {
+        // 没有选择小组，清空型号列表
+        modelFilter.innerHTML = '';
+        if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+            try {
+                jQuery('#model-filter').trigger('change');
+            } catch (e) {
+                console.log('Select2未初始化');
+            }
+        }
+        return;
+    }
+    
+    try {
+        // 获取该小组的所有型号（使用页面上的时间区间和员工筛选）
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!processName) {
+            console.error('小组信息不完整');
+            return;
+        }
+        
+        // 获取用户选择的时间区间
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        const startTime = document.getElementById('start-time').value || '00:00:00';
+        const endTime = document.getElementById('end-time').value || '23:59:59';
+        
+        // 如果用户还没选择日期，使用默认的最近30天
+        let startDateTime, endDateTime;
+        if (startDate && endDate) {
+            startDateTime = `${startDate}T${startTime}Z`;
+            endDateTime = `${endDate}T${endTime}Z`;
+        } else {
+            // 默认最近30天
+            const endDateObj = new Date();
+            const startDateObj = new Date();
+            startDateObj.setDate(startDateObj.getDate() - 30);
+            startDateTime = startDateObj.toISOString();
+            endDateTime = endDateObj.toISOString();
+        }
+        
+        // 获取员工筛选
+        const employeeFilterValue = document.getElementById('employee-filter').value;
+        const employeeName = employeeFilterValue || null;
+        
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: startDateTime,
+            end_date: endDateTime,
+            employee_name: employeeName
+        };
+        
+        // 发送请求获取型号列表
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取型号列表失败');
+        }
+        
+        const data = await response.json();
+        const models = new Set();
+        
+        // 从返回的数据中提取型号
+        // 智能过滤：只显示有数据的型号
+        if (data.items) {
+            data.items.forEach(item => {
+                if (item.product_model && item.product_model.trim()) {
+                    // 根据筛选条件决定使用哪个完成数
+                    let completedCount;
+                    if (employeeName) {
+                        // 如果选择了员工，使用该员工的完成数
+                        completedCount = item.employee_completed || 0;
+                    } else {
+                        // 如果没选择员工，使用总完成数
+                        completedCount = item.total_completed || 0;
+                    }
+                    
+                    // 只添加有完成数的型号（在当前时间范围和员工条件下有数据）
+                    if (completedCount > 0) {
+                        models.add(item.product_model.trim());
+                    }
+                }
+            });
+        }
+        
+        // 填充型号下拉框
+        const modelArray = Array.from(models).sort();
+        const modelFilter = document.getElementById('model-filter');
+        
+        // 保存当前选中的型号
+        const currentSelected = Array.from(modelFilter.selectedOptions).map(opt => opt.value);
+        
+        modelFilter.innerHTML = '';
+        
+        if (modelArray.length === 0) {
+            // 没有型号
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '当前筛选条件下没有数据';
+            option.disabled = true;
+            modelFilter.appendChild(option);
+            showToast('当前筛选条件下没有数据', 'warning');
+        } else {
+            // 添加"全部型号"选项作为第一项
+            const allOption = document.createElement('option');
+            allOption.value = '';
+            allOption.textContent = '全部型号';
+            modelFilter.appendChild(allOption);
+            
+            // 添加具体型号
+            modelArray.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                // 如果之前选中过这个型号，且它仍在新列表中，保持选中状态
+                if (currentSelected.includes(model)) {
+                    option.selected = true;
+                }
+                modelFilter.appendChild(option);
+            });
+            showToast(`型号列表已刷新，共${modelArray.length}个型号`, 'success');
+        }
+        
+        // 如果Select2已初始化，触发更新
+        if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+            try {
+        jQuery('#model-filter').trigger('change');
+            } catch (e) {
+                console.log('Select2未初始化');
+            }
+        }
+        
+    } catch (error) {
+        console.error('加载型号列表失败:', error);
+        const modelFilter = document.getElementById('model-filter');
+        modelFilter.innerHTML = '';
+        if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+            try {
+                jQuery('#model-filter').trigger('change');
+            } catch (e) {
+                console.log('Select2未初始化');
+            }
+        }
+    }
+}
+
+// 查询小组产品数量
+async function queryGroupProducts() {
+    const groupSelect = document.getElementById('group-select');
+    const groupName = groupSelect.value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const startTime = document.getElementById('start-time').value || '00:00:00';
+    const endTime = document.getElementById('end-time').value || '23:59:59';
+    const employeeFilter = document.getElementById('employee-filter').value;
+    
+    // 获取选中的型号（数组） - 兼容Select2和原生多选框
+    let modelFilter = [];
+    const modelFilterElement = document.getElementById('model-filter');
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+        try {
+            modelFilter = jQuery('#model-filter').val() || [];
+        } catch (e) {
+            // Select2未初始化，使用原生方式
+            modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
+        }
+    } else {
+        // 使用原生方式获取多选值
+        modelFilter = Array.from(modelFilterElement.selectedOptions).map(opt => opt.value);
+    }
+    
+    // 过滤掉空值（"全部型号"选项的value是空字符串）
+    modelFilter = modelFilter.filter(v => v && v.trim() !== '');
+    
+    if (!groupName) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        showToast('请选择日期范围', 'warning');
+        return;
+    }
+    
+    try {
+        // 获取选中的工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!processName) {
+            showToast('小组信息不完整', 'error');
+            return;
+        }
+        
+        // 组合日期和时间
+        const startDateTime = `${startDate}T${startTime}Z`;
+        const endDateTime = `${endDate}T${endTime}Z`;
+        
+        // 调用组长汇总API
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: startDateTime,
+            end_date: endDateTime,
+            employee_name: employeeFilter || null  // 如果选择了员工则筛选
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '查询数据失败');
+        }
+        
+        const data = await response.json();
+        
+        // 显示结果
+        displayGroupProductsResult(data, groupName, processName, startDate, endDate, startTime, endTime, employeeFilter, modelFilter);
+    } catch (error) {
+        console.error('查询失败:', error);
+        showToast('查询失败: ' + error.message, 'error');
+    }
+}
+
+// 显示小组产品数量结果
+function displayGroupProductsResult(data, groupName, processName, startDate, endDate, startTime, endTime, employeeFilter, modelFilter) {
+    const resultContainer = document.getElementById('group-products-result');
+    
+    if (!data || !data.items || data.items.length === 0) {
+        resultContainer.innerHTML = '<div class="alert alert-info">该时间范围内没有找到产品数据</div>';
+        return;
+    }
+    
+    // 如果筛选了员工，显示该员工的完成数；否则显示所有员工的总数
+    const isEmployeeFiltered = employeeFilter && employeeFilter.trim() !== '';
+    
+    // 是否筛选了型号
+    const isModelFiltered = modelFilter && Array.isArray(modelFilter) && modelFilter.length > 0;
+    
+    // 只显示数量大于0的产品（根据筛选条件选择合适的字段）
+    const filteredItems = data.items.filter(item => {
+        const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        // 先过滤数量
+        if (count <= 0) return false;
+        // 如果筛选了型号，只显示选中的型号
+        if (isModelFiltered && !modelFilter.includes(item.product_model)) return false;
+        return true;
+    });
+    
+    if (filteredItems.length === 0) {
+        let msg = '该时间范围内没有完成数量大于0的产品';
+        if (isEmployeeFiltered) {
+            msg = `员工 ${employeeFilter} 在该时间范围内没有完成任何产品`;
+        }
+        if (isModelFiltered) {
+            msg += '（已应用型号筛选）';
+        }
+        resultContainer.innerHTML = `<div class="alert alert-info">${msg}</div>`;
+        return;
+    }
+    
+    const timeRangeStr = startTime && endTime ? ` ${startTime} - ${endTime}` : '';
+    const employeeStr = isEmployeeFiltered ? ` (员工: ${employeeFilter})` : '';
+    const modelStr = isModelFiltered ? ` (型号: ${modelFilter.join(', ')})` : '';
+    
+    let html = `
+        <h4 class="mb-3">查询结果</h4>
+        <p><strong>小组:</strong> ${groupName} (${getProcessDisplayName(processName)})</p>
+        <p><strong>时间范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}${timeRangeStr}${employeeStr}${modelStr}</p>
+        <div class="table-responsive">
+        <table class="table table-striped table-bordered" id="group-products-table">
+            <thead>
+                <tr>
+                    <th class="long-text">产品型号 (点击查看详情)</th>
+                    <th class="number-cell">完成数量</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    let totalCount = 0;
+    
+    filteredItems.forEach((item, index) => {
+        // 根据是否筛选员工，显示对应的数量
+        const displayCount = isEmployeeFiltered ? item.employee_completed : item.total_completed;
+        
+        html += `
+            <tr class="product-row" data-index="${index}" style="cursor: pointer;">
+                <td class="long-text">${item.product_model}</td>
+                <td class="number-cell">${displayCount}</td>
+            </tr>
+            <tr class="product-detail-row" id="detail-${index}" style="display: none;">
+                <td colspan="2">
+                    <div class="card mt-2 mb-2">
+                        <div class="card-body" style="padding: 0.5rem;">
+                            <h6 style="font-size: 0.9rem; margin-bottom: 0.3rem;">员工完成详情：</h6>
+                            <table class="table table-sm table-bordered mb-0" style="font-size: 0.85rem; table-layout: fixed;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 0.25rem 0.5rem !important; line-height: 1.2 !important; width: 70%;">员工姓名</th>
+                                        <th style="padding: 0.25rem 0.5rem !important; line-height: 1.2 !important; width: 30%;">完成数量</th>
+            </tr>
+                                </thead>
+                                <tbody>
+        `;
+        
+        // 显示员工详情
+        if (item.employees && item.employees.length > 0) {
+            item.employees.forEach((emp, empIndex) => {
+                html += `
+                    <tr class="employee-row" data-product-index="${index}" data-employee-index="${empIndex}" style="cursor: pointer; height: 28px;">
+                        <td class="employee-name-cell" style="color: #0d6efd; font-weight: 500; padding: 0.25rem 0.5rem !important; font-size: 0.875rem; line-height: 1.2 !important; height: 28px; vertical-align: middle;">
+                            <i class="bi bi-chevron-right employee-chevron" id="chevron-${index}-${empIndex}" style="font-size: 0.7rem;"></i>
+                            ${emp.employee_name}
+                        </td>
+                        <td style="padding: 0.25rem 0.5rem !important; font-size: 0.875rem; line-height: 1.2 !important; height: 28px; vertical-align: middle;">${emp.count}</td>
+                    </tr>
+                    <tr class="employee-products-row" id="employee-products-${index}-${empIndex}" style="display: none;">
+                        <td colspan="2" style="padding: 0 !important;">
+                            <div style="background-color: #f8f9fa; padding: 0.25rem 0.5rem;">
+                                <div id="products-list-${index}-${empIndex}">
+                                    <div class="text-center text-muted small">
+                                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        加载中...
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            html += `
+                <tr>
+                    <td colspan="2" class="text-center text-muted" style="padding: 0.3rem 0.5rem; font-size: 0.85rem;">暂无员工详情</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        totalCount += displayCount;
+    });
+    
+    html += `
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="long-text">总计</th>
+                    <th class="number-cell">${totalCount}</th>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+    `;
+    
+    resultContainer.innerHTML = html;
+    
+    // 添加点击事件
+    filteredItems.forEach((item, index) => {
+        const row = document.querySelector(`.product-row[data-index="${index}"]`);
+        const detailRow = document.getElementById(`detail-${index}`);
+        
+        if (row && detailRow) {
+            row.addEventListener('click', () => {
+                // 切换显示/隐藏
+                if (detailRow.style.display === 'none') {
+                    detailRow.style.display = '';
+                    row.style.backgroundColor = '#e7f3ff';
+                } else {
+                    detailRow.style.display = 'none';
+                    row.style.backgroundColor = '';
+                }
+            });
+        }
+        
+        // 为每个员工添加点击事件
+        if (item.employees && item.employees.length > 0) {
+            item.employees.forEach((emp, empIndex) => {
+                const empRow = document.querySelector(`.employee-row[data-product-index="${index}"][data-employee-index="${empIndex}"]`);
+                const empProductsRow = document.getElementById(`employee-products-${index}-${empIndex}`);
+                const chevron = document.getElementById(`chevron-${index}-${empIndex}`);
+                
+                if (empRow && empProductsRow) {
+                    empRow.addEventListener('click', async (e) => {
+                        e.stopPropagation(); // 防止触发产品行的点击事件
+                        
+                        // 切换显示/隐藏
+                        if (empProductsRow.style.display === 'none') {
+                            empProductsRow.style.display = '';
+                            if (chevron) chevron.className = 'bi bi-chevron-down employee-chevron';
+                            empRow.style.backgroundColor = '#fff3cd';
+                            
+                            // 加载该员工的产品列表
+                            await loadEmployeeProducts(index, empIndex, emp.employee_name, item.product_model, startDate, endDate, startTime, endTime);
+                        } else {
+                            empProductsRow.style.display = 'none';
+                            if (chevron) chevron.className = 'bi bi-chevron-right employee-chevron';
+                            empRow.style.backgroundColor = '';
+                        }
+                    });
+                }
+            });
+        }
+    });
+}
+
+// 加载员工完成的产品列表
+async function loadEmployeeProducts(productIndex, empIndex, employeeName, productModel, startDate, endDate, startTime, endTime) {
+    const productsListDiv = document.getElementById(`products-list-${productIndex}-${empIndex}`);
+    
+    if (!productsListDiv) return;
+    
+    try {
+        // 构建时间范围
+        const startDateTime = new Date(`${startDate}T${startTime || '00:00:00'}`);
+        const endDateTime = new Date(`${endDate}T${endTime || '23:59:59'}`);
+        
+        // 调用API获取该员工完成的所有产品
+        const products = await getUserMonthlyProducts(employeeName, startDateTime, endDateTime);
+        
+        if (!products || products.length === 0) {
+            productsListDiv.innerHTML = '<div class="text-center text-muted small py-2">该员工在此时间范围内未完成任何产品</div>';
+            return;
+        }
+        
+        // 过滤出该型号的产品，并确定完成时间
+        const filteredProducts = products.filter(p => p['产品型号'] === productModel).map(p => {
+            // 找出该员工操作的工序和时间
+            let completedTime = null;
+            const processes = ['绕线', '嵌线', '接线', '压装', '车止口', '浸漆'];
+            
+            for (const process of processes) {
+                const empField = `${process}员工`;
+                const timeField = `${process}时间`;
+                
+                if (p[empField] && p[empField].includes(employeeName) && p[timeField]) {
+                    const processTime = new Date(p[timeField]);
+                    if (!completedTime || processTime > completedTime) {
+                        completedTime = processTime;
+                    }
+                }
+            }
+            
+            return {
+                code: p['产品编码'],
+                model: p['产品型号'],
+                completedTime: completedTime,
+                fullData: p
+            };
+        }).filter(p => p.completedTime); // 只保留有完成时间的
+        
+        if (filteredProducts.length === 0) {
+            productsListDiv.innerHTML = '<div class="text-center text-muted small py-2">该员工未完成该型号的产品</div>';
+            return;
+        }
+        
+        // 按完成时间排序
+        filteredProducts.sort((a, b) => b.completedTime - a.completedTime);
+        
+        // 构建产品列表HTML
+        let html = '<div style="border: 1px solid #dee2e6;">';
+        filteredProducts.forEach((product, idx) => {
+            const timeStr = formatDateTime(product.completedTime);
+            html += `
+                <a href="#" class="product-code-link" 
+                   data-product-code="${product.code}" 
+                   data-product-index="${productIndex}" 
+                   data-emp-index="${empIndex}" 
+                   data-item-index="${idx}"
+                   style="display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0.5rem; font-size: 0.8rem; line-height: 1.3; border-bottom: 1px solid #dee2e6; text-decoration: none; background-color: white;">
+                    <strong style="color: #0066cc;">${product.code}</strong>
+                    <span class="text-muted" style="font-size: 0.75rem; white-space: nowrap;">
+                        <i class="bi bi-clock" style="font-size: 0.7rem;"></i>
+                        ${timeStr}
+                    </span>
+                </a>
+            `;
+        });
+        html += '</div>';
+        
+        productsListDiv.innerHTML = html;
+        
+        // 为每个产品编号添加点击事件和hover效果
+        filteredProducts.forEach((product, idx) => {
+            const link = productsListDiv.querySelector(`.product-code-link[data-item-index="${idx}"]`);
+            if (link) {
+                // 添加hover效果
+                link.addEventListener('mouseenter', (e) => {
+                    e.target.style.backgroundColor = '#e7f3ff';
+                });
+                link.addEventListener('mouseleave', (e) => {
+                    e.target.style.backgroundColor = 'white';
+                });
+                
+                // 添加点击事件
+                link.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // 显示工序详情弹窗
+                    showProductDetail(product.fullData);
+                    
+                    // 显示模态窗口
+                    const modal = document.getElementById('product-detail-modal');
+                    if (modal) {
+                        const bsModal = new bootstrap.Modal(modal);
+                        bsModal.show();
+                    }
+                });
+            }
+        });
+        
+    } catch (error) {
+        console.error('加载员工产品列表失败:', error);
+        productsListDiv.innerHTML = '<div class="text-center text-danger small py-2">加载失败，请重试</div>';
+    }
+}
+
+// 格式化日期时间
+function formatDateTime(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// 处理员工产品数量查询
+async function handleEmployeeProducts() {
+    // 加载小组数据到employee-group-select
+    await loadEmployeeGroups();
+    // 设置默认日期范围（当月）
+    setDefaultDateRange('employee-start-date', 'employee-end-date');
+    showScreen(SCREENS.EMPLOYEE_PRODUCTS);
+}
+
+// 加载员工查询的小组数据
+async function loadEmployeeGroups() {
+    try {
+        // 从API获取所有组别
+        const response = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!response.ok) {
+            throw new Error('获取组别数据失败');
+        }
+        
+        const data = await response.json();
+        const groups = data.groups || [];
+        
+        const groupSelect = document.getElementById('employee-group-select');
+        if (!groupSelect) {
+            console.error('找不到employee-group-select元素');
+            return;
+        }
+        
+        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        
+        // 只显示当前登录用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        groups.forEach(group => {
+            // 检查当前用户是否是该组的组长
+            const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
+            if (isLeader) {
+                const option = document.createElement('option');
+                option.value = group.group_name;  // 使用group_name作为value
+                option.setAttribute('data-group-name', group.group_name);
+                option.setAttribute('data-process-name', group.process_name);
+                option.textContent = `${group.group_name} - ${getProcessDisplayName(group.process_name)}`;
+                groupSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('加载小组数据失败:', error);
+        showToast('获取小组数据失败: ' + error.message, 'error');
+    }
+}
+
+// 查询员工产品数量
+async function queryEmployeeProducts() {
+    const groupSelect = document.getElementById('employee-group-select');
+    const groupName = groupSelect.value;
+    const employeeName = document.getElementById('employee-name').value.trim();
+    const startDate = document.getElementById('employee-start-date').value;
+    const endDate = document.getElementById('employee-end-date').value;
+    
+    if (!groupName) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        showToast('请选择日期范围', 'warning');
+        return;
+    }
+    
+    try {
+        // 获取选中的工序
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const processName = selectedOption.getAttribute('data-process-name');
+        
+        if (!processName) {
+            showToast('小组信息不完整', 'error');
+            return;
+        }
+        
+        // 调用组长汇总API
+        const requestBody = {
+            group_name: groupName,
+            process: processName,
+            requester_name: userState.fullName,
+            start_date: `${startDate}T00:00:00Z`,
+            end_date: `${endDate}T23:59:59Z`,
+            employee_name: employeeName || null  // 如果留空则查询全部
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/leader-summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '查询数据失败');
+                    }
+        
+        const data = await response.json();
+        
+        // 显示结果
+        displayEmployeeProductsResult(data, employeeName, groupName, processName, startDate, endDate);
+    } catch (error) {
+        console.error('查询失败:', error);
+        showToast('查询失败: ' + error.message, 'error');
+    }
+}
+
+// 显示员工产品数量结果
+function displayEmployeeProductsResult(data, employeeName, groupName, processName, startDate, endDate) {
+    const resultContainer = document.getElementById('employee-products-result');
+    
+    if (!data || !data.items || data.items.length === 0) {
+        resultContainer.innerHTML = '<div class="alert alert-info">该时间范围内没有找到产品数据</div>';
+        return;
+    }
+    
+    let html = `
+        <h4 class="mb-3">查询结果</h4>
+        <p><strong>小组:</strong> ${groupName} (${getProcessDisplayName(processName)})</p>
+        ${employeeName ? `<p><strong>员工:</strong> ${employeeName}</p>` : '<p><strong>范围:</strong> 全部员工</p>'}
+        <p><strong>日期范围:</strong> ${formatDate(startDate)} 至 ${formatDate(endDate)}</p>
+        <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th class="long-text">产品型号</th>
+                    ${employeeName ? '<th class="number-cell">该员工完成</th>' : ''}
+                    <th class="number-cell">小组总完成</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    let totalEmployeeCount = 0;
+    let totalGroupCount = 0;
+    
+    data.items.forEach(item => {
+        html += `
+            <tr>
+                <td class="long-text">${item.product_model}</td>
+                ${employeeName ? `<td class="number-cell">${item.employee_completed}</td>` : ''}
+                <td class="number-cell">${item.total_completed}</td>
+            </tr>
+        `;
+        totalEmployeeCount += item.employee_completed;
+        totalGroupCount += item.total_completed;
+    });
+    
+    html += `
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="long-text">总计</th>
+                    ${employeeName ? `<th class="number-cell">${totalEmployeeCount}</th>` : ''}
+                    <th class="number-cell">${totalGroupCount}</th>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+    `;
+    
+    resultContainer.innerHTML = html;
+}
+
+// 处理为新产品分配小组
+function handleAssignGroup() {
+    showScreen(SCREENS.ASSIGN_GROUP);
+}
+
+// 加载产品型号和小组数据
+async function loadProductModelsAndGroups() {
+    const processType = document.getElementById('process-type-select').value;
+    
+    if (!processType) {
+        return;
+    }
+    
+    try {
+        // 加载未分配小组的产品型号
+        const productResponse = await fetch(`${API_BASE_URL}/group-management/unassigned-products?process=${encodeURIComponent(processType)}`);
+        if (!productResponse.ok) {
+            throw new Error('获取产品型号数据失败');
+        }
+        
+        const products = await productResponse.json();
+        const productSelect = document.getElementById('product-model-select');
+        productSelect.innerHTML = '';
+        
+        if (!products || products.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '该工序暂无未分配的产品型号';
+            option.disabled = true;
+            productSelect.appendChild(option);
+        } else {
+            products.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.model;
+                option.textContent = product.model;
+            productSelect.appendChild(option);
+        });
+        }
+        
+        // 加载该工序下所有小组（只显示当前用户作为组长的小组）
+        const groupResponse = await fetch(`${API_BASE_URL}/groups?active_only=true`);
+        if (!groupResponse.ok) {
+            throw new Error('获取小组数据失败');
+        }
+        
+        const groupData = await groupResponse.json();
+        const allGroups = groupData.groups || [];
+        
+        // 获取当前用户作为组长的小组
+        const userGroups = await getLeaderGroups();
+        
+        const groupSelect = document.getElementById('assign-group-select');
+        groupSelect.innerHTML = '<option value="" selected>请选择小组</option>';
+        
+        // 只显示该工序下，且当前用户是组长的小组
+        allGroups.forEach(group => {
+            if (group.process_name === processType) {
+                const isLeader = userGroups.some(ug => ug.group_name === group.group_name);
+                if (isLeader) {
+            const option = document.createElement('option');
+            option.value = group.group_name;  // 使用group_name作为value
+                    option.setAttribute('data-group-name', group.group_name);
+                    option.textContent = group.group_name;
+            groupSelect.appendChild(option);
+                }
+            }
+        });
+        
+        if (groupSelect.options.length === 1) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '您不是该工序任何小组的组长';
+            option.disabled = true;
+            groupSelect.appendChild(option);
+        }
+    } catch (error) {
+        console.error('加载数据失败:', error);
+        showToast('加载数据失败: ' + error.message, 'error');
+    }
+}
+
+// 提交小组分配
+async function submitGroupAssignment() {
+    const productSelect = document.getElementById('product-model-select');
+    const groupSelect = document.getElementById('assign-group-select');
+    const processType = document.getElementById('process-type-select').value;
+    
+    // 获取所有选中的产品型号
+    const selectedOptions = Array.from(productSelect.selectedOptions);
+    const productModels = selectedOptions.map(opt => opt.value).filter(v => v);
+    
+    if (productModels.length === 0) {
+        showToast('请选择至少一个产品型号', 'warning');
+        return;
+    }
+    
+    const groupName = groupSelect.value;
+    if (!groupName) {
+        showToast('请选择小组', 'warning');
+        return;
+    }
+    
+    try {
+        // 使用严格分配API
+        const requestBody = {
+            group_name: groupName,
+            process: processType,
+            product_models: productModels,
+            requester_name: userState.fullName
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/group-management/assign-secure`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '分配失败');
+        }
+        
+        const data = await response.json();
+        
+        // 显示分配结果
+            const resultElement = document.getElementById('assign-group-result');
+        resultElement.classList.remove('d-none');
+        
+        let html = '<div class="alert alert-success"><h5>分配结果</h5><ul>';
+        let successCount = 0;
+        let failCount = 0;
+        
+        data.results.forEach(result => {
+            if (result.success) {
+                successCount++;
+                html += `<li class="text-success">✓ ${result.product_model}: ${result.action === 'created' ? '新分配' : '更新分配'}</li>`;
+        } else {
+                failCount++;
+                html += `<li class="text-danger">✗ ${result.product_model}: ${result.error}</li>`;
+            }
+        });
+        
+        html += `</ul><p><strong>成功: ${successCount}, 失败: ${failCount}</strong></p></div>`;
+        resultElement.innerHTML = html;
+        
+        // 重新加载产品型号列表
+        await loadProductModelsAndGroups();
+        
+        if (successCount > 0) {
+            showToast(`成功分配 ${successCount} 个产品型号`, 'success');
+        }
+    } catch (error) {
+        console.error('分配失败:', error);
+        const resultElement = document.getElementById('assign-group-result');
+        resultElement.innerHTML = `<div class="alert alert-danger">分配失败: ${error.message}</div>`;
+        resultElement.classList.remove('d-none');
+        showToast('分配失败: ' + error.message, 'error');
+    }
+}
+
+// 处理查看已分配
+async function handleViewAssigned() {
+    const processSelect = document.getElementById('process-type-select');
+    const processName = processSelect.value;
+    const groupSelect = document.getElementById('assign-group-select');
+    const groupName = groupSelect.value; // 可能为空
+    
+    if (!processName) {
+        showToast('请先选择工序', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('正在加载已分配列表...', 'info');
+        
+        // 获取已分配的产品列表
+        const response = await fetch(`${API_BASE_URL}/group-management/assigned-products?process=${encodeURIComponent(processName)}`);
+        
+        if (!response.ok) {
+            throw new Error('获取已分配列表失败');
+        }
+        
+        const assignments = await response.json();
+        displayAssignedList({assignments: assignments}, processName, groupName);
+        
+    } catch (error) {
+        console.error('获取已分配列表失败:', error);
+        showToast('获取已分配列表失败: ' + error.message, 'error');
+    }
+}
+
+// 显示已分配列表
+function displayAssignedList(data, processName, groupName = '') {
+    const container = document.getElementById('assigned-list-container');
+    const listDiv = document.getElementById('assigned-list');
+    
+    if (!data || !data.assignments || data.assignments.length === 0) {
+        listDiv.innerHTML = '<div class="alert alert-info">该工序暂无已分配的产品型号</div>';
+        container.classList.remove('d-none');
+        return;
+    }
+    
+    // 如果选择了小组，则筛选该小组的数据
+    let filteredAssignments = data.assignments;
+    if (groupName && groupName.trim() !== '') {
+        filteredAssignments = data.assignments.filter(item => item.group_name === groupName);
+    }
+    
+    if (filteredAssignments.length === 0) {
+        const message = groupName ? `小组 ${groupName} 暂无已分配的产品型号` : '该工序暂无已分配的产品型号';
+        listDiv.innerHTML = `<div class="alert alert-info">${message}</div>`;
+        container.classList.remove('d-none');
+        return;
+    }
+    
+    // 添加全选操作区域（移除批量删除按钮，将移到底部）
+    const groupInfo = groupName ? ` - ${groupName}` : '';
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-2" style="padding: 0.5rem; background-color: #f8f9fa; border-radius: 0.25rem;">
+            <div class="form-check" style="margin: 0;">
+                <input class="form-check-input" type="checkbox" id="select-all-assignments" style="margin-top: 0;">
+                <label class="form-check-label" for="select-all-assignments" style="font-size: 0.9rem;">
+                    全选${groupInfo}
+                </label>
+            </div>
+            <span id="selected-count-display" style="font-size: 0.85rem; color: #6c757d;">已选: <span id="selected-count">0</span></span>
+        </div>
+    `;
+    
+    filteredAssignments.forEach(item => {
+        const timeStr = new Date(item.assigned_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        html += `
+            <div class="list-group-item" style="padding: 0.4rem 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.3rem; overflow: hidden;">
+                    <input class="form-check-input assignment-checkbox" type="checkbox" 
+                           data-assignment-id="${item.id}"
+                           data-product-model="${item.product_model}"
+                           data-group-name="${item.group_name}"
+                           style="flex-shrink: 0; margin: 0; width: 16px; height: 16px;">
+                    <span style="font-weight: 600; font-size: 0.85rem; flex-shrink: 0;">${item.product_model}</span>
+                    <span style="font-size: 0.75rem; color: #6c757d; flex-shrink: 0;">→</span>
+                    <span style="font-size: 0.8rem; font-weight: 500; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.group_name}</span>
+                    <span style="font-size: 0.7rem; color: #999; flex-shrink: 0; margin-left: auto;">${timeStr}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    listDiv.innerHTML = html;
+    container.classList.remove('d-none');
+    
+    // 绑定全选功能
+    const selectAllCheckbox = document.getElementById('select-all-assignments');
+    const assignmentCheckboxes = document.querySelectorAll('.assignment-checkbox');
+    const batchDeleteBtn = document.getElementById('batch-delete-btn');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const selectedCountBtnSpan = document.getElementById('selected-count-btn');
+    
+    function updateSelectedCount() {
+        const checkedBoxes = document.querySelectorAll('.assignment-checkbox:checked');
+        const count = checkedBoxes.length;
+        selectedCountSpan.textContent = count;
+        if (selectedCountBtnSpan) {
+            selectedCountBtnSpan.textContent = count;
+        }
+        batchDeleteBtn.disabled = count === 0;
+    }
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        assignmentCheckboxes.forEach(cb => cb.checked = this.checked);
+        updateSelectedCount();
+    });
+    
+    assignmentCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+    
+    // 绑定批量删除按钮
+    batchDeleteBtn.addEventListener('click', function() {
+        const checkedBoxes = Array.from(document.querySelectorAll('.assignment-checkbox:checked'));
+        if (checkedBoxes.length === 0) return;
+        
+        const items = checkedBoxes.map(cb => ({
+            id: cb.getAttribute('data-assignment-id'),
+            model: cb.getAttribute('data-product-model'),
+            group: cb.getAttribute('data-group-name')
+        }));
+        
+        handleBatchDeleteAssignment(items, processName);
+    });
+}
+
+// 处理批量删除分配
+async function handleBatchDeleteAssignment(items, processName) {
+    const modelList = items.map(item => `"${item.model}"`).join('、');
+    if (!confirm(`确定要删除以下 ${items.length} 个型号的分配吗？\n\n${modelList}\n\n删除后这些型号将重新出现在未分配列表中。`)) {
+        return;
+    }
+    
+    try {
+        showToast(`正在删除 ${items.length} 个分配...`, 'info');
+        
+        let successCount = 0;
+        let failCount = 0;
+        
+        // 依次删除每个分配
+        for (const item of items) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/group-management/assignments/${item.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (error) {
+                console.error(`删除 ${item.model} 失败:`, error);
+                failCount++;
+            }
+        }
+        
+        if (successCount > 0) {
+            showToast(`成功删除 ${successCount} 个分配${failCount > 0 ? `，失败 ${failCount} 个` : ''}`, 'success');
+        } else {
+            showToast('删除失败', 'error');
+        }
+        
+        // 刷新已分配列表
+        handleViewAssigned();
+        
+        // 刷新未分配列表
+        loadProductModelsAndGroups();
+        
+    } catch (error) {
+        console.error('批量删除失败:', error);
+        showToast('批量删除失败: ' + error.message, 'error');
+    }
+}
+
+// 辅助函数
+function getProcessDisplayName(processName) {
+    const processMap = {
+        'wiring': '绕线',
+        'embedding': '嵌线',
+        'connecting': '接线',
+        'pressing': '压装',
+        'turning': '车止口',
+        'dipping': '浸漆'
+    };
+    return processMap[processName] || processName;
+}
+
+function getEmployeeFieldByProcess(processName) {
+    const fieldMap = {
+        'wiring': '绕线员工',
+        'embedding': '嵌线员工',
+        'connecting': '接线员工',
+        'pressing': '压装员工',
+        'turning': '车止口员工',
+        'dipping': '浸漆员工'
+    };
+    return fieldMap[processName] || '';
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+}
+
+// 单次扫码工序按钮
+    document.querySelectorAll('.process-btn').forEach(btn => {
+        if (btn && typeof btn.addEventListener === 'function') {
+            btn.addEventListener('click', function() {
+                const processType = this.getAttribute('data-process');
+                scanState.processType = processType;
+                scanState.isContinuous = false;
+                startScan(processType, false);
+            });
+        }
     });
     
     // 连续扫码工序按钮
     document.querySelectorAll('.process-btn-continuous').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const processType = this.getAttribute('data-process');
-            scanState.processType = processType;
-            scanState.isContinuous = true;
-            startScan(processType, true);
-        });
+        if (btn && typeof btn.addEventListener === 'function') {
+            btn.addEventListener('click', function() {
+                const processType = this.getAttribute('data-process');
+                scanState.processType = processType;
+                scanState.isContinuous = true;
+                startScan(processType, true);
+            });
+        }
     });
     
-    // 返回按钮
-    document.getElementById('single-scan-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('continuous-scan-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('query-back').addEventListener('click', () => showScreen(SCREENS.HOME));
-    document.getElementById('models-back').addEventListener('click', () => showScreen(SCREENS.QUERY));
-    document.getElementById('products-back').addEventListener('click', () => showScreen(SCREENS.MODELS));
+    // 返回按钮（安全绑定）
+    onId('single-scan-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('continuous-scan-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('query-back', 'click', () => showScreen(SCREENS.HOME));
+    onId('models-back', 'click', () => showScreen(SCREENS.QUERY));
+    onId('products-back', 'click', () => showScreen(SCREENS.MODELS));
     
-    // 扫码相关
-    document.getElementById('scan-stop').addEventListener('click', stopScan);
-    document.getElementById('scan-upload').addEventListener('click', uploadPendingCodes);
+    // 扫码相关（安全绑定）
+    onId('scan-stop', 'click', stopScan);
+    onId('scan-upload', 'click', uploadPendingCodes);
     
     // 添加扫码枪/手动录入按钮事件
     addManualScanEvent();
@@ -275,6 +2196,11 @@ function navigateToHome() {
         if (userFullnameElement) {
             userFullnameElement.textContent = `用户: ${userState.fullName || '未登录'}`;
         }
+        // 清空用户角色显示（不需要显示任何内容）
+        const userRoleElement = document.getElementById('user-role');
+        if (userRoleElement) {
+            userRoleElement.textContent = '';
+        }
         // 在主页上方添加工序提醒条
         showProcessWarning();
         // 显示主屏幕
@@ -328,41 +2254,55 @@ function showProcessWarning() {
 function showScreen(screenId) {
     try {
         console.log('切换到页面:', screenId);
-        
-        // 隐藏所有屏幕
+
+        // 隐藏所有屏幕（容错：屏幕不存在则跳过）
         Object.values(SCREENS).forEach(id => {
-            document.getElementById(id).classList.add('d-none');
+            const el = document.getElementById(id);
+            if (el && el.classList) {
+                el.classList.add('d-none');
+            } else {
+                console.warn('[screen-miss]', id);
+            }
         });
-        
-        // 显示目标屏幕
-        document.getElementById(screenId).classList.remove('d-none');
-        
+
+        // 显示目标屏幕（容错：目标不存在则回退首页）
+        const targetEl = document.getElementById(screenId);
+        if (targetEl && targetEl.classList) {
+            targetEl.classList.remove('d-none');
+        } else {
+            console.error('[screen-target-miss]', screenId);
+            const homeEl = document.getElementById(SCREENS.HOME);
+            if (homeEl && homeEl.classList) {
+                homeEl.classList.remove('d-none');
+            }
+        }
+
         // 隐藏所有模态框
         hideAllModals();
-        
+
         // 如果切换回首页，停止扫码并刷新今日工序数量
         if (screenId === SCREENS.HOME) {
             if (scanState.currentHtml5QrScanner) {
-            stopScanner();
+                stopScanner();
             }
             setTimeout(refreshTodayProcessCount, 0);
         }
-        
+
         // 在查询页面隐藏浮动工序框，其他页面显示
         const floatingProcessEl = document.getElementById('floating-process');
         if (floatingProcessEl) {
-            if (screenId === SCREENS.QUERY || 
-                screenId === SCREENS.MODELS || 
+            if (screenId === SCREENS.QUERY ||
+                screenId === SCREENS.MODELS ||
                 screenId === SCREENS.PRODUCTS ||
                 screenId === SCREENS.DELETE_RECORDS) {
                 floatingProcessEl.style.display = 'none';
             } else {
                 floatingProcessEl.style.display = 'block';
             }
-        } else if (screenId !== SCREENS.QUERY && 
-                  screenId !== SCREENS.MODELS && 
-                  screenId !== SCREENS.PRODUCTS &&
-                  screenId !== SCREENS.DELETE_RECORDS) {
+        } else if (screenId !== SCREENS.QUERY &&
+                   screenId !== SCREENS.MODELS &&
+                   screenId !== SCREENS.PRODUCTS &&
+                   screenId !== SCREENS.DELETE_RECORDS) {
             // 创建浮动工序名称框（如果不存在）
             createFloatingProcess();
         }
@@ -370,6 +2310,7 @@ function showScreen(screenId) {
         console.error('切换屏幕失败:', error);
     }
 }
+
 
 // 隐藏所有模态框
 function hideAllModals() {
@@ -813,37 +2754,82 @@ async function onScanSuccess(decodedText, decodedResult, showSuccessToast = true
                     });
                 }, 1000);
             } else if (result === 'duplicate') {
-                // 单次扫码遇到已存在记录：弹出阻塞确认模态，不返回主页
+                // 单次扫码遇到已存在记录：先判断是否为当前用户自己录入
                 playErrorSound();
                 try {
-                    // 在模态确认之前，不可再次处理扫码
                     scanState.isProcessing = true;
-                    const msgEl = document.getElementById('duplicate-record-message');
-                    if (msgEl) {
-                        const processName = getChineseProcessName(scanState.processType);
-                        msgEl.textContent = `${processName}已存在，编号 ${normalized} 已录入，是否知悉？`;
-                    }
-                    const modalEl = document.getElementById('duplicate-record-modal');
-                    if (modalEl) {
-                        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-                        // 绑定确认按钮关闭
-                        const confirmBtn = document.getElementById('duplicate-record-confirm');
-                        if (confirmBtn && !confirmBtn.dataset.bound) {
-                            confirmBtn.addEventListener('click', () => {
-                                modal.hide();
-                                // 确认后恢复处理能力，保持在当前页面
-                                setTimeout(() => { scanState.isProcessing = false; }, 100);
-                            });
-                            confirmBtn.dataset.bound = '1';
+                    let isOwn = false;
+                    try {
+                        const details = await getProductDetails(normalized);
+                        if (details) {
+                            const { employeeField } = getProcessFields(scanState.processType);
+                            const dbName = (details[employeeField] || '').replace(/\s+/g, '').trim();
+                            const userName = (userState.fullName || '').replace(/\s+/g, '').trim();
+                            isOwn = !!dbName && !!userName && (dbName === userName);
                         }
-                        modal.show();
+                    } catch (e) {
+                        console.warn('判断是否本人录入失败，按非本人处理:', e);
+                    }
+
+                    if (isOwn) {
+                        // 自己录入：不弹阻塞窗，仅提示
+                        showToast('该产品该工序已由你录入，无需重复', 'warning');
+                        setTimeout(() => { scanState.isProcessing = false; }, 200);
                     } else {
-                        // 兜底：如果模态不存在，使用普通提示但不返回主页
-                        showToast('该产品的该工序已存在，请勿重复扫码', 'error');
-                        setTimeout(() => { scanState.isProcessing = false; }, 300);
+                        // 非本人：弹出需点击关闭的阻塞模态
+                        const msgEl = document.getElementById('duplicate-record-message');
+                        if (msgEl) {
+                            const processName = getChineseProcessName(scanState.processType);
+                            msgEl.innerHTML = `编号 <b>${normalized}</b> 的 <b>${processName}</b> 已存在记录。<br><span class="text-danger">注意：本次扫码不会计入当前登录人账目，即为如果继续使用此二维码，这台活儿白干。</span>`;
+                        }
+                        const modalEl = document.getElementById('duplicate-record-modal');
+                        console.debug('[duplicate-modal] modalEl found?', !!modalEl);
+                        if (modalEl) {
+                            let modal;
+                            try {
+                                modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+                            } catch (e) {
+                                console.warn('[duplicate-modal] 获取Bootstrap实例失败，使用退化显示方式', e);
+                            }
+                            const confirmBtn = document.getElementById('duplicate-record-confirm');
+                            if (confirmBtn) {
+                                const newBtn = confirmBtn.cloneNode(true);
+                                confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+                                newBtn.addEventListener('click', () => {
+                                    try { modal && modal.hide(); } catch (_) {}
+                                    try {
+                                        modalEl.classList.remove('show');
+                                        modalEl.style.display = 'none';
+                                        document.body.classList.remove('modal-open');
+                                        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                                    } catch(_) {}
+                                    setTimeout(() => { scanState.isProcessing = false; }, 100);
+                                });
+                            }
+                            try {
+                                if (modal) {
+                                    modal.show();
+                                } else {
+                                    modalEl.style.display = 'block';
+                                    modalEl.classList.add('show');
+                                    const backdrop = document.createElement('div');
+                                    backdrop.className = 'modal-backdrop fade show';
+                                    document.body.appendChild(backdrop);
+                                    document.body.classList.add('modal-open');
+                                }
+                                console.debug('[duplicate-modal] 显示完成');
+                            } catch (showErr) {
+                                console.error('[duplicate-modal] 显示失败：', showErr);
+                                showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+                                setTimeout(() => { scanState.isProcessing = false; }, 300);
+                            }
+                        } else {
+                            showToast('该产品的该工序已存在，请勿重复扫码', 'error');
+                            setTimeout(() => { scanState.isProcessing = false; }, 300);
+                        }
                     }
                 } catch (e) {
-                    console.error('显示重复提示失败:', e);
+                    console.error('处理重复逻辑失败:', e);
                     setTimeout(() => { scanState.isProcessing = false; }, 300);
                 }
                 // 保持在单次扫码界面
@@ -1190,6 +3176,10 @@ async function updateProductProcess(productCode, processType, employeeName, show
             console.error('解析响应失败:', e);
             return { success: false, error: '网络错误' };
         });
+        // 记录最近一次响应，便于弹窗读取已有员工与时间
+        window.__lastUpdateProcessResponseStatus = response.status;
+        window.__lastUpdateProcessResult = result;
+        console.debug('[updateProductProcess] status=', response.status, 'result=', result);
         
         // 不再检查response.ok，而是检查返回的result对象
         if (result.success) {
@@ -1224,9 +3214,9 @@ async function updateProductProcess(productCode, processType, employeeName, show
         }
         
         // 检查是否是"已存在数据"的错误（兼容detail或error字段）
-        if ((result.error && result.error.includes('该产品的该工序已存在数据，不能覆盖')) ||
-            (result.detail && String(result.detail).includes('该产品的该工序已存在数据，不能覆盖'))) {
-            console.log('检测到重复记录错误，将触发模态框');
+        if ((result && result.error && String(result.error).includes('该产品的该工序已存在数据，不能覆盖')) ||
+            (result && result.detail && String(result.detail).includes('该产品的该工序已存在数据，不能覆盖'))) {
+            console.log('[updateProductProcess] 检测到重复记录错误，将触发模态框');
             return 'duplicate'; // 返回特殊值表示重复记录
         }
         
@@ -2516,20 +4506,243 @@ async function handleDeleteRecords() {
             return;
         }
         
-        // 构建HTML表格 - 与台账查询页面相同的表格样式
+        // 构建HTML表格 - 优化响应式设计和美化样式
         let html = `
-            <div class="table-responsive mb-5 pb-5"> <!-- 添加底部间距，避免按钮遮挡内容 -->
-                <table class="table table-striped table-bordered table-sm">
-                    <thead class="table-dark">
-                        <tr>
-                            <th scope="col" width="40px"></th>
-                            <th scope="col">工序</th>
-                            <th scope="col">产品编码</th>
-                            <th scope="col">型号</th>
-                            <th scope="col">时间</th>
-                        </tr>
-                    </thead>
-                    <tbody id="records-tbody">
+            <style>
+                /* 删除记录表格专用样式 */
+                .delete-records-container {
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border-radius: 12px;
+                    padding: 20px;
+                    margin: 10px 0;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                    width: 100%;
+                    max-width: none;
+                }
+                
+                .delete-records-table {
+                    background: white;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    margin-bottom: 0;
+                    width: 100%;
+                    table-layout: fixed;
+                }
+                
+                .delete-records-table thead th {
+                    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+                    color: white;
+                    font-weight: 600;
+                    text-align: center;
+                    border: none;
+                    padding: 12px 8px;
+                    font-size: 0.95rem;
+                    white-space: nowrap;
+                }
+                
+                .delete-records-table tbody tr {
+                    transition: all 0.2s ease;
+                    border-bottom: 1px solid #e9ecef;
+                }
+                
+                .delete-records-table tbody tr:hover {
+                    background-color: #f8f9fa;
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                
+                .delete-records-table tbody tr:last-child {
+                    border-bottom: none;
+                }
+                
+                .delete-records-table td {
+                    padding: 12px 8px;
+                    vertical-align: middle;
+                    text-align: center;
+                    border: none;
+                    font-size: 0.9rem;
+                    word-wrap: break-word;
+                }
+                
+                /* 列宽度分配 */
+                .delete-records-table th:nth-child(1),
+                .delete-records-table td:nth-child(1) {
+                    width: 8%;
+                    min-width: 50px;
+                }
+                
+                .delete-records-table th:nth-child(2),
+                .delete-records-table td:nth-child(2) {
+                    width: 15%;
+                    min-width: 80px;
+                }
+                
+                .delete-records-table th:nth-child(3),
+                .delete-records-table td:nth-child(3) {
+                    width: 25%;
+                    min-width: 120px;
+                }
+                
+                .delete-records-table th:nth-child(4),
+                .delete-records-table td:nth-child(4) {
+                    width: 20%;
+                    min-width: 100px;
+                }
+                
+                .delete-records-table th:nth-child(5),
+                .delete-records-table td:nth-child(5) {
+                    width: 32%;
+                    min-width: 140px;
+                }
+                
+                .delete-records-table .record-checkbox {
+                    width: 18px;
+                    height: 18px;
+                    cursor: pointer;
+                    transform: scale(1.2);
+                }
+                
+                .delete-records-table .record-checkbox:checked {
+                    accent-color: #dc3545;
+                }
+                
+                /* 工序列样式 */
+                .delete-records-table .process-cell {
+                    font-weight: 600;
+                    color: #495057;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
+                    padding: 6px 8px;
+                    margin: 2px 0;
+                    display: inline-block;
+                }
+                
+                /* 产品编码列样式 */
+                .delete-records-table .product-code-cell {
+                    font-family: 'Courier New', monospace;
+                    font-weight: 500;
+                    color: #0d6efd;
+                    word-break: break-all;
+                }
+                
+                /* 型号列样式 */
+                .delete-records-table .model-cell {
+                    font-weight: 500;
+                    color: #28a745;
+                    word-break: break-word;
+                }
+                
+                /* 时间列样式 - 优化显示，避免换行 */
+                .delete-records-table .time-cell {
+                    color: #6c757d;
+                    font-size: 0.85rem;
+                    white-space: nowrap;
+                    font-family: 'Courier New', monospace;
+                }
+                
+                /* 响应式设计优化 */
+                @media (max-width: 768px) {
+                    .delete-records-container {
+                        padding: 15px;
+                        margin: 5px 0;
+                    }
+                    
+                    .delete-records-table {
+                        font-size: 0.85rem;
+                    }
+                    
+                    .delete-records-table thead th {
+                        font-size: 0.8rem;
+                        padding: 8px 4px;
+                    }
+                    
+                    .delete-records-table td {
+                        font-size: 0.75rem;
+                        padding: 8px 4px;
+                    }
+                    
+                    .delete-records-table .time-cell {
+                        font-size: 0.7rem;
+                    }
+                    
+                    .delete-records-table .record-checkbox {
+                        transform: scale(1.1);
+                    }
+                }
+                
+                @media (max-width: 576px) {
+                    .delete-records-container {
+                        padding: 10px;
+                        border-radius: 8px;
+                    }
+                    
+                    .delete-records-table thead th {
+                        font-size: 0.75rem;
+                        padding: 6px 2px;
+                    }
+                    
+                    .delete-records-table td {
+                        font-size: 0.7rem;
+                        padding: 6px 2px;
+                    }
+                    
+                    .delete-records-table .time-cell {
+                        font-size: 0.65rem;
+                    }
+                    
+                    /* 在超小屏幕上调整列宽 */
+                    .delete-records-table th:nth-child(1),
+                    .delete-records-table td:nth-child(1) {
+                        width: 10%;
+                    }
+                    
+                    .delete-records-table th:nth-child(2),
+                    .delete-records-table td:nth-child(2) {
+                        width: 18%;
+                    }
+                    
+                    .delete-records-table th:nth-child(3),
+                    .delete-records-table td:nth-child(3) {
+                        width: 28%;
+                    }
+                    
+                    .delete-records-table th:nth-child(4),
+                    .delete-records-table td:nth-child(4) {
+                        width: 20%;
+                    }
+                    
+                    .delete-records-table th:nth-child(5),
+                    .delete-records-table td:nth-child(5) {
+                        width: 24%;
+                    }
+                }
+                
+                /* 加载动画 */
+                .delete-records-loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: #6c757d;
+                }
+                
+                .delete-records-loading .spinner-border {
+                    width: 3rem;
+                    height: 3rem;
+                    border-width: 0.3em;
+                }
+            </style>
+            <div class="table-responsive mb-5 pb-5">
+                <table class="table delete-records-table">
+                        <thead>
+                            <tr>
+                                 <th scope="col"></th>
+                                 <th scope="col">工序</th>
+                                 <th scope="col">产品编码</th>
+                                 <th scope="col">型号</th>
+                                 <th scope="col">时间</th>
+                             </tr>
+                        </thead>
+                        <tbody id="records-tbody">
         `;
         
         // 按时间排序（最新的在前）
@@ -2543,10 +4756,10 @@ async function handleDeleteRecords() {
             html += `
                 <tr data-id="${record.id || Math.random().toString(36).substring(2, 10)}">
                     <td><input type="checkbox" class="record-checkbox" data-id="${record.id || Math.random().toString(36).substring(2, 10)}"></td>
-                    <td>${record.process}</td>
-                    <td>${record.productCode}</td>
-                    <td>${record.model}</td>
-                    <td>${formattedDate}</td>
+                    <td><span class="process-cell">${record.process}</span></td>
+                    <td class="product-code-cell">${record.productCode}</td>
+                    <td class="model-cell">${record.model}</td>
+                    <td class="time-cell">${formattedDate}</td>
                 </tr>
             `;
         });
