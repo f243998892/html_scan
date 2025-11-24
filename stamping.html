@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冲床计数实时监控 v2.0</title>
+    
+    <!-- 禁止缓存 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Bootstrap CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    
+    <style>
+        body {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .header-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            margin: 0;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            min-width: 120px;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .device-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .device-card.status-running {
+            border-left: 5px solid #28a745;
+        }
+        
+        .device-card.status-stopped {
+            border-left: 5px solid #dc3545;
+        }
+        
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .device-id {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .device-status {
+            font-size: 1rem;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        
+        .status-running-badge {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-stopped-badge {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .big-number {
+            font-size: 3.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            color: #667eea;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .device-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .alert-section {
+            margin-top: 20px;
+        }
+        
+        .alert-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .alert-danger {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        
+        .alert-warning {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+        
+        .alert-success {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 50px;
+            color: white;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        .no-devices {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .refresh-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            font-size: 0.85rem;
+            z-index: 1000;
+        }
+        
+        .refresh-indicator.active {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        .error-message {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            color: #dc3545;
+            margin: 20px 0;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header-title {
+                font-size: 1.5rem;
+            }
+            
+            .big-number {
+                font-size: 2.5rem;
+            }
+            
+            .device-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .device-status {
+                margin-top: 10px;
+            }
+        }
+        
+        /* 暗色主题 */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #2d3561 0%, #4a2c5a 100%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 刷新指示器 -->
+    <div class="refresh-indicator" id="refreshIndicator">
+        <i class="bi bi-arrow-clockwise"></i> <span id="refreshText">正在加载...</span>
+    </div>
+
+    <div class="container-fluid" style="max-width: 1400px;">
+        <!-- 顶部标题和统计 -->
+        <div class="header-section">
+            <h1 class="header-title">
+                🔨 冲床计数实时监控
+            </h1>
+            <div class="stats-row" id="statsRow">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalDevices">-</div>
+                    <div class="stat-label">设备总数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="runningDevices">-</div>
+                    <div class="stat-label">运行中</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="stoppedDevices">-</div>
+                    <div class="stat-label">已停机</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="totalCountToday">-</div>
+                    <div class="stat-label">今日总冲次</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 报警区域 -->
+        <div class="alert-section" id="alertsContainer"></div>
+        
+        <!-- 设备列表 -->
+        <div id="devicesContainer">
+            <div class="loading-spinner">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-3">正在加载设备数据...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 自定义JS -->
+    <script>
+        const API_BASE = '/api/stamping';
+        let isLoading = false;
+        let lastUpdateTime = null;
+        
+        // 格式化时间
+        function formatTime(seconds) {
+            if (seconds < 60) return `${seconds}秒`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟`;
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            return `${hours}小时${mins}分钟`;
+        }
+        
+        // 格式化数字（千位分隔）
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // 加载数据
+        async function loadData() {
+            if (isLoading) return;
+            isLoading = true;
+            
+            const refreshIndicator = document.getElementById('refreshIndicator');
+            const refreshText = document.getElementById('refreshText');
+            refreshIndicator.classList.add('active');
+            refreshText.textContent = '正在刷新...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/monitor/realtime`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    renderDevices(data.devices);
+                    updateStats(data.devices);
+                    await loadAlerts();
+                    lastUpdateTime = new Date();
+                    refreshText.textContent = `更新于 ${lastUpdateTime.toLocaleTimeString()}`;
+                } else {
+                    showError('数据加载失败: ' + (data.message || '未知错误'));
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                showError('无法连接到服务器，请检查网络连接');
+            } finally {
+                isLoading = false;
+                refreshIndicator.classList.remove('active');
+            }
+        }
+        
+        // 加载报警信息
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/monitor/alerts`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    renderAlerts(data.alerts || []);
+                }
+            } catch (error) {
+                console.error('加载报警失败:', error);
+            }
+        }
+        
+        // 渲染设备列表
+        function renderDevices(devices) {
+            const container = document.getElementById('devicesContainer');
+            
+            if (!devices || devices.length === 0) {
+                container.innerHTML = `
+                    <div class="no-devices">
+                        <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                        <h3 class="mt-3">暂无设备数据</h3>
+                        <p class="text-muted">请确认ESP32已连接并上传数据</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = devices.map(device => {
+                const isRunning = device.is_running;
+                const statusClass = isRunning ? 'status-running' : 'status-stopped';
+                const badgeClass = isRunning ? 'status-running-badge' : 'status-stopped-badge';
+                const statusIcon = isRunning ? '🟢' : '🔴';
+                const statusText = isRunning ? '运行中' : '已停机';
+                
+                return `
+                    <div class="device-card ${statusClass}">
+                        <div class="device-header">
+                            <div>
+                                <div class="device-id">${device.device_id}</div>
+                                <small class="text-muted">${device.device_name || '冲床设备'}</small>
+                            </div>
+                            <div class="device-status ${badgeClass}">
+                                ${statusIcon} ${statusText}
+                            </div>
+                        </div>
+                        
+                        <div class="big-number">
+                            ${formatNumber(device.counts.today)}
+                        </div>
+                        <div class="text-center text-muted mb-3">今日冲次</div>
+                        
+                        <div class="device-info">
+                            <div class="info-item">
+                                <div class="info-label">当前频率</div>
+                                <div class="info-value">${device.frequency.per_minute.toFixed(1)} 次/分</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">累计总数</div>
+                                <div class="info-value">${formatNumber(device.counts.total)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">空闲时间</div>
+                                <div class="info-value">${formatTime(device.idle_duration)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">平均频率</div>
+                                <div class="info-value">${device.frequency.per_hour.toFixed(0)} 次/时</div>
+                            </div>
+                        </div>
+                        
+                        ${device.current.employee || device.current.model ? `
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <small class="text-muted">
+                                    ${device.current.employee ? `👤 ${device.current.employee}` : ''}
+                                    ${device.current.model ? `📦 ${device.current.model}` : ''}
+                                </small>
+                            </div>
+                        ` : ''}
+                        
+                        ${device.last_stamping_time ? `
+                            <div class="text-center mt-2">
+                                <small class="text-muted">
+                                    最后冲压: ${new Date(device.last_stamping_time).toLocaleString()}
+                                </small>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="text-center mt-3">
+                            <button class="btn btn-sm btn-outline-warning" onclick="testStopAlert('${device.device_id}')">
+                                <i class="bi bi-bell"></i> 测试停机通知
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 更新统计数据
+        function updateStats(devices) {
+            const total = devices.length;
+            const running = devices.filter(d => d.is_running).length;
+            const stopped = total - running;
+            const totalCount = devices.reduce((sum, d) => sum + d.counts.today, 0);
+            
+            document.getElementById('totalDevices').textContent = total;
+            document.getElementById('runningDevices').textContent = running;
+            document.getElementById('stoppedDevices').textContent = stopped;
+            document.getElementById('totalCountToday').textContent = formatNumber(totalCount);
+        }
+        
+        // 渲染报警信息
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alertsContainer');
+            
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = `
+                    <div class="alert-card alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <strong>所有设备运行正常</strong>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <h4 class="text-white mb-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i> 设备报警 (${alerts.length})
+                </h4>
+                ${alerts.map(alert => {
+                    const alertClass = alert.severity === 'high' ? 'alert-danger' : 'alert-warning';
+                    const icon = alert.severity === 'high' ? 'bi-x-circle-fill' : 'bi-exclamation-circle-fill';
+                    
+                    return `
+                        <div class="alert-card ${alertClass}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <i class="bi ${icon} me-2"></i>
+                                    <strong>${alert.device_id}</strong>
+                                    <p class="mb-0 mt-1">${alert.message}</p>
+                                </div>
+                                <small class="text-muted">${new Date(alert.timestamp).toLocaleString()}</small>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        }
+        
+        // 测试停机通知
+        async function testStopAlert(deviceId) {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            
+            try {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 发送中...';
+                
+                const response = await fetch(`${API_BASE}/test/stop-alert/${deviceId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    button.innerHTML = '<i class="bi bi-check-circle"></i> 已发送';
+                    button.classList.remove('btn-outline-warning');
+                    button.classList.add('btn-success');
+                    
+                    alert('✅ 测试通知已发送成功！\n请查看钉钉群消息。');
+                    
+                    // 3秒后恢复按钮状态
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-warning');
+                        button.disabled = false;
+                    }, 3000);
+                } else {
+                    button.innerHTML = '<i class="bi bi-x-circle"></i> 发送失败';
+                    button.classList.remove('btn-outline-warning');
+                    button.classList.add('btn-danger');
+                    
+                    alert('❌ ' + (result.message || '测试通知发送失败'));
+                    
+                    // 3秒后恢复按钮状态
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('btn-danger');
+                        button.classList.add('btn-outline-warning');
+                        button.disabled = false;
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('测试通知失败:', error);
+                button.innerHTML = '<i class="bi bi-x-circle"></i> 发送失败';
+                button.classList.remove('btn-outline-warning');
+                button.classList.add('btn-danger');
+                
+                alert('❌ 网络错误，请稍后重试');
+                
+                // 3秒后恢复按钮状态
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('btn-danger');
+                    button.classList.add('btn-outline-warning');
+                    button.disabled = false;
+                }, 3000);
+            }
+        }
+        
+        // 显示错误信息
+        function showError(message) {
+            const container = document.getElementById('devicesContainer');
+            container.innerHTML = `
+                <div class="error-message">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">加载失败</h3>
+                    <p>${message}</p>
+                    <button class="btn btn-primary mt-2" onclick="loadData()">
+                        <i class="bi bi-arrow-clockwise"></i> 重试
+                    </button>
+                </div>
+            `;
+        }
+        
+        // 初始加载
+        loadData();
+        
+        // 每3秒自动刷新
+        setInterval(loadData, 3000);
+        
+        // 页面可见性变化时刷新
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>
