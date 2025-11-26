@@ -84,6 +84,16 @@
             border-left: 5px solid #dc3545;
         }
         
+        .device-card.status-power-off {
+            border-left: 5px solid #ff0000;
+            animation: pulse-red 2s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3); }
+            50% { box-shadow: 0 5px 25px rgba(255, 0, 0, 0.6); }
+        }
+        
         .device-header {
             display: flex;
             justify-content: space-between;
@@ -114,6 +124,17 @@
         .status-stopped-badge {
             background: #dc3545;
             color: white;
+        }
+        
+        .status-power-off-badge {
+            background: #ff0000;
+            color: white;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
         
         .big-number {
@@ -188,6 +209,130 @@
         .alert-success {
             border-color: #28a745;
             background: #f0fff4;
+        }
+        
+        .error-message {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            color: #dc3545;
+            margin: 20px 0;
+        }
+        
+        .current-work-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .work-info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .work-info-title {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .work-info-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .work-info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #333;
+        }
+        
+        .today-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            border-radius: 10px;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .models-stats {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .model-stat-card {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .model-stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .model-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .model-completed {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .model-progress-bar {
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .model-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        
+        .model-progress-text {
+            font-size: 0.85rem;
+            color: #666;
+            text-align: center;
         }
         
         .loading-spinner {
@@ -402,11 +547,29 @@
             }
             
             container.innerHTML = devices.map(device => {
-                const isRunning = device.is_running;
-                const statusClass = isRunning ? 'status-running' : 'status-stopped';
-                const badgeClass = isRunning ? 'status-running-badge' : 'status-stopped-badge';
-                const statusIcon = isRunning ? '🟢' : '🔴';
-                const statusText = isRunning ? '运行中' : '已停机';
+                // 根据 device_status_type 区分不同状态
+                const deviceStatusType = device.device_status_type || 'running';
+                let statusClass, badgeClass, statusIcon, statusText;
+                
+                if (deviceStatusType === 'power_off') {
+                    // ESP32断电
+                    statusClass = 'status-power-off';
+                    badgeClass = 'status-power-off-badge';
+                    statusIcon = '⚡';
+                    statusText = 'ESP32断电';
+                } else if (deviceStatusType === 'stamping_stop') {
+                    // 冲床停机
+                    statusClass = 'status-stopped';
+                    badgeClass = 'status-stopped-badge';
+                    statusIcon = '🛑';
+                    statusText = '冲床停机';
+                } else {
+                    // 运行中
+                    statusClass = 'status-running';
+                    badgeClass = 'status-running-badge';
+                    statusIcon = '🟢';
+                    statusText = '运行中';
+                }
                 
                 return `
                     <div class="device-card ${statusClass}">
@@ -420,10 +583,34 @@
                             </div>
                         </div>
                         
-                        <div class="big-number">
-                            ${formatNumber(device.counts.today)}
+                        <!-- 当前工作信息 -->
+                        <div class="current-work-section">
+                            <div class="work-info-header">
+                                <span class="work-info-title">📋 当前工作</span>
+                            </div>
+                            <div class="work-info-content">
+                                <div class="work-info-item">
+                                    <i class="bi bi-person"></i>
+                                    <span>${device.current.employee || '未绑定员工'}</span>
+                                </div>
+                                <div class="work-info-item">
+                                    <i class="bi bi-box"></i>
+                                    <span>${device.current.model || '未选择型号'}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="text-center text-muted mb-3">今日冲次</div>
+                        
+                        <!-- 今日数据汇总 -->
+                        <div class="today-summary">
+                            <div class="summary-item">
+                                <div class="summary-label">今日冲次</div>
+                                <div class="summary-value">${formatNumber(device.counts.today)}</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">今日完成</div>
+                                <div class="summary-value text-success" id="totalCompleted-${device.device_id}">-</div>
+                            </div>
+                        </div>
                         
                         <div class="device-info">
                             <div class="info-item">
@@ -444,14 +631,10 @@
                             </div>
                         </div>
                         
-                        ${device.current.employee || device.current.model ? `
-                            <div class="mt-3 p-2 bg-light rounded">
-                                <small class="text-muted">
-                                    ${device.current.employee ? `👤 ${device.current.employee}` : ''}
-                                    ${device.current.model ? `📦 ${device.current.model}` : ''}
-                                </small>
-                            </div>
-                        ` : ''}
+                        <!-- 今日型号统计 -->
+                        <div class="models-stats" id="modelsStats-${device.device_id}">
+                            <div class="text-center text-muted">加载中...</div>
+                        </div>
                         
                         ${device.last_stamping_time ? `
                             <div class="text-center mt-2">
@@ -469,6 +652,61 @@
                     </div>
                 `;
             }).join('');
+            
+            // 加载每个设备的多型号数据
+            devices.forEach(device => {
+                loadDeviceModels(device.device_id);
+            });
+        }
+        
+        // 加载设备的多型号统计数据
+        async function loadDeviceModels(deviceId) {
+            try {
+                const response = await fetch(`${API_BASE}/device/${deviceId}/today-models`);
+                const data = await response.json();
+                
+                const container = document.getElementById(`modelsStats-${deviceId}`);
+                const completedSpan = document.getElementById(`totalCompleted-${deviceId}`);
+                
+                if (!data.models || data.models.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted">今日暂无型号数据</div>';
+                    completedSpan.textContent = '0 台';
+                    return;
+                }
+                
+                // 更新总完成数
+                completedSpan.textContent = data.today_summary.total_completed + ' 台';
+                
+                // 渲染每个型号的统计
+                let html = '<h6 class="mb-2">📦 今日型号统计</h6>';
+                
+                data.models.forEach(model => {
+                    const progress = model.progress_percent || 0;
+                    html += `
+                        <div class="model-stat-card">
+                            <div class="model-stat-header">
+                                <span class="model-name">${model.model_name}</span>
+                                <span class="model-completed">${model.completed_products} 台</span>
+                            </div>
+                            <div class="model-progress-bar">
+                                <div class="model-progress-fill" style="width: ${progress}%">
+                                    ${progress > 10 ? progress.toFixed(1) + '%' : ''}
+                                </div>
+                            </div>
+                            <div class="model-progress-text">
+                                ${model.current_sheets}/${model.sheets_per_product} 片
+                                ${model.current_sheets > 0 ? `(还需${model.remaining_sheets}片)` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('加载型号数据失败:', error);
+                document.getElementById(`modelsStats-${deviceId}`).innerHTML = 
+                    '<div class="text-center text-muted">加载失败</div>';
+            }
         }
         
         // 更新统计数据

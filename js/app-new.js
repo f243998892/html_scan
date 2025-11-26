@@ -191,6 +191,7 @@ function addEventListeners() {
     onId('card-continuous-scan', 'click', handleContinuousScan);
     onId('card-product-query', 'click', handleProductQuery);
     onId('card-product-scan-query', 'click', handleProductScanQuery);
+    onId('card-stamping-scan', 'click', handleStampingScan);
     onId('card-inventory', 'click', () => showFeatureNotAvailable('该功能暂未开放，敬请期待'));
     onId('card-delete-records', 'click', handleDeleteRecords);
     
@@ -5381,4 +5382,293 @@ if (typeof showToast === 'function') {
     window.showToast = function(message, type) {
         alert(message);
     };
+}
+
+// ==================== 冲床型号扫描功能 ====================
+
+let stampingCurrentDevice = '';
+let stampingScanningFor = '';
+let stampingHtml5QrCode = null;
+let stampingScannedModel = null;
+
+function handleStampingScan() {
+    if (!userState.fullName) {
+        showToast('请先登录', 'warning');
+        return;
+    }
+    
+    // 检查bootstrap是否已加载
+    if (typeof bootstrap === 'undefined') {
+        alert('系统正在加载，请稍后再试');
+        return;
+    }
+    
+    const modalEl = document.getElementById('stamping-scan-modal');
+    if (!modalEl) {
+        alert('扫码功能未加载，请刷新页面');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    
+    document.getElementById('stamping-current-employee').textContent = userState.fullName;
+    
+    const lastDevice = localStorage.getItem('lastStampingDevice');
+    if (lastDevice) {
+        document.getElementById('stamping-last-device').style.display = 'block';
+        document.getElementById('stamping-last-device-name').textContent = lastDevice;
+    }
+    
+    document.getElementById('stamping-scan-device-btn').onclick = startScanStampingDevice;
+    document.getElementById('stamping-scan-model-btn').onclick = startScanStampingModel;
+}
+
+function useLastStampingDevice() {
+    const lastDevice = localStorage.getItem('lastStampingDevice');
+    if (lastDevice) {
+        onStampingDeviceScanned(lastDevice);
+    }
+}
+
+function startScanStampingDevice() {
+    stampingScanningFor = 'device';
+    document.getElementById('stamping-qr-reader').style.display = 'block';
+    document.getElementById('stamping-scan-device-btn').style.display = 'none';
+    
+    stampingHtml5QrCode = new Html5Qrcode("stamping-qr-reader");
+    stampingHtml5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onStampingScanSuccess
+    ).catch(err => {
+        showToast('启动摄像头失败', 'error');
+        document.getElementById('stamping-scan-device-btn').style.display = 'block';
+    });
+}
+
+function startScanStampingModel() {
+    stampingScanningFor = 'model';
+    document.getElementById('stamping-qr-reader').style.display = 'block';
+    document.getElementById('stamping-scan-model-btn').style.display = 'none';
+    
+    stampingHtml5QrCode = new Html5Qrcode("stamping-qr-reader");
+    stampingHtml5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onStampingScanSuccess
+    ).catch(err => {
+        showToast('启动摄像头失败', 'error');
+        document.getElementById('stamping-scan-model-btn').style.display = 'block';
+    });
+}
+
+function onStampingScanSuccess(decodedText) {
+    stampingHtml5QrCode.stop();
+    document.getElementById('stamping-qr-reader').style.display = 'none';
+    
+    if (stampingScanningFor === 'device') {
+        onStampingDeviceScanned(decodedText);
+    } else if (stampingScanningFor === 'model') {
+        onStampingModelScanned(decodedText);
+    }
+}
+
+function onStampingDeviceScanned(deviceId) {
+    // 验证设备ID格式（应该以STAMP_开头）
+    if (!deviceId.startsWith('STAMP_')) {
+        showToast('设备ID格式错误，应以STAMP_开头', 'error');
+        document.getElementById('stamping-scan-device-btn').style.display = 'block';
+        return;
+    }
+    
+    stampingCurrentDevice = deviceId;
+    localStorage.setItem('lastStampingDevice', deviceId);
+    
+    // 隐藏上次设备按钮
+    document.getElementById('stamping-last-device').style.display = 'none';
+    
+    // 更新显示
+    document.getElementById('stamping-info-device').textContent = deviceId;
+    document.getElementById('stamping-current-info').style.display = 'block';
+    document.getElementById('stamping-scan-device-btn').style.display = 'none';
+    document.getElementById('stamping-scan-model-btn').style.display = 'block';
+    
+    loadStampingDeviceInfo(deviceId);
+    showToast(`设备 ${deviceId} 选择成功，请扫描型号二维码`, 'success');
+}
+
+async function onStampingModelScanned(modelName) {
+    try {
+        const response = await fetch(`/api/stamping/models`);
+        const result = await response.json();
+        
+        // 查找匹配的型号
+        const models = result.data || [];
+        stampingScannedModel = models.find(m => m.model_name === modelName);
+        
+        if (stampingScannedModel && stampingScannedModel.is_active) {
+            
+            if (confirm(`型号：${stampingScannedModel.model_name}\n配置：${stampingScannedModel.sheets_per_product}片/台\n\n确认绑定此型号？`)) {
+                await confirmStampingBinding();
+            } else {
+                document.getElementById('stamping-scan-model-btn').style.display = 'block';
+            }
+        } else {
+            showToast(`型号 ${modelName} 不存在或已禁用`, 'error');
+            document.getElementById('stamping-scan-model-btn').style.display = 'block';
+        }
+    } catch (error) {
+        showToast('查询型号失败', 'error');
+        document.getElementById('stamping-scan-model-btn').style.display = 'block';
+    }
+}
+
+async function confirmStampingBinding() {
+    try {
+        const response = await fetch(`/api/stamping/device/${stampingCurrentDevice}/bind-model`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                model_name: stampingScannedModel.model_name,
+                employee_name: userState.fullName
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            let message = '绑定成功！';
+            if (result.previous_employee) {
+                message += `\n已推送交接通知给：${result.previous_employee}`;
+            }
+            if (result.unbound_count > 0) {
+                message += `\n未绑定的${result.unbound_count}冲次已记录到您的台账`;
+            }
+            showToast(message, 'success');
+            
+            loadStampingDeviceInfo(stampingCurrentDevice);
+            
+            setTimeout(() => {
+                const modalEl = document.getElementById('stamping-scan-modal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                // 手动移除backdrop
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }, 300);
+            }, 2000);
+        } else {
+            showToast('绑定失败：' + result.message, 'error');
+        }
+    } catch (error) {
+        showToast('绑定失败', 'error');
+    }
+}
+
+async function loadStampingDeviceInfo(deviceId) {
+    try {
+        const response = await fetch(`/api/stamping/device/${deviceId}/today-models`);
+        const data = await response.json();
+        
+        document.getElementById('stamping-info-device').textContent = data.device_id;
+        document.getElementById('stamping-info-model').textContent = data.current_model || '未选择';
+        
+        if (data.models && data.models.length > 0) {
+            const currentModel = data.models.find(m => m.model_name === data.current_model) || data.models[0];
+            document.getElementById('stamping-info-sheets').textContent = currentModel.sheets_per_product + ' 片/台';
+            document.getElementById('stamping-info-completed').textContent = data.today_summary.total_completed + ' 台';
+            document.getElementById('stamping-info-progress').textContent = 
+                `${currentModel.current_sheets}/${currentModel.sheets_per_product} 片`;
+            
+            const progress = currentModel.progress_percent || 0;
+            document.getElementById('stamping-progress-bar').style.width = progress + '%';
+            document.getElementById('stamping-progress-bar').textContent = progress.toFixed(1) + '%';
+        }
+    } catch (error) {
+        console.error('加载设备信息失败:', error);
+    }
+}
+
+function closeStampingModal() {
+    // 停止扫码
+    if (stampingHtml5QrCode) {
+        try {
+            stampingHtml5QrCode.stop();
+        } catch (e) {
+            console.log('扫码器已停止');
+        }
+        stampingHtml5QrCode = null;
+    }
+    
+    // 关闭模态框
+    const modalEl = document.getElementById('stamping-scan-modal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+    
+    // 强制清理backdrop
+    setTimeout(() => {
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }, 100);
+}
+
+async function handoverStampingTask() {
+    if (!stampingCurrentDevice || !userState.fullName) {
+        showToast('请先绑定设备和型号', 'warning');
+        return;
+    }
+    
+    if (!confirm('确认交接任务？\n您的工作数据将被保存，设备绑定将被清除。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/stamping/device/${stampingCurrentDevice}/handover`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                employee_name: userState.fullName
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            let summary = '交接成功！\n\n您的工作数据：\n';
+            result.work_summary.models.forEach(m => {
+                summary += `\n${m.model_name}: ${m.total_sheets}片, ${m.completed_products}台`;
+            });
+            summary += `\n\n总完成：${result.work_summary.total_completed}台`;
+            
+            alert(summary);
+            localStorage.removeItem('lastStampingDevice');
+            
+            const modalEl = document.getElementById('stamping-scan-modal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+            // 手动移除backdrop
+            setTimeout(() => {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }, 300);
+        } else {
+            showToast('交接失败：' + result.message, 'error');
+        }
+    } catch (error) {
+        showToast('交接失败', 'error');
+    }
 }
