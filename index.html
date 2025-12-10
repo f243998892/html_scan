@@ -233,65 +233,6 @@
             box-shadow: 0 3px 6px rgba(0,0,0,0.16);
         }
         
-        /* 浮动工序提醒框样式 */
-        .floating-process {
-            position: fixed;
-            background-color: rgba(138, 43, 226, 0.9);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            font-weight: bold;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            z-index: 999;
-            pointer-events: none; /* 不可选中 */
-            user-select: none; /* 禁止选择文本 */
-            animation: float-blink 2s infinite, process-bounce 15s linear infinite;
-        }
-        
-        @keyframes float-blink {
-            0%, 100% { 
-                background-color: rgba(138, 43, 226, 0.9);
-                box-shadow: 0 5px 15px rgba(138, 43, 226, 0.5);
-            }
-            50% { 
-                background-color: rgba(255, 87, 34, 0.9);
-                box-shadow: 0 5px 20px rgba(255, 87, 34, 0.7);
-            }
-        }
-        
-        @keyframes process-bounce {
-            0%, 100% {
-                transform: translate(0, 0);
-            }
-            10% {
-                transform: translate(20vw, 15vh);
-            }
-            20% {
-                transform: translate(-10vw, 30vh);
-            }
-            30% {
-                transform: translate(30vw, 5vh);
-            }
-            40% {
-                transform: translate(10vw, -15vh);
-            }
-            50% {
-                transform: translate(-20vw, 10vh);
-            }
-            60% {
-                transform: translate(25vw, 25vh);
-            }
-            70% {
-                transform: translate(-30vw, -5vh);
-            }
-            80% {
-                transform: translate(5vw, -25vh);
-            }
-            90% {
-                transform: translate(-25vw, -20vh);
-            }
-        }
-
         /* Toast提示样式 */
         .custom-toast {
             border-radius: 8px;
@@ -607,6 +548,14 @@
                             </div>
                         </div>
                     </a>
+                </div>
+                <div class="col-6">
+                    <div class="card shadow-sm h-100" id="card-stamping-ledger" onclick="handleStampingLedger()" style="cursor: pointer;">
+                        <div class="card-body text-center p-4 home-card">
+                            <i class="bi bi-journal-text text-info"></i>
+                            <h5 class="text-info">冲床台账查询</h5>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-6" id="leader-functions-card" style="display:none;">
                     <div class="card shadow-sm h-100">
@@ -1252,6 +1201,108 @@
         </div>
     </div>
 
+    <!-- 冲床台账查询模态框 -->
+    <div class="modal fade" id="stamping-ledger-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📓 冲床台账查询</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <!-- 筛选条件 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-funnel"></i> 筛选条件
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">员工姓名</label>
+                                    <input type="text" class="form-control" id="ledger-employee" placeholder="全部员工">
+                                    <small class="text-muted">普通员工只能查看自己</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">型号筛选（可多选）</label>
+                                    <select id="ledger-model" class="form-select" multiple="multiple" size="4" style="min-height: 80px;">
+                                        <option value="" disabled>请先选择日期...</option>
+                                    </select>
+                                    <small class="text-muted" id="model-count-hint">
+                                        <i class="bi bi-magic"></i> 自动加载该时间范围内的型号，按住Ctrl/Cmd可多选
+                                    </small>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">开始日期</label>
+                                    <input type="date" class="form-control" id="ledger-start-date">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">结束日期</label>
+                                    <input type="date" class="form-control" id="ledger-end-date">
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <button class="btn btn-primary w-100" onclick="queryStampingLedger()">
+                                        <i class="bi bi-search"></i> 查询
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 汇总统计 -->
+                    <div id="ledger-summary" style="display:none;">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">记录数</h6>
+                                        <h3 class="text-primary" id="ledger-count">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">总片数</h6>
+                                        <h3 class="text-info" id="ledger-total-sheets">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">总完成</h6>
+                                        <h3 class="text-success" id="ledger-total-completed">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">平均每天</h6>
+                                        <h3 class="text-warning" id="ledger-avg-daily">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 查询结果 -->
+                    <div id="ledger-results" class="table-responsive">
+                        <p class="text-center text-muted">请设置查询条件后点击查询</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" onclick="exportStampingLedger()">
+                        <i class="bi bi-file-earmark-excel"></i> 导出Excel
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 加载JS库 -->
     <script src="js/bootstrap/bootstrap.bundle.min.js?v=5.3.0"></script>
     <script src="js/html5-qrcode.min.js?v=1.1"></script>
@@ -1268,7 +1319,7 @@
     <script src="js/loading-indicator.js?v=1.0"></script>
     <!-- 推送设置管理模块 -->
     <script src="js/push-manager.js?v=1.6"></script>
-    <script src="js/app-new.js?v=3.36"></script>
+    <script src="js/app-new.js?v=3.42"></script>
     <script src="js/push-settings-ui.js?v=4.4"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>

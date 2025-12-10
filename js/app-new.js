@@ -230,8 +230,6 @@ function addEventListeners() {
     if (processSelect && typeof processSelect.addEventListener === 'function') {
         processSelect.addEventListener('change', function() {
             saveProcessSelection(this.value);
-            // 立即更新浮动工序框
-            createFloatingProcess();
         });
     }
     
@@ -306,9 +304,9 @@ async function handleExportExcel() {
         const selectedOption = groupSelect.options[groupSelect.selectedIndex];
         const processName = selectedOption.getAttribute('data-process-name');
         
-        // 组合日期和时间
-        const startDateTime = `${startDate}T${startTime}Z`;
-        const endDateTime = `${endDate}T${endTime}Z`;
+        // 组合日期和时间（不添加Z，使用本地时间避免时区问题）
+        const startDateTime = `${startDate}T${startTime}`;
+        const endDateTime = `${endDate}T${endTime}`;
         
         // 调用组长汇总API获取数据
         const requestBody = {
@@ -611,8 +609,8 @@ async function generateDetailsSheet(filters) {
         body: JSON.stringify({
             group_name: filters.groupName,
             process_name: filters.processName,
-            start_date: `${filters.startDate}T${filters.startTime}Z`,
-            end_date: `${filters.endDate}T${filters.endTime}Z`
+            start_date: `${filters.startDate}T${filters.startTime}`,
+            end_date: `${filters.endDate}T${filters.endTime}`
         })
     });
     
@@ -1031,8 +1029,8 @@ async function loadModelList() {
         // 如果用户还没选择日期，使用默认的最近30天
         let startDateTime, endDateTime;
         if (startDate && endDate) {
-            startDateTime = `${startDate}T${startTime}Z`;
-            endDateTime = `${endDate}T${endTime}Z`;
+            startDateTime = `${startDate}T${startTime}`;
+            endDateTime = `${endDate}T${endTime}`;
         } else {
             // 默认最近30天
             const endDateObj = new Date();
@@ -2140,8 +2138,6 @@ function saveProcessSelection(processType) {
     try {
         localStorage.setItem('selected_process', processType);
         console.log('工序选择已保存:', processType);
-        // 立即更新浮动工序框
-        createFloatingProcess();
     } catch (error) {
         console.error('保存工序选择失败:', error);
     }
@@ -2213,8 +2209,6 @@ function navigateToHome() {
         showProcessWarning();
         // 显示主屏幕
         showScreen(SCREENS.HOME);
-        // 创建浮动工序名称框
-        createFloatingProcess();
         // 不在这里调用refreshTodayProcessCount，避免和showScreen重复
     } catch (error) {
         console.error('导航到首页失败:', error);
@@ -2296,24 +2290,7 @@ function showScreen(screenId) {
             setTimeout(refreshTodayProcessCount, 0);
         }
 
-        // 在查询页面隐藏浮动工序框，其他页面显示
-        const floatingProcessEl = document.getElementById('floating-process');
-        if (floatingProcessEl) {
-            if (screenId === SCREENS.QUERY ||
-                screenId === SCREENS.MODELS ||
-                screenId === SCREENS.PRODUCTS ||
-                screenId === SCREENS.DELETE_RECORDS) {
-                floatingProcessEl.style.display = 'none';
-            } else {
-                floatingProcessEl.style.display = 'block';
-            }
-        } else if (screenId !== SCREENS.QUERY &&
-                   screenId !== SCREENS.MODELS &&
-                   screenId !== SCREENS.PRODUCTS &&
-                   screenId !== SCREENS.DELETE_RECORDS) {
-            // 创建浮动工序名称框（如果不存在）
-            createFloatingProcess();
-        }
+        // 浮动工序框功能已删除
     } catch (error) {
         console.error('切换屏幕失败:', error);
     }
@@ -2465,9 +2442,6 @@ function startScan(processType, isContinuous) {
     
     // 初始化扫码器
     initializeScanner();
-    
-    // 确保浮动工序框在扫码页面也显示
-    createFloatingProcess();
 }
 
 // 初始化扫码器
@@ -5162,38 +5136,7 @@ function handleContinuousScan() {
     startScan(selectedProcess, true);
 }
 
-// 创建浮动工序名称框
-function createFloatingProcess() {
-    // 移除已存在的浮动框
-    const existingFloat = document.getElementById('floating-process');
-    if (existingFloat) {
-        existingFloat.remove();
-    }
-    
-    // 获取当前工序名称
-    const processSelect = document.getElementById('process-select');
-    if (!processSelect || processSelect.selectedIndex < 0) return;
-    
-    const selectedProcessText = processSelect.options[processSelect.selectedIndex].text;
-    console.log('创建浮动工序框, 当前选择工序:', selectedProcessText);
-    
-    // 创建浮动框元素
-    const floatingDiv = document.createElement('div');
-    floatingDiv.id = 'floating-process';
-    floatingDiv.className = 'floating-process';
-    
-    // 设置内容 - 工序名称加上醒目符号
-    floatingDiv.innerHTML = `⚠️ 当前工序: <span style="font-size: 1.5em;">${selectedProcessText}</span> ⚠️`;
-    
-    // 随机初始位置
-    const initialX = Math.random() * (window.innerWidth - 200);
-    const initialY = Math.random() * (window.innerHeight - 100);
-    floatingDiv.style.left = `${initialX}px`;
-    floatingDiv.style.top = `${initialY}px`;
-    
-    // 添加到body
-    document.body.appendChild(floatingDiv);
-}
+// 浮动工序框功能已删除
 
 // 添加扫码枪/手动录入按钮事件
 function addManualScanEvent() {
@@ -5368,7 +5311,7 @@ window.onFaceLoginSuccess = function(fullName) {
         console.error('❌ onFaceLoginSuccess 执行出错:', error);
         console.error('错误堆栈:', error.stack);
         // 如果出错，至少尝试刷新页面
-        alert('登录成功，但跳转出错。页面将刷新。');
+        alert('登录成功！正在为您加载系统...');
         location.reload();
     }
 };
@@ -5408,6 +5351,9 @@ function handleStampingScan() {
         alert('扫码功能未加载，请刷新页面');
         return;
     }
+    
+    // 重置模态框状态（修复bug）
+    resetStampingModal();
     
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
@@ -5549,20 +5495,10 @@ async function confirmStampingBinding() {
             
             loadStampingDeviceInfo(stampingCurrentDevice);
             
+            // 立即关闭模态框并清理backdrop
             setTimeout(() => {
-                const modalEl = document.getElementById('stamping-scan-modal');
-                const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
-                // 手动移除backdrop
-                setTimeout(() => {
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                    document.body.classList.remove('modal-open');
-                    document.body.style.overflow = '';
-                    document.body.style.paddingRight = '';
-                }, 300);
-            }, 2000);
+                closeStampingModal();
+            }, 1500);
         } else {
             showToast('绑定失败：' + result.message, 'error');
         }
@@ -5595,6 +5531,25 @@ async function loadStampingDeviceInfo(deviceId) {
     }
 }
 
+function resetStampingModal() {
+    // 重置所有按钮和显示状态
+    document.getElementById('stamping-scan-device-btn').style.display = 'block';
+    document.getElementById('stamping-scan-model-btn').style.display = 'none';
+    document.getElementById('stamping-qr-reader').style.display = 'none';
+    document.getElementById('stamping-current-info').style.display = 'none';
+    document.getElementById('stamping-last-device').style.display = 'none';
+    
+    // 清空扫码器
+    if (stampingHtml5QrCode) {
+        try {
+            stampingHtml5QrCode.stop();
+        } catch (e) {
+            console.log('扫码器已停止');
+        }
+        stampingHtml5QrCode = null;
+    }
+}
+
 function closeStampingModal() {
     // 停止扫码
     if (stampingHtml5QrCode) {
@@ -5613,13 +5568,309 @@ function closeStampingModal() {
         modalInstance.hide();
     }
     
-    // 强制清理backdrop
+    // 强制清理backdrop和恢复页面状态
     setTimeout(() => {
+        // 移除所有backdrop
         document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        // 移除modal-open类
         document.body.classList.remove('modal-open');
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
+        // 恢复滚动
+        document.body.style.overflow = 'auto';
+        document.body.style.overflowX = 'hidden';
+        document.body.style.paddingRight = '0';
+        // 恢复html滚动
+        document.documentElement.style.overflow = 'auto';
     }, 100);
+}
+
+// ==================== 冲床台账查询功能 ====================
+
+let stampingLedgerData = [];
+
+async function handleStampingLedger() {
+    if (!userState.fullName) {
+        showToast('请先登录', 'warning');
+        return;
+    }
+    
+    // 检查是否是组长
+    const isLeader = await checkIfLeader(userState.fullName);
+    
+    const modal = new bootstrap.Modal(document.getElementById('stamping-ledger-modal'));
+    modal.show();
+    
+    // 设置默认日期为本月
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('ledger-start-date').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('ledger-end-date').value = today.toISOString().split('T')[0];
+    
+    // 如果不是组长，默认填入当前员工姓名并禁用修改
+    const employeeInput = document.getElementById('ledger-employee');
+    if (!isLeader) {
+        employeeInput.value = userState.fullName;
+        employeeInput.readOnly = true;
+        employeeInput.classList.add('bg-light');
+    } else {
+        employeeInput.value = '';
+        employeeInput.readOnly = false;
+        employeeInput.classList.remove('bg-light');
+    }
+}
+
+async function checkIfLeader(employeeName) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/group-leaders?leader_name=${encodeURIComponent(employeeName)}`);
+        if (!response.ok) return false;
+        const data = await response.json();
+        return data && data.length > 0;
+    } catch (error) {
+        return false;
+    }
+}
+
+// 加载型号选项
+let availableModels = [];
+
+async function loadModelOptions() {
+    const startDate = document.getElementById('ledger-start-date').value;
+    const endDate = document.getElementById('ledger-end-date').value;
+    const employee = document.getElementById('ledger-employee').value.trim();
+    
+    if (!startDate || !endDate) {
+        return;
+    }
+    
+    try {
+        // 构建查询参数
+        const params = new URLSearchParams();
+        if (employee) params.append('employee_name', employee);
+        params.append('start_date', startDate);
+        params.append('end_date', endDate);
+        params.append('get_models_only', 'true'); // 只获取型号列表
+        
+        const response = await fetch(`/api/stamping/ledger/models?${params}`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.models) {
+            availableModels = data.models;
+            updateModelDatalist(data.models);
+        }
+    } catch (error) {
+        console.error('加载型号失败:', error);
+    }
+}
+
+function updateModelDatalist(models) {
+    const select = document.getElementById('ledger-model');
+    const hint = document.getElementById('model-count-hint');
+    
+    if (!select) return;
+    
+    // 清空现有选项
+    select.innerHTML = '';
+    
+    if (models && models.length > 0) {
+        // 添加选项
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            select.appendChild(option);
+        });
+        
+        // 更新提示
+        if (hint) {
+            hint.innerHTML = `<i class="bi bi-check-circle"></i> 共 ${models.length} 个型号可选，按住Ctrl/Cmd可多选`;
+            hint.style.color = '#28a745';
+        }
+    } else {
+        const option = document.createElement('option');
+        option.value = '';
+        option.disabled = true;
+        option.textContent = '该时间范围内无型号数据';
+        select.appendChild(option);
+        
+        if (hint) {
+            hint.innerHTML = '<i class="bi bi-info-circle"></i> 请选择有数据的日期范围';
+            hint.style.color = '#6c757d';
+        }
+    }
+}
+
+// 监听日期和员工变化，自动加载型号
+function initStampingLedgerListeners() {
+    const startDateInput = document.getElementById('ledger-start-date');
+    const endDateInput = document.getElementById('ledger-end-date');
+    const employeeInput = document.getElementById('ledger-employee');
+    
+    if (startDateInput) {
+        startDateInput.addEventListener('change', loadModelOptions);
+    }
+    if (endDateInput) {
+        endDateInput.addEventListener('change', loadModelOptions);
+    }
+    if (employeeInput) {
+        employeeInput.addEventListener('input', debounce(loadModelOptions, 500));
+    }
+}
+
+// 防抖函数
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// 在页面加载时初始化
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initStampingLedgerListeners);
+} else {
+    initStampingLedgerListeners();
+}
+
+async function queryStampingLedger() {
+    const employee = document.getElementById('ledger-employee').value.trim();
+    const modelSelect = document.getElementById('ledger-model');
+    const selectedModels = Array.from(modelSelect.selectedOptions).map(opt => opt.value).filter(v => v);
+    const startDate = document.getElementById('ledger-start-date').value;
+    const endDate = document.getElementById('ledger-end-date').value;
+    
+    try {
+        showToast('查询中...', 'info');
+        
+        // 构建查询参数
+        const params = new URLSearchParams();
+        if (employee) params.append('employee_name', employee);
+        // 如果选择了型号，传递所有选中的型号
+        if (selectedModels.length > 0) {
+            selectedModels.forEach(model => {
+                params.append('model_names', model);
+            });
+        }
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        const response = await fetch(`/api/stamping/ledger/query?${params}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            stampingLedgerData = data.records;
+            displayStampingLedger(data);
+            showToast(`查询成功，共 ${data.count} 条记录`, 'success');
+        } else {
+            showToast('查询失败', 'error');
+        }
+    } catch (error) {
+        showToast('查询失败：' + error.message, 'error');
+    }
+}
+
+function displayStampingLedger(data) {
+    const resultsDiv = document.getElementById('ledger-results');
+    const summaryDiv = document.getElementById('ledger-summary');
+    
+    if (data.records.length === 0) {
+        resultsDiv.innerHTML = '<p class="text-center text-muted">没有找到符合条件的记录</p>';
+        summaryDiv.style.display = 'none';
+        return;
+    }
+    
+    // 滚动到顶部
+    resultsDiv.scrollTop = 0;
+    
+    // 计算统计数据
+    const uniqueDates = new Set(data.records.map(r => r.work_date));
+    const dayCount = uniqueDates.size;
+    const avgDaily = dayCount > 0 ? (data.summary.total_completed / dayCount).toFixed(2) : 0;
+    
+    // 显示汇总
+    document.getElementById('ledger-count').textContent = data.count;
+    document.getElementById('ledger-total-sheets').textContent = data.summary.total_sheets;
+    document.getElementById('ledger-total-completed').textContent = data.summary.total_completed + ' 台';
+    document.getElementById('ledger-avg-daily').textContent = avgDaily + ' 台/天';
+    summaryDiv.style.display = 'block';
+    
+    // 显示表格
+    let html = `
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>日期</th>
+                    <th>员工</th>
+                    <th>设备</th>
+                    <th>型号</th>
+                    <th>冲压片数</th>
+                    <th>完成台数</th>
+                    <th>当前进度</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    data.records.forEach((record, index) => {
+        html += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${record.work_date}</td>
+                <td>${record.employee_name}</td>
+                <td>${record.device_id}</td>
+                <td>${record.model_name}</td>
+                <td>${record.total_sheets}</td>
+                <td class="text-success"><strong>${record.completed_products}</strong></td>
+                <td>${record.current_sheets} 片</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    resultsDiv.innerHTML = html;
+}
+
+function exportStampingLedger() {
+    if (!stampingLedgerData || stampingLedgerData.length === 0) {
+        showToast('没有数据可导出', 'warning');
+        return;
+    }
+    
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel库未加载', 'error');
+        return;
+    }
+    
+    const data = [[
+        '序号', '日期', '员工', '设备', '型号', 
+        '冲压片数', '完成台数', '当前进度'
+    ]];
+    
+    stampingLedgerData.forEach((record, index) => {
+        data.push([
+            index + 1,
+            record.work_date,
+            record.employee_name,
+            record.device_id,
+            record.model_name,
+            record.total_sheets,
+            record.completed_products,
+            record.current_sheets + ' 片'
+        ]);
+    });
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, '冲床台账');
+    
+    const fileName = `冲床台账_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    
+    showToast('Excel导出成功', 'success');
 }
 
 async function handoverStampingTask() {
