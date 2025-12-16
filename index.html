@@ -450,16 +450,21 @@
                 <div class="col-12">
                     <div class="card shadow-sm bg-light">
                         <div class="card-body p-3">
-                            <div class="process-select-container">
-                                <label for="process-select" class="form-label">工序选择：</label>
-                                <select class="form-select" id="process-select">
+                            <div class="d-flex justify-content-between align-items-center gap-3">
+                                <div class="flex-grow-1">
+                                    <label for="process-select" class="form-label mb-1">工序选择：</label>
+                                    <select class="form-select" id="process-select">
                                     <option value="wiring">绕线</option>
                                     <option value="embedding">嵌线</option>
                                     <option value="wiring_connect">接线</option>
                                     <option value="pressing">压装</option>
                                     <option value="stopper">车止口</option>
                                     <option value="immersion">浸漆</option>
-                                </select>
+                                    </select>
+                                </div>
+                                <div id="model-switcher-container" style="min-width: 150px;">
+                                    <!-- 型号切换器将在这里动态生成 -->
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -721,8 +726,11 @@
                                 <button id="assign-group-btn" class="btn btn-lg btn-warning">
                                     <i class="bi bi-diagram-3"></i> 为产品分配组别
                                 </button>
-                                <button id="push-settings-btn" class="btn btn-lg btn-info">
-                                    <i class="bi bi-bell"></i> 推送通知设置
+                                <button id="work-time-config-btn" class="btn btn-lg btn-success">
+                                    <i class="bi bi-clock-history"></i> 型号工时配置
+                                </button>
+                                <button id="notification-frequency-btn" class="btn btn-lg btn-info">
+                                    <i class="bi bi-bell"></i> 钉钉通知设置
                                 </button>
                             </div>
                         </div>
@@ -1201,6 +1209,248 @@
         </div>
     </div>
 
+    <!-- 通知设置模态框（合并频率和推送设置） -->
+    <div class="modal fade" id="notification-frequency-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-bell"></i> 钉钉通知设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        设置通知聚合间隔，防止频繁通知被钉钉屏蔽。间隔越长，通知越少，但延迟越大。
+                    </div>
+                    
+                    <!-- 推送开关 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-toggle-on"></i> 推送开关
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enable-push" checked>
+                                <label class="form-check-label fw-bold" for="enable-push">
+                                    推送总开关
+                                </label>
+                                <br><small class="text-muted">关闭后将不会收到任何推送通知</small>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enable-task-complete" checked>
+                                <label class="form-check-label" for="enable-task-complete">
+                                    任务完成通知
+                                </label>
+                                <br><small class="text-muted">小组成员完成任务时推送</small>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enable-daily-summary">
+                                <label class="form-check-label" for="enable-daily-summary">
+                                    每日汇总通知
+                                </label>
+                                <br><small class="text-muted">每天下午6点推送当日汇总（暂未开放）</small>
+                            </div>
+                            
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable-abnormal-alert" checked>
+                                <label class="form-check-label" for="enable-abnormal-alert">
+                                    异常提醒
+                                </label>
+                                <br><small class="text-muted">发生异常情况时推送</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            任务完成通知
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label">聚合间隔（分钟）</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <select class="form-select" id="freq-task-complete">
+                                        <option value="1">1分钟（几乎实时）</option>
+                                        <option value="5" selected>5分钟（推荐）</option>
+                                        <option value="10">10分钟</option>
+                                        <option value="15">15分钟</option>
+                                        <option value="30">30分钟</option>
+                                    </select>
+                                    <small class="text-muted">每次任务完成后，等待该时间聚合后发送</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-warning text-dark">
+                            配置变更通知
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label">聚合间隔（分钟）</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <select class="form-select" id="freq-config-change">
+                                        <option value="15">15分钟</option>
+                                        <option value="30" selected>30分钟（推荐）</option>
+                                        <option value="60">60分钟</option>
+                                        <option value="120">120分钟</option>
+                                    </select>
+                                    <small class="text-muted">组长修改工时配置后，等待该时间聚合后发送</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-danger text-white">
+                            异常预警通知
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                异常预警通知立即发送，但同类异常会去重（防止重复通知）
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label">去重间隔（分钟）</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <select class="form-select" id="freq-abnormal-alert">
+                                        <option value="30">30分钟</option>
+                                        <option value="60" selected>60分钟（推荐）</option>
+                                        <option value="120">120分钟</option>
+                                    </select>
+                                    <small class="text-muted">同类异常在该时间内只通知一次</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 免打扰时间 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-secondary text-white">
+                            <i class="bi bi-moon"></i> 免打扰时间
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">开始时间</label>
+                                    <select id="quiet-start-hour" class="form-select">
+                                        <option value="20">20:00</option>
+                                        <option value="21">21:00</option>
+                                        <option value="22" selected>22:00</option>
+                                        <option value="23">23:00</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">结束时间</label>
+                                    <select id="quiet-end-hour" class="form-select">
+                                        <option value="6">06:00</option>
+                                        <option value="7">07:00</option>
+                                        <option value="8" selected>08:00</option>
+                                        <option value="9">09:00</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2">在免打扰时间内不会收到推送通知（默认 22:00 - 08:00）</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="saveNotificationSettings()">
+                        <i class="bi bi-save"></i> 保存设置
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 型号工时配置模态框 -->
+    <div class="modal fade" id="work-time-config-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-clock-history"></i> 型号工时配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <!-- 添加配置区域 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-plus-circle"></i> 添加/修改配置
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">型号名称</label>
+                                    <input type="text" class="form-control" id="config-model-name" list="available-models" placeholder="输入或选择型号" autocomplete="off">
+                                    <datalist id="available-models">
+                                        <!-- 型号选项动态加载 -->
+                                    </datalist>
+                                    <small class="text-muted" id="available-models-hint">加载中...</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">工序</label>
+                                    <select class="form-select" id="config-process-type">
+                                        <option value="embedding">嵌线</option>
+                                        <option value="wiring">绕线</option>
+                                        <option value="connecting">接线</option>
+                                        <option value="pressing">压装</option>
+                                        <option value="stopper">车止口</option>
+                                        <option value="immersion">浸漆</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">扫码次数</label>
+                                    <select class="form-select" id="config-scan-mode">
+                                        <option value="single">一次录入</option>
+                                        <option value="double">两次录入</option>
+                                    </select>
+                                    <small class="text-muted">选择扫码模式</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">最短工时（分钟）</label>
+                                    <input type="number" class="form-control" id="config-min-minutes" min="0" value="0" placeholder="0=不限制">
+                                    <small class="text-muted" id="min-time-hint">仅两次录入时生效，0=不限制</small>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <button class="btn btn-success w-100" onclick="saveWorkTimeConfig()">
+                                        <i class="bi bi-save"></i> 保存配置
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 配置列表 -->
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-list-ul"></i> 已配置列表
+                        </div>
+                        <div class="card-body">
+                            <div id="work-time-config-list" class="table-responsive">
+                                <p class="text-center text-muted">加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 冲床台账查询模态框 -->
     <div class="modal fade" id="stamping-ledger-modal" tabindex="-1">
         <div class="modal-dialog modal-xl">
@@ -1317,10 +1567,20 @@
     -->
     <!-- 加载状态指示器 -->
     <script src="js/loading-indicator.js?v=1.0"></script>
+    <!-- 型号切换管理模块 -->
+    <script src="js/model-switcher.js?v=2.1"></script>
+    <!-- 型号显示适配器 -->
+    <script src="js/model-display-adapter.js?v=2.0"></script>
     <!-- 推送设置管理模块 -->
     <script src="js/push-manager.js?v=1.6"></script>
-    <script src="js/app-new.js?v=3.42"></script>
+    <script src="js/app-new.js?v=3.49"></script>
+    <!-- 型号显示补丁（必须在 app-new.js 之后） -->
+    <script src="js/model-display-patch.js?v=2.1"></script>
+    <!-- 嵌线双次扫码补丁（必须紧跟 app-new.js 之后） -->
+    <script src="js/embedding-double-scan-patch.js?v=3.0"></script>
     <script src="js/push-settings-ui.js?v=4.4"></script>
+    <!-- 任务管理模块（双次扫码制度） -->
+    <script src="js/task-management.js?v=2.0"></script>
     <!-- 加载补丁脚本 -->
     <script src="patches/fix-scan-issues.js?v=1.1"></script>
     <!-- 加载iOS修复补丁 -->
@@ -1405,6 +1665,15 @@
             console.log('✅ Bootstrap Tab功能可用:', typeof bootstrap.Tab);
         } else {
             console.error('❌ Bootstrap未加载');
+        }
+        
+        // 初始化型号切换器UI
+        if (typeof ModelSwitcher !== 'undefined') {
+            const container = document.getElementById('model-switcher-container');
+            if (container) {
+                container.innerHTML = ModelSwitcher.createHtml();
+                console.log('✅ 型号切换器UI已初始化');
+            }
         }
     });
     </script>

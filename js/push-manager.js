@@ -9,7 +9,7 @@ const PushManager = (function() {
     // 配置
     const CONFIG = {
         apiBaseUrl: '/api',
-        swPath: '/sw-push.js',
+        swPath: '/service-worker.js',  // 使用统一的Service Worker
         vapidPublicKey: null  // 从服务器获取
     };
     

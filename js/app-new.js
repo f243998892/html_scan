@@ -233,6 +233,19 @@ function addEventListeners() {
         });
     }
     
+    // 监听所有Bootstrap Modal的关闭事件，确保恢复页面滚动
+    document.addEventListener('hidden.bs.modal', function (event) {
+        console.log('Modal关闭事件触发');
+        // 强制清理所有modal相关的类和样式
+        setTimeout(() => {
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            document.documentElement.style.overflow = '';
+        }, 100);
+    });
+    
     // 组长功能实现
 // 处理组长功能入口
 function handleLeaderFunctions() {
@@ -622,9 +635,9 @@ async function generateDetailsSheet(filters) {
     
     const data = [];
     
-    // 标题行 - 包含所有字段
+    // 标题行 - 包含所有字段（包括三个型号列）
     const headers = [
-        '序号', '产品编码', '产品型号',
+        '序号', '产品编码', '产品型号', '半成品型号', '成品型号',
         '绕线员工', '绕线时间',
         '嵌线员工', '嵌线时间',
         '接线员工', '接线时间',
@@ -664,6 +677,8 @@ async function generateDetailsSheet(filters) {
             index + 1,
             record['产品编码'] || '',
             record['产品型号'] || '',
+            record['半成品型号'] || '',
+            record['成品型号'] || '',
             record['绕线员工'] || '',
             formatTime(record['绕线时间']),
             record['嵌线员工'] || '',
@@ -1202,9 +1217,9 @@ async function queryGroupProducts() {
             return;
         }
         
-        // 组合日期和时间
-        const startDateTime = `${startDate}T${startTime}Z`;
-        const endDateTime = `${endDate}T${endTime}Z`;
+        // 组合日期和时间（不添加Z，使用本地时间避免时区问题）
+        const startDateTime = `${startDate}T${startTime}`;
+        const endDateTime = `${endDate}T${endTime}`;
         
         // 调用组长汇总API
         const requestBody = {
@@ -1255,12 +1270,13 @@ function displayGroupProductsResult(data, groupName, processName, startDate, end
     const isModelFiltered = modelFilter && Array.isArray(modelFilter) && modelFilter.length > 0;
     
     // 只显示数量大于0的产品（根据筛选条件选择合适的字段）
+    // 只保留有完成数的项
     const filteredItems = data.items.filter(item => {
         const count = isEmployeeFiltered ? item.employee_completed : item.total_completed;
         // 先过滤数量
         if (count <= 0) return false;
         // 如果筛选了型号，只显示选中的型号
-        if (isModelFiltered && !modelFilter.includes(item.product_model)) return false;
+        if (isModelFiltered && modelFilter.length > 0 && !modelFilter.includes(item.product_model)) return false;
         return true;
     });
     
@@ -1301,9 +1317,31 @@ function displayGroupProductsResult(data, groupName, processName, startDate, end
         // 根据是否筛选员工，显示对应的数量
         const displayCount = isEmployeeFiltered ? item.employee_completed : item.total_completed;
         
+        // 使用ModelSwitcher获取要显示的型号
+        let displayModel = item.product_model;
+        if (typeof ModelSwitcher !== 'undefined') {
+            const currentType = ModelSwitcher.getCurrentType();
+            if (currentType === 'auto') {
+                // 自动模式：优先显示成品型号 → 半成品型号 → 产品型号
+                if (item.finished_product_model && item.finished_product_model.trim()) {
+                    displayModel = item.finished_product_model;
+                } else if (item.semi_product_model && item.semi_product_model.trim()) {
+                    displayModel = item.semi_product_model;
+                } else {
+                    displayModel = item.product_model;
+                }
+            } else if (currentType === 'semi') {
+                // 选择半成品型号：fallback到产品型号
+                displayModel = item.semi_product_model || item.product_model;
+            } else if (currentType === 'finished') {
+                // 选择成品型号：fallback到产品型号
+                displayModel = item.finished_product_model || item.product_model;
+            }
+        }
+        
         html += `
             <tr class="product-row" data-index="${index}" style="cursor: pointer;">
-                <td class="long-text">${item.product_model}</td>
+                <td class="long-text">${displayModel}</td>
                 <td class="number-cell">${displayCount}</td>
             </tr>
             <tr class="product-detail-row" id="detail-${index}" style="display: none;">
@@ -1435,43 +1473,57 @@ async function loadEmployeeProducts(productIndex, empIndex, employeeName, produc
     if (!productsListDiv) return;
     
     try {
-        // 构建时间范围
-        const startDateTime = new Date(`${startDate}T${startTime || '00:00:00'}`);
-        const endDateTime = new Date(`${endDate}T${endTime || '23:59:59'}`);
+        // 获取当前小组和工序信息
+        const groupSelect = document.getElementById('group-select');
+        const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+        const groupName = groupSelect.value;
+        const processName = selectedOption.getAttribute('data-process-name');
         
-        // 调用API获取该员工完成的所有产品
-        const products = await getUserMonthlyProducts(employeeName, startDateTime, endDateTime);
+        // 使用getProductsByGroup API查询该时间范围的所有产品
+        const response = await fetch(`${API_BASE_URL}/getProductsByGroup`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                group_name: groupName,
+                process_name: processName,
+                start_date: `${startDate}T${startTime || '00:00:00'}`,
+                end_date: `${endDate}T${endTime || '23:59:59'}`
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取产品列表失败');
+        }
+        
+        const products = await response.json();
         
         if (!products || products.length === 0) {
             productsListDiv.innerHTML = '<div class="text-center text-muted small py-2">该员工在此时间范围内未完成任何产品</div>';
             return;
         }
         
-        // 过滤出该型号的产品，并确定完成时间
-        const filteredProducts = products.filter(p => p['产品型号'] === productModel).map(p => {
-            // 找出该员工操作的工序和时间
-            let completedTime = null;
-            const processes = ['绕线', '嵌线', '接线', '压装', '车止口', '浸漆'];
-            
-            for (const process of processes) {
-                const empField = `${process}员工`;
-                const timeField = `${process}时间`;
-                
-                if (p[empField] && p[empField].includes(employeeName) && p[timeField]) {
-                    const processTime = new Date(p[timeField]);
-                    if (!completedTime || processTime > completedTime) {
-                        completedTime = processTime;
-                    }
-                }
-            }
-            
-            return {
+        // 获取当前工序的员工字段和时间字段
+        const empField = `${processName}员工`;
+        const timeField = `${processName}时间`;
+        
+        // 过滤出该型号、该员工在该工序完成的产品
+        const filteredProducts = products
+            .filter(p => {
+                return p['产品型号'] === productModel && 
+                       p[empField] && 
+                       p[empField].includes(employeeName) && 
+                       p[timeField];
+            })
+            .map(p => ({
                 code: p['产品编码'],
                 model: p['产品型号'],
-                completedTime: completedTime,
+                completedTime: new Date(p[timeField]),
                 fullData: p
-            };
-        }).filter(p => p.completedTime); // 只保留有完成时间的
+            }));
+        
+        console.log(`员工${employeeName}在${processName}完成${productModel}的产品数:`, filteredProducts.length);
         
         if (filteredProducts.length === 0) {
             productsListDiv.innerHTML = '<div class="text-center text-muted small py-2">该员工未完成该型号的产品</div>';
@@ -2314,8 +2366,13 @@ function hideAllModals() {
                 }
             });
             
-            // 移除body上的modal-open类
+            // 移除body上的modal-open类和恢复滚动
             document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            
+            // 恢复html的滚动
+            document.documentElement.style.overflow = '';
         }
     } catch (error) {
         console.error('隐藏模态框失败:', error);
@@ -5150,8 +5207,13 @@ function addManualScanEvent() {
                 showToast('请先选择工序', 'warning');
                 return;
             }
-            if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion' && selectedProcess !== 'embedding') {
-                showToast('只有嵌线、车止口和浸漆工序支持手动录入', 'error');
+            // 禁止嵌线使用扫码枪/手动录入
+            if (selectedProcess === 'embedding') {
+                showToast('嵌线工序不支持批量录入，请使用单次扫码', 'error');
+                return;
+            }
+            if (selectedProcess !== 'stopper' && selectedProcess !== 'immersion') {
+                showToast('只有车止口和浸漆工序支持手动录入', 'error');
                 return;
             }
             // 显示工序提示

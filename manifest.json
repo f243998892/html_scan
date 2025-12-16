@@ -1,12 +1,14 @@
 {
-  "name": "扫码系统",
+  "name": "生产扫描系统",
   "short_name": "扫码系统",
-  "description": "产品扫码管理系统",
+  "description": "产品扫码管理和冲床监控系统",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007bff",
   "orientation": "portrait",
+  "categories": ["productivity", "business"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -19,6 +21,32 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "扫码绑定",
+      "short_name": "扫码",
+      "description": "快速进入扫码页面",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "冲床监控",
+      "short_name": "监控",
+      "description": "查看冲床实时状态",
+      "url": "/stamping.html",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 } 

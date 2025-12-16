@@ -3,12 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>冲床计数实时监控 v2.0</title>
+    <title>冲床计数实时监控 v2.1</title>
     
     <!-- 禁止缓存 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    
+    <!-- PWA支持 -->
+    <link rel="manifest" href="./manifest.json?v=1.2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="冲床监控">
+    <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
+    <meta name="theme-color" content="#007bff">
     
     <!-- Bootstrap CSS -->
     <link href="css/bootstrap.min.css" rel="stylesheet">
@@ -531,7 +539,11 @@
             }
         }
         
-        // 渲染设备列表
+        // 存储上次的设备数据，用于比较变化
+        let lastDevicesData = {};
+        let devicesRendered = false;
+        
+        // 渲染设备列表（智能更新，完全避免闪动）
         function renderDevices(devices) {
             const container = document.getElementById('devicesContainer');
             
@@ -546,7 +558,70 @@
                 return;
             }
             
-            container.innerHTML = devices.map(device => {
+            // 第一次渲染或设备数量变化时，完整重新渲染
+            const currentDeviceIds = devices.map(d => d.device_id).sort().join(',');
+            const lastDeviceIds = Object.keys(lastDevicesData).sort().join(',');
+            
+            if (!devicesRendered || currentDeviceIds !== lastDeviceIds) {
+                // 完整渲染
+                container.innerHTML = renderDevicesHTML(devices);
+                devicesRendered = true;
+            } else {
+                // 只更新数字，不重新渲染HTML
+                updateDevicesNumbers(devices);
+            }
+            
+            // 保存当前数据
+            devices.forEach(device => {
+                lastDevicesData[device.device_id] = device;
+            });
+        }
+        
+        // 增量更新（只更新数字，不重新渲染HTML）
+        function updateDevicesNumbers(devices) {
+            devices.forEach(device => {
+                const deviceId = device.device_id;
+                
+                // 更新今日冲次
+                const todayEl = document.querySelector(`[data-device="${deviceId}"] [data-field="today-count"]`);
+                if (todayEl && todayEl.textContent !== formatNumber(device.counts.today)) {
+                    todayEl.textContent = formatNumber(device.counts.today);
+                }
+                
+                // 更新当前频率
+                const freqEl = document.querySelector(`[data-device="${deviceId}"] [data-field="frequency"]`);
+                if (freqEl) {
+                    freqEl.textContent = device.frequency.per_minute.toFixed(1) + ' 次/分';
+                }
+                
+                // 更新累计总数
+                const totalEl = document.querySelector(`[data-device="${deviceId}"] [data-field="total-count"]`);
+                if (totalEl) {
+                    totalEl.textContent = formatNumber(device.counts.total);
+                }
+                
+                // 更新空闲时间
+                const idleEl = document.querySelector(`[data-device="${deviceId}"] [data-field="idle-time"]`);
+                if (idleEl) {
+                    idleEl.textContent = formatTime(device.idle_duration);
+                }
+                
+                // 更新状态（只在变化时更新）
+                const lastDevice = lastDevicesData[deviceId];
+                if (!lastDevice || lastDevice.device_status_type !== device.device_status_type) {
+                    // 状态变化，重新渲染该设备
+                    const deviceCard = document.querySelector(`[data-device="${deviceId}"]`);
+                    if (deviceCard) {
+                        const newHTML = renderDevicesHTML([device]);
+                        deviceCard.outerHTML = newHTML;
+                    }
+                }
+            });
+        }
+        
+        // 生成设备HTML
+        function renderDevicesHTML(devices) {
+            return devices.map(device => {
                 // 根据 device_status_type 区分不同状态
                 const deviceStatusType = device.device_status_type || 'running';
                 let statusClass, badgeClass, statusIcon, statusText;
@@ -572,7 +647,7 @@
                 }
                 
                 return `
-                    <div class="device-card ${statusClass}">
+                    <div class="device-card ${statusClass}" data-device="${device.device_id}">
                         <div class="device-header">
                             <div>
                                 <div class="device-id">${device.device_id}</div>
@@ -604,7 +679,7 @@
                         <div class="today-summary">
                             <div class="summary-item">
                                 <div class="summary-label">今日冲次</div>
-                                <div class="summary-value">${formatNumber(device.counts.today)}</div>
+                                <div class="summary-value" data-field="today-count">${formatNumber(device.counts.today)}</div>
                             </div>
                             <div class="summary-item">
                                 <div class="summary-label">今日完成</div>
@@ -615,15 +690,15 @@
                         <div class="device-info">
                             <div class="info-item">
                                 <div class="info-label">当前频率</div>
-                                <div class="info-value">${device.frequency.per_minute.toFixed(1)} 次/分</div>
+                                <div class="info-value" data-field="frequency">${device.frequency.per_minute.toFixed(1)} 次/分</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">累计总数</div>
-                                <div class="info-value">${formatNumber(device.counts.total)}</div>
+                                <div class="info-value" data-field="total-count">${formatNumber(device.counts.total)}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">空闲时间</div>
-                                <div class="info-value">${formatTime(device.idle_duration)}</div>
+                                <div class="info-value" data-field="idle-time">${formatTime(device.idle_duration)}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">平均频率</div>
@@ -652,11 +727,6 @@
                     </div>
                 `;
             }).join('');
-            
-            // 加载每个设备的多型号数据
-            devices.forEach(device => {
-                loadDeviceModels(device.device_id);
-            });
         }
         
         // 加载设备的多型号统计数据
@@ -839,8 +909,28 @@
         // 初始加载
         loadData();
         
-        // 每3秒自动刷新
-        setInterval(loadData, 3000);
+        // 每5秒自动刷新（减少闪动）
+        setInterval(loadData, 5000);
+        
+        // 型号统计单独刷新（每10秒一次，减少闪动）
+        async function refreshAllModelsStats() {
+            try {
+                const response = await fetch(`${API_BASE}/monitor/realtime`);
+                const data = await response.json();
+                if (data.status === 'success' && data.devices) {
+                    data.devices.forEach(device => {
+                        loadDeviceModels(device.device_id);
+                    });
+                }
+            } catch (error) {
+                console.error('刷新型号统计失败:', error);
+            }
+        }
+        
+        // 初始加载型号统计
+        setTimeout(refreshAllModelsStats, 1000);
+        // 每10秒刷新型号统计
+        setInterval(refreshAllModelsStats, 10000);
         
         // 页面可见性变化时刷新
         document.addEventListener('visibilitychange', function() {
@@ -848,6 +938,37 @@
                 loadData();
             }
         });
+        
+        // ====================================================================
+        // PWA Service Worker注册
+        // ====================================================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/service-worker.js', {
+                    scope: '/'
+                }).then(function(registration) {
+                    console.log('[PWA] Service Worker注册成功:', registration.scope);
+                    
+                    // 检查更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('[PWA] 发现新版本，将在下次访问时更新');
+                            }
+                        });
+                    });
+                }).catch(function(error) {
+                    console.error('[PWA] Service Worker注册失败:', error);
+                });
+                
+                // 监听Service Worker更新
+                navigator.serviceWorker.addEventListener('controllerchange', function() {
+                    console.log('[PWA] Service Worker已更新，刷新页面...');
+                    window.location.reload();
+                });
+            });
+        }
     </script>
 </body>
 </html>

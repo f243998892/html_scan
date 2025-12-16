@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线模式 - 生产扫描系统</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .offline-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        .offline-icon {
+            font-size: 80px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 2rem;
+        }
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .btn-retry {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-retry:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .network-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .status-online {
+            color: #28a745;
+        }
+        .status-offline {
+            color: #dc3545;
+        }
+        .cached-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e7f3ff;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">
+            <i class="bi bi-wifi-off"></i>
+        </div>
+        <h1>离线模式</h1>
+        <p>当前网络连接不可用，无法加载最新数据。</p>
+        
+        <div class="network-status" id="networkStatus">
+            <i class="bi bi-circle-fill"></i>
+            <span id="statusText">检测网络状态...</span>
+        </div>
+        
+        <div class="cached-info" id="cachedInfo" style="display: none;">
+            <i class="bi bi-info-circle"></i>
+            <span>您可以使用已缓存的数据</span>
+        </div>
+        
+        <button class="btn-retry" onclick="retryConnection()">
+            <i class="bi bi-arrow-clockwise"></i> 重试连接
+        </button>
+        
+        <div style="margin-top: 30px;">
+            <a href="/" style="color: #667eea; text-decoration: none;">
+                <i class="bi bi-house"></i> 返回首页
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // 检测网络状态
+        function updateNetworkStatus() {
+            const statusEl = document.getElementById('networkStatus');
+            const statusText = document.getElementById('statusText');
+            const cachedInfo = document.getElementById('cachedInfo');
+            
+            if (navigator.onLine) {
+                statusEl.className = 'network-status status-online';
+                statusText.innerHTML = '<i class="bi bi-wifi"></i> 网络已连接';
+                cachedInfo.style.display = 'none';
+                
+                // 网络恢复，3秒后自动刷新
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                statusEl.className = 'network-status status-offline';
+                statusText.innerHTML = '<i class="bi bi-wifi-off"></i> 网络未连接';
+                cachedInfo.style.display = 'block';
+            }
+        }
+        
+        // 重试连接
+        function retryConnection() {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 连接中...';
+            
+            // 检查网络
+            if (navigator.onLine) {
+                window.location.reload();
+            } else {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    alert('网络仍未连接，请检查您的网络设置');
+                }, 2000);
+            }
+        }
+        
+        // 监听网络状态变化
+        window.addEventListener('online', () => {
+            updateNetworkStatus();
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        });
+        
+        window.addEventListener('offline', () => {
+            updateNetworkStatus();
+        });
+        
+        // 初始化
+        updateNetworkStatus();
+        
+        // 定期检查网络状态
+        setInterval(updateNetworkStatus, 5000);
+    </script>
+</body>
+</html>
+
