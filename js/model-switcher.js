@@ -31,6 +31,9 @@
             currentModelType = saved;
         }
         console.log(`✅ 型号切换模块已加载，当前显示: ${MODEL_FIELDS[currentModelType].label}`);
+        
+        // 初始化后立即更新UI
+        updateSwitcherUI();
     }
     
     /**
@@ -166,6 +169,43 @@
             labelElement.textContent = MODEL_FIELDS[currentModelType].label;
         }
         
+        // 更新筛选框标签
+        const filterLabelElement = document.getElementById('model-filter-label');
+        console.log('🔍 查找筛选框标签元素:', filterLabelElement);
+        if (filterLabelElement) {
+            const newText = MODEL_FIELDS[currentModelType].label + '筛选（可多选）';
+            console.log('🏷️ 更新筛选框标签:', newText);
+            filterLabelElement.textContent = newText;
+        } else {
+            console.warn('❌ 未找到筛选框标签元素 model-filter-label');
+        }
+        
+        // 更新Select2占位符
+        if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+            try {
+                const $modelFilter = jQuery('#model-filter');
+                if ($modelFilter.data('select2')) {
+                    $modelFilter.select2('destroy');
+                }
+                $modelFilter.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: '全部' + MODEL_FIELDS[currentModelType].label + '（可多选）',
+                    allowClear: true,
+                    width: '100%',
+                    language: {
+                        noResults: function() {
+                            return '未找到匹配的型号';
+                        },
+                        searching: function() {
+                            return '搜索中...';
+                        }
+                    }
+                });
+            } catch (e) {
+                console.log('Select2更新失败:', e);
+            }
+        }
+        
         // 更新active状态
         const dropdown = document.getElementById('modelSwitcher');
         if (dropdown) {
@@ -203,8 +243,12 @@
         MODEL_FIELDS: MODEL_FIELDS
     };
     
-    // 自动初始化
-    init();
+    // 等待DOM加载完成后再初始化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
     
 })();
 

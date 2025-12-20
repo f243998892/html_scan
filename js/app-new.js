@@ -932,9 +932,15 @@ function initModelFilter() {
             if (jQuery('#model-filter').data('select2')) {
                 jQuery('#model-filter').select2('destroy');
             }
+        // 获取当前型号类型的标签
+        let modelLabel = '型号';
+        if (typeof ModelSwitcher !== 'undefined') {
+            modelLabel = ModelSwitcher.MODEL_FIELDS[ModelSwitcher.getCurrentType()].label;
+        }
+        
         jQuery('#model-filter').select2({
             theme: 'bootstrap-5',
-            placeholder: '全部型号（可多选）',
+            placeholder: '全部' + modelLabel + '（可多选）',
             allowClear: true,
             width: '100%',
             language: {
@@ -1086,10 +1092,32 @@ async function loadModelList() {
         const models = new Set();
         
         // 从返回的数据中提取型号
-        // 智能过滤：只显示有数据的型号
+        // 智能过滤：只显示有数据的型号，并根据ModelSwitcher选择显示对应的型号类型
         if (data.items) {
             data.items.forEach(item => {
-                if (item.product_model && item.product_model.trim()) {
+                // 根据ModelSwitcher获取要显示的型号（与查询结果保持一致）
+                let displayModel = item.product_model;
+                if (typeof ModelSwitcher !== 'undefined') {
+                    const currentType = ModelSwitcher.getCurrentType();
+                    if (currentType === 'auto') {
+                        // 自动模式：优先显示成品型号 → 半成品型号 → 产品型号
+                        if (item.finished_product_model && item.finished_product_model.trim()) {
+                            displayModel = item.finished_product_model;
+                        } else if (item.semi_product_model && item.semi_product_model.trim()) {
+                            displayModel = item.semi_product_model;
+                        } else {
+                            displayModel = item.product_model;
+                        }
+                    } else if (currentType === 'semi') {
+                        // 选择半成品型号：fallback到产品型号
+                        displayModel = item.semi_product_model || item.product_model;
+                    } else if (currentType === 'finished') {
+                        // 选择成品型号：fallback到产品型号
+                        displayModel = item.finished_product_model || item.product_model;
+                    }
+                }
+                
+                if (displayModel && displayModel.trim()) {
                     // 根据筛选条件决定使用哪个完成数
                     let completedCount;
                     if (employeeName) {
@@ -1102,7 +1130,7 @@ async function loadModelList() {
                     
                     // 只添加有完成数的型号（在当前时间范围和员工条件下有数据）
                     if (completedCount > 0) {
-                        models.add(item.product_model.trim());
+                        models.add(displayModel.trim());
                     }
                 }
             });
@@ -1746,9 +1774,31 @@ function displayEmployeeProductsResult(data, employeeName, groupName, processNam
     let totalGroupCount = 0;
     
     data.items.forEach(item => {
+        // 使用ModelSwitcher获取要显示的型号
+        let displayModel = item.product_model;
+        if (typeof ModelSwitcher !== 'undefined') {
+            const currentType = ModelSwitcher.getCurrentType();
+            if (currentType === 'auto') {
+                // 自动模式：优先显示成品型号 → 半成品型号 → 产品型号
+                if (item.finished_product_model && item.finished_product_model.trim()) {
+                    displayModel = item.finished_product_model;
+                } else if (item.semi_product_model && item.semi_product_model.trim()) {
+                    displayModel = item.semi_product_model;
+                } else {
+                    displayModel = item.product_model;
+                }
+            } else if (currentType === 'semi') {
+                // 选择半成品型号：fallback到产品型号
+                displayModel = item.semi_product_model || item.product_model;
+            } else if (currentType === 'finished') {
+                // 选择成品型号：fallback到产品型号
+                displayModel = item.finished_product_model || item.product_model;
+            }
+        }
+
         html += `
             <tr>
-                <td class="long-text">${item.product_model}</td>
+                <td class="long-text">${displayModel}</td>
                 ${employeeName ? `<td class="number-cell">${item.employee_completed}</td>` : ''}
                 <td class="number-cell">${item.total_completed}</td>
             </tr>
