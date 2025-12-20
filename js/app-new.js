@@ -419,12 +419,7 @@ async function generateExcelReport(data, filters) {
     const modelSheet = generateModelSummarySheet(filteredItems, filters, isEmployeeFiltered);
     XLSX.utils.book_append_sheet(wb, modelSheet, '按型号汇总');
     
-    // 3. 生成按员工汇总页
-    console.log('准备生成按员工汇总页，filteredItems:', filteredItems);
-    const employeeSheet = generateEmployeeSummarySheet(filteredItems, filters);
-    XLSX.utils.book_append_sheet(wb, employeeSheet, '按员工汇总');
-    
-    // 4. 生成详细流水账（获取详细记录）
+    // 3. 生成详细流水账（获取详细记录）
     const detailsSheet = await generateDetailsSheet(filters);
     XLSX.utils.book_append_sheet(wb, detailsSheet, '详细流水账');
     
@@ -611,7 +606,7 @@ function generateEmployeeSummarySheet(items, filters) {
     return XLSX.utils.aoa_to_sheet(data);
 }
 
-// 生成详细流水账页
+// 生成详细流水账页 - 动态导出所有字段
 async function generateDetailsSheet(filters) {
     // 调用API获取详细记录
     const response = await fetch(`${API_BASE_URL}/getProductsByGroup`, {
@@ -633,19 +628,17 @@ async function generateDetailsSheet(filters) {
     
     const records = await response.json();
     
+    if (!records || records.length === 0) {
+        return XLSX.utils.aoa_to_sheet([['暂无数据']]);
+    }
+    
+    // 动态获取所有字段名（从第一条记录）
+    const allFields = Object.keys(records[0]);
+    
     const data = [];
     
-    // 标题行 - 包含所有字段（包括三个型号列）
-    const headers = [
-        '序号', '产品编码', '产品型号', '半成品型号', '成品型号',
-        '绕线员工', '绕线时间',
-        '嵌线员工', '嵌线时间',
-        '接线员工', '接线时间',
-        '压装员工', '压装时间',
-        '车止口员工', '车止口时间',
-        '浸漆员工', '浸漆时间',
-        '扫码时间', '备注'
-    ];
+    // 标题行 - 动态生成，包含所有字段
+    const headers = ['序号', ...allFields];
     data.push(headers);
     
     // 数据行
@@ -657,9 +650,32 @@ async function generateDetailsSheet(filters) {
         filteredRecords = filteredRecords.filter(r => r[employeeField] === filters.employeeFilter);
     }
     
-    // 应用型号筛选
+    // 应用型号筛选 - 根据ModelSwitcher当前类型选择正确的型号字段
     if (filters.modelFilter && filters.modelFilter.length > 0) {
-        filteredRecords = filteredRecords.filter(r => filters.modelFilter.includes(r['产品型号']));
+        filteredRecords = filteredRecords.filter(record => {
+            // 使用与显示逻辑一致的型号选择
+            let displayModel = record['产品型号'];
+            if (typeof ModelSwitcher !== 'undefined') {
+                const currentType = ModelSwitcher.getCurrentType();
+                if (currentType === 'auto') {
+                    // 自动模式：优先显示成品型号 → 半成品型号 → 产品型号
+                    if (record['成品型号'] && record['成品型号'].trim()) {
+                        displayModel = record['成品型号'];
+                    } else if (record['半成品型号'] && record['半成品型号'].trim()) {
+                        displayModel = record['半成品型号'];
+                    } else {
+                        displayModel = record['产品型号'];
+                    }
+                } else if (currentType === 'semi') {
+                    // 半成品模式
+                    displayModel = record['半成品型号'] || record['产品型号'];
+                } else if (currentType === 'finished') {
+                    // 成品模式
+                    displayModel = record['成品型号'] || record['产品型号'];
+                }
+            }
+            return filters.modelFilter.includes(displayModel);
+        });
     }
     
     filteredRecords.forEach((record, index) => {
@@ -673,31 +689,24 @@ async function generateDetailsSheet(filters) {
             }
         };
         
-        data.push([
-            index + 1,
-            record['产品编码'] || '',
-            record['产品型号'] || '',
-            record['半成品型号'] || '',
-            record['成品型号'] || '',
-            record['绕线员工'] || '',
-            formatTime(record['绕线时间']),
-            record['嵌线员工'] || '',
-            formatTime(record['嵌线时间']),
-            record['接线员工'] || '',
-            formatTime(record['接线时间']),
-            record['压装员工'] || '',
-            formatTime(record['压装时间']),
-            record['车止口员工'] || '',
-            formatTime(record['车止口时间']),
-            record['浸漆员工'] || '',
-            formatTime(record['浸漆时间']),
-            formatTime(record['扫码时间']),
-            record['备注'] || ''
-        ]);
+        // 动态构建数据行
+        const row = [index + 1]; // 序号
+        allFields.forEach(field => {
+            const value = record[field];
+            // 如果字段名包含"时间"，格式化时间
+            if (field.includes('时间') && value) {
+                row.push(formatTime(value));
+            } else {
+                row.push(value || '');
+            }
+        });
+        
+        data.push(row);
     });
     
     return XLSX.utils.aoa_to_sheet(data);
 }
+
 
 // 辅助函数：根据工序获取员工字段名
 function getEmployeeFieldName(processName) {
