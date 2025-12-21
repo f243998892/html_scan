@@ -1,0 +1,566 @@
+/**
+ * 拍照打卡功能样式
+ * 响应式设计，支持移动端和桌面端
+ */
+
+/* 拍照打卡模态框 */
+.photo-checkin-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.photo-checkin-modal.show {
+    opacity: 1;
+}
+
+.photo-checkin-modal .modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.photo-checkin-modal .modal-content {
+    position: relative;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    margin: 5vh auto;
+    background: #fff;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 模态框头部 */
+.photo-checkin-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.photo-checkin-modal .modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.photo-checkin-modal .btn-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    transition: background-color 0.2s;
+}
+
+.photo-checkin-modal .btn-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 模态框主体 */
+.photo-checkin-modal .modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
+/* 拍照区域 */
+.photo-capture-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.camera-preview {
+    width: 100%;
+    max-width: 500px;
+    aspect-ratio: 4/3;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.camera-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.camera-controls .btn {
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.camera-controls .btn-lg {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    min-width: 140px;
+}
+
+.file-upload-option {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.file-upload-option .btn {
+    padding: 10px 20px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 照片预览区域 */
+.photo-preview-area {
+    padding: 20px;
+    text-align: center;
+}
+
+.preview-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto 20px;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.preview-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.preview-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    color: white;
+    padding: 15px;
+}
+
+.photo-info {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.preview-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.preview-controls .btn {
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 130px;
+    justify-content: center;
+}
+
+/* 上传进度区域 */
+.upload-progress-area {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.progress-container {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.upload-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.upload-status i {
+    font-size: 1.5rem;
+}
+
+.progress {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-text {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* 拍照打卡按钮样式 */
+.photo-checkin-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.photo-checkin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.photo-checkin-btn:active {
+    transform: translateY(0);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .photo-checkin-modal .modal-content {
+        width: 95%;
+        margin: 2.5vh auto;
+        max-height: 95vh;
+        border-radius: 10px;
+    }
+    
+    .photo-checkin-modal .modal-header {
+        padding: 15px;
+    }
+    
+    .photo-checkin-modal .modal-title {
+        font-size: 1.1rem;
+    }
+    
+    .camera-preview {
+        aspect-ratio: 3/4;
+    }
+    
+    .camera-controls,
+    .preview-controls {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .camera-controls .btn,
+    .preview-controls .btn {
+        width: 200px;
+        max-width: 100%;
+    }
+    
+    .upload-progress-area {
+        padding: 30px 15px;
+    }
+}
+
+/* 小屏设备 */
+@media (max-width: 480px) {
+    .photo-checkin-modal .modal-content {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .camera-preview {
+        border-radius: 10px;
+    }
+    
+    .preview-container {
+        border-radius: 10px;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .photo-checkin-modal .modal-content {
+        background: #1a1a1a;
+        color: #fff;
+    }
+    
+    .progress {
+        background: #333;
+    }
+    
+    .progress-text {
+        color: #999;
+    }
+}
+
+/* 加载动画 */
+.photo-loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: photo-spin 1s linear infinite;
+}
+
+@keyframes photo-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 成功/错误状态样式 */
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+/* 按钮状态 */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    border: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    border: none;
+}
+
+.btn-outline-primary {
+    border: 2px solid #007bff;
+    color: #007bff;
+    background: transparent;
+}
+
+.btn-outline-primary:hover {
+    background: #007bff;
+    color: white;
+}
+
+/* 打卡范围限制对话框样式 */
+.restriction-details {
+    margin: 15px 0;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin: 5px 0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.check-item.passed {
+    background: rgba(40, 167, 69, 0.1);
+    color: #155724;
+}
+
+.check-item.failed {
+    background: rgba(220, 53, 69, 0.1);
+    color: #721c24;
+}
+
+.admin-bypass {
+    border-top: 1px solid #dee2e6;
+    padding-top: 15px;
+}
+
+.admin-bypass .form-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.input-group .form-control {
+    border-right: none;
+}
+
+.input-group .btn {
+    border-left: none;
+}
+
+/* 打卡范围配置界面样式 */
+.checkin-range-config {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 15px 0;
+}
+
+.config-section {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    border: 1px solid #dee2e6;
+}
+
+.config-section h5 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.location-settings,
+.time-settings {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.time-slot {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.config-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.config-actions .btn {
+    min-width: 120px;
+}
+
+#test-results {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+#test-output {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* 响应式优化 */
+@media (max-width: 576px) {
+    .config-actions {
+        flex-direction: column;
+    }
+    
+    .config-actions .btn {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .input-group .form-control,
+    .input-group .btn {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+    
+    .input-group .btn {
+        margin-top: 5px;
+    }
+}
