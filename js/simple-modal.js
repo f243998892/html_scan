@@ -482,12 +482,20 @@
         
         // 将canvas转换为blob保存
         canvas.toBlob((blob) => {
-            simpleCapturedImage = blob;
-            status.textContent = '✅ 照片已拍摄！可以上传或重新拍摄';
-            console.log('💾 照片已保存为blob，大小:', blob.size, '字节');
-            
-            // 更新按钮状态
-            updateCameraButtons('captured');
+            if (blob) {
+                simpleCapturedImage = blob;
+                status.textContent = '✅ 照片已拍摄！可以上传或重新拍摄';
+                console.log('💾 照片已保存为blob:');
+                console.log('   - 大小:', blob.size, '字节');
+                console.log('   - 类型:', blob.type);
+                console.log('   - 有效性:', blob.size > 0 ? '✅' : '❌');
+                
+                // 更新按钮状态
+                updateCameraButtons('captured');
+            } else {
+                console.error('❌ canvas转blob失败');
+                status.textContent = '❌ 拍照失败，请重试';
+            }
         }, 'image/jpeg', 0.8);
     };
     
@@ -570,10 +578,20 @@
             const location = window.currentUserLocation;
             console.log('📤 准备上传照片，位置信息:', location);
             
+            // 检查图片数据
+            console.log('🖼️ 检查图片数据:');
+            console.log('   - 图片对象:', simpleCapturedImage);
+            console.log('   - 图片大小:', simpleCapturedImage.size, '字节');
+            console.log('   - 图片类型:', simpleCapturedImage.type);
+            console.log('   - 是否有效:', simpleCapturedImage.size > 0 && simpleCapturedImage.type.startsWith('image/'));
+            
+            const employeeName = '员工' + Math.floor(Math.random() * 1000);
+            const timestamp = new Date().toISOString();
+            
             const formData = new FormData();
             formData.append('photo', simpleCapturedImage, `checkin_${Date.now()}.jpg`);
-            formData.append('employee_name', '员工' + Math.floor(Math.random() * 1000));
-            formData.append('timestamp', new Date().toISOString());
+            formData.append('employee_name', employeeName);
+            formData.append('timestamp', timestamp);
             formData.append('location', JSON.stringify({
                 latitude: location.latitude,
                 longitude: location.longitude,
@@ -581,12 +599,15 @@
                 distance_to_company: location.distance
             }));
             
-            console.log('📍 上传位置数据:', {
+            console.log('📋 FormData内容:');
+            console.log('   - employee_name:', employeeName);
+            console.log('   - timestamp:', timestamp);
+            console.log('   - location:', JSON.stringify({
                 latitude: location.latitude,
                 longitude: location.longitude,
                 accuracy: location.accuracy,
                 distance: location.distance.toFixed(0) + '米'
-            });
+            }));
             
             // 使用正确的API端点 - 端口8002的开发服务器
             const response = await fetch('http://localhost:8002/api/upload-checkin-photo', {
