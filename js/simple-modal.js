@@ -466,14 +466,90 @@
             return;
         }
         
+        console.log('📸 开始拍照...');
+        
+        // 捕获当前视频帧到canvas
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, 320, 240);
         
+        // 显示捕获的画面，隐藏视频流
+        video.style.display = 'none';
+        canvas.style.display = 'block';
+        canvas.style.borderRadius = '10px';
+        canvas.style.margin = '10px';
+        
+        console.log('📷 画面已捕获到canvas');
+        
+        // 将canvas转换为blob保存
         canvas.toBlob((blob) => {
             simpleCapturedImage = blob;
-            status.textContent = '照片已拍摄，可以上传了';
+            status.textContent = '✅ 照片已拍摄！可以上传或重新拍摄';
+            console.log('💾 照片已保存为blob，大小:', blob.size, '字节');
+            
+            // 更新按钮状态
+            updateCameraButtons('captured');
         }, 'image/jpeg', 0.8);
     };
+    
+    // 重新拍照功能
+    window.retakeSimplePhoto = function() {
+        const video = document.getElementById('simple-video');
+        const canvas = document.getElementById('simple-canvas');
+        const status = document.getElementById('simple-status');
+        
+        // 显示视频流，隐藏canvas
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+        
+        // 清除已拍摄的照片
+        simpleCapturedImage = null;
+        status.textContent = '摄像头已重新启动，可以重新拍照';
+        
+        // 更新按钮状态
+        updateCameraButtons('streaming');
+        
+        console.log('🔄 已重置到拍照状态');
+    };
+    
+    // 更新摄像头按钮状态
+    function updateCameraButtons(state) {
+        const buttonsContainer = document.querySelector('.simple-modal-content');
+        if (!buttonsContainer) return;
+        
+        // 找到按钮容器
+        const buttonContainer = buttonsContainer.querySelector('div[style*="text-align: center"]');
+        if (!buttonContainer) return;
+        
+        if (state === 'captured') {
+            // 拍照后状态：显示重拍和上传按钮
+            const captureBtn = buttonContainer.querySelector('button[onclick="captureSimplePhoto()"]');
+            const uploadBtn = buttonContainer.querySelector('button[onclick="uploadSimplePhoto()"]');
+            
+            if (captureBtn) {
+                captureBtn.textContent = '🔄 重新拍照';
+                captureBtn.setAttribute('onclick', 'retakeSimplePhoto()');
+            }
+            
+            if (uploadBtn) {
+                uploadBtn.style.background = '#28a745';  // 绿色突出显示
+                uploadBtn.style.fontWeight = 'bold';
+            }
+        } else if (state === 'streaming') {
+            // 视频流状态：正常的拍照按钮
+            const retakeBtn = buttonContainer.querySelector('button[onclick="retakeSimplePhoto()"]');
+            const uploadBtn = buttonContainer.querySelector('button[onclick="uploadSimplePhoto()"]');
+            
+            if (retakeBtn) {
+                retakeBtn.textContent = '📸 拍照';
+                retakeBtn.setAttribute('onclick', 'captureSimplePhoto()');
+            }
+            
+            if (uploadBtn) {
+                uploadBtn.style.background = '';  // 重置颜色
+                uploadBtn.style.fontWeight = '';
+            }
+        }
+    }
     
     window.uploadSimplePhoto = async function() {
         const status = document.getElementById('simple-status');
