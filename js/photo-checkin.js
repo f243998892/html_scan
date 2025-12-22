@@ -42,28 +42,38 @@ class PhotoCheckin {
      * 开始拍照打卡流程
      */
     async startPhotoCheckin() {
+        console.log('🚀 开始拍照打卡流程');
+        
         try {
             // 检查打卡范围限制
             if (typeof CheckinRangeConfig !== 'undefined') {
+                console.log('✅ CheckinRangeConfig 类存在，开始检查权限');
                 const rangeConfig = new CheckinRangeConfig();
                 
                 this.showToast('正在检查打卡权限...', 'info');
                 const checkResult = await rangeConfig.checkCheckinAllowed();
+                console.log('权限检查结果:', checkResult);
                 
                 if (!checkResult.overall.passed) {
+                    console.log('❌ 权限检查未通过，显示限制对话框');
                     // 显示限制原因对话框
                     this.showRangeRestrictionDialog(checkResult);
                     return;
                 }
                 
+                console.log('✅ 权限检查通过');
                 this.showToast(checkResult.overall.message, 'success');
+            } else {
+                console.log('⚠️ CheckinRangeConfig 类不存在，跳过权限检查');
             }
             
             // 显示拍照界面
+            console.log('📱 显示拍照界面');
             this.showPhotoInterface();
             
         } catch (error) {
-            console.error('启动拍照功能失败:', error);
+            console.error('❌ 启动拍照功能失败:', error);
+            alert('启动拍照功能失败: ' + error.message);
             this.showToast('启动拍照功能失败，请重试', 'error');
         }
     }
@@ -72,14 +82,53 @@ class PhotoCheckin {
      * 显示拍照界面
      */
     showPhotoInterface() {
-        // 创建拍照模态框
-        const modal = this.createPhotoModal();
-        document.body.appendChild(modal);
+        console.log('📱 开始显示拍照界面');
         
-        // 显示模态框
-        setTimeout(() => {
-            modal.classList.add('show');
-        }, 100);
+        try {
+            // 检查并移除已存在的模态框
+            const existingModal = document.querySelector('.photo-checkin-modal');
+            if (existingModal) {
+                console.log('🗑️ 移除已存在的模态框');
+                existingModal.remove();
+            }
+            
+            // 创建拍照模态框
+            console.log('🔨 创建新的拍照模态框');
+            const modal = this.createPhotoModal();
+            
+            if (!modal) {
+                throw new Error('创建模态框失败');
+            }
+            
+            console.log('📄 模态框HTML结构:', modal.outerHTML.substring(0, 200) + '...');
+            
+            // 添加到页面
+            document.body.appendChild(modal);
+            console.log('✅ 模态框已添加到页面');
+            
+            // 强制重排
+            modal.offsetHeight;
+            
+            // 显示模态框
+            console.log('🎭 显示模态框 (添加show类)');
+            setTimeout(() => {
+                modal.classList.add('show');
+                console.log('✨ show类已添加，模态框应该可见');
+                
+                // 检查模态框状态
+                const computedStyle = window.getComputedStyle(modal);
+                console.log('模态框计算样式:');
+                console.log('- opacity:', computedStyle.opacity);
+                console.log('- visibility:', computedStyle.visibility);
+                console.log('- z-index:', computedStyle.zIndex);
+                console.log('- position:', computedStyle.position);
+                console.log('- pointer-events:', computedStyle.pointerEvents);
+            }, 100);
+            
+        } catch (error) {
+            console.error('❌ 显示拍照界面失败:', error);
+            alert('显示拍照界面失败: ' + error.message);
+        }
     }
     
     /**

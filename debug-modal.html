@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>模态框调试</title>
+    <style>
+        .debug-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+        
+        .debug-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .debug-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .debug-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .test-btn {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>模态框调试测试</h1>
+    
+    <button class="test-btn" onclick="showDebugModal()">测试简单模态框</button>
+    <button class="test-btn" onclick="testPhotoCheckin()">测试拍照打卡</button>
+    
+    <div id="debug-modal" class="debug-modal" onclick="closeOnBackdrop(event)">
+        <div class="debug-content" onclick="event.stopPropagation()">
+            <button class="debug-close" onclick="closeDebugModal()">&times;</button>
+            <h3>测试模态框</h3>
+            <p>如果你能看到这个内容，说明基本模态框可以工作。</p>
+            <button class="test-btn" onclick="alert('按钮可以点击!')">测试按钮</button>
+            <input type="text" placeholder="测试输入框" style="width: 100%; padding: 5px; margin: 10px 0;">
+        </div>
+    </div>
+    
+    <script>
+        function showDebugModal() {
+            console.log('显示调试模态框');
+            const modal = document.getElementById('debug-modal');
+            modal.classList.add('show');
+        }
+        
+        function closeDebugModal() {
+            console.log('关闭调试模态框');
+            const modal = document.getElementById('debug-modal');
+            modal.classList.remove('show');
+        }
+        
+        function closeOnBackdrop(event) {
+            if (event.target.id === 'debug-modal') {
+                closeDebugModal();
+            }
+        }
+        
+        function testPhotoCheckin() {
+            console.log('测试拍照打卡');
+            if (typeof PhotoCheckin !== 'undefined') {
+                console.log('PhotoCheckin类存在');
+                const photoCheckin = new PhotoCheckin();
+                photoCheckin.startPhotoCheckin();
+            } else {
+                alert('PhotoCheckin类不存在，可能JavaScript加载失败');
+            }
+        }
+        
+        // 检查依赖
+        console.log('=== 模态框调试信息 ===');
+        console.log('jQuery存在:', typeof $ !== 'undefined');
+        console.log('Bootstrap存在:', typeof bootstrap !== 'undefined');
+        console.log('PhotoCheckin存在:', typeof PhotoCheckin !== 'undefined');
+        console.log('CheckinRangeConfig存在:', typeof CheckinRangeConfig !== 'undefined');
+        
+        // 检查CSS加载
+        const cssFiles = Array.from(document.styleSheets);
+        console.log('加载的CSS文件数量:', cssFiles.length);
+        
+        // 监听所有错误
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript错误:', e.error);
+            alert('JavaScript错误: ' + e.message);
+        });
+    </script>
+</body>
+</html>
