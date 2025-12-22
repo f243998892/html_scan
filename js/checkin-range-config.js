@@ -9,8 +9,8 @@ class CheckinRangeConfig {
             // 地理位置限制
             location: {
                 enabled: true,
-                centerLat: 31.2304,  // 公司纬度（默认：上海）
-                centerLng: 121.4737, // 公司经度（默认：上海）
+                centerLat: 39.075277,  // 公司纬度（北纬 39°4'31"）
+                centerLng: 117.037222, // 公司经度（东经 117°2'14"）
                 radius: 500,         // 允许打卡范围半径（米）
                 accuracy: 100,       // GPS精度要求（米）
                 timeout: 15000       // 定位超时时间（毫秒）

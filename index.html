@@ -50,8 +50,10 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     -->
-    <!-- 拍照打卡样式 -->
-    <link href="css/photo-checkin.css" rel="stylesheet">
+    <!-- 拍照打卡功能样式 -->
+    <link rel="stylesheet" href="css/photo-checkin.css?v=1.0">
+    <!-- 照片管理功能样式 -->
+    <link rel="stylesheet" href="css/photo-management.css?v=1.0">
     
     <!-- PWA支持 -->
     <link rel="manifest" href="./manifest.json?v=1.1">
@@ -535,6 +537,14 @@
                         <div class="card-body text-center p-4 home-card">
                             <i class="bi bi-camera-fill text-success"></i>
                             <h5 class="text-success">拍照打卡</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card shadow-sm h-100 photo-management-btn" id="card-photo-management">
+                        <div class="card-body text-center p-4 home-card">
+                            <i class="bi bi-images text-info"></i>
+                            <h5 class="text-info">照片管理</h5>
                         </div>
                     </div>
                 </div>
@@ -1589,6 +1599,8 @@
     <!-- 拍照打卡功能 -->
     <script src="js/checkin-range-config.js?v=1.0"></script>
     <script src="js/photo-checkin.js?v=1.0"></script>
+    <!-- 照片管理功能 -->
+    <script src="js/photo-management.js?v=1.0"></script>
     <!-- 嵌线双次扫码补丁（必须紧跟 app-new.js 之后） -->
     <script src="js/embedding-double-scan-patch.js?v=3.0"></script>
     <script src="js/push-settings-ui.js?v=4.4"></script>

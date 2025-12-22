@@ -209,6 +209,13 @@ class PhotoCheckin {
             this.stopCamera();
         });
         
+        // 点击背景关闭模态框
+        const backdrop = modal.querySelector('.modal-backdrop');
+        backdrop?.addEventListener('click', () => {
+            this.stopCamera();
+            modal.remove();
+        });
+        
         // 启动摄像头
         setTimeout(() => this.startCamera(modal), 500);
     }
@@ -663,6 +670,12 @@ class PhotoCheckin {
         setTimeout(() => {
             modal.classList.add('show');
         }, 100);
+        
+        // 点击背景关闭模态框
+        const backdrop = modal.querySelector('.modal-backdrop');
+        backdrop.addEventListener('click', () => {
+            modal.remove();
+        });
         
         // 绑定事件
         const retryBtn = modal.querySelector('#retryCheckBtn');

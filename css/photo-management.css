@@ -1,0 +1,499 @@
+/* 照片管理模态框样式 */
+.photo-management-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.photo-management-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.photo-management-modal .modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+}
+
+.photo-management-modal .modal-content {
+    position: relative;
+    width: 95%;
+    max-width: 1200px;
+    height: 90vh;
+    margin: 2.5vh auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    transform: translateY(30px);
+    transition: transform 0.3s ease;
+}
+
+.photo-management-modal.show .modal-content {
+    transform: translateY(0);
+}
+
+.photo-management-modal .modal-header {
+    padding: 20px 25px 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 15px 15px 0 0;
+}
+
+.photo-management-modal .modal-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.photo-management-modal .modal-body {
+    flex: 1;
+    padding: 20px 25px;
+    overflow-y: auto;
+}
+
+.photo-management-modal .modal-footer {
+    padding: 15px 25px 20px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    background: #f8f9fa;
+    border-radius: 0 0 15px 15px;
+}
+
+/* 筛选栏样式 */
+.filter-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.filter-section .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+/* 统计信息样式 */
+.stats-section {
+    margin-bottom: 25px;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #007bff;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* 照片列表区域样式 */
+.photos-section {
+    flex: 1;
+    min-height: 0;
+}
+
+.view-controls .btn {
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.85rem;
+}
+
+.view-controls .btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* 照片网格卡片样式 */
+.photo-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.photo-card:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.photo-card-header {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+}
+
+.photo-card-header .form-check-input {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.photo-card-image {
+    aspect-ratio: 4/3;
+    position: relative;
+    overflow: hidden;
+}
+
+.photo-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.photo-card-image img:hover {
+    transform: scale(1.05);
+}
+
+.photo-card-image .image-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #6c757d;
+}
+
+.photo-card-image .image-placeholder i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.photo-card-body {
+    padding: 15px;
+}
+
+.photo-card-body h6 {
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.photo-card-body p {
+    margin: 0 0 12px 0;
+}
+
+/* 表格样式优化 */
+.table-responsive {
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+    padding: 12px;
+}
+
+.table tbody tr:hover {
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.table tbody td {
+    padding: 12px;
+    vertical-align: middle;
+}
+
+.photo-thumbnail {
+    flex-shrink: 0;
+}
+
+.thumbnail-placeholder {
+    width: 40px;
+    height: 40px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+}
+
+/* 加载指示器 */
+.loading-indicator {
+    padding: 40px 20px;
+}
+
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+    color: #007bff;
+}
+
+/* 空状态样式 */
+.empty-state {
+    color: #6c757d;
+}
+
+.empty-state i {
+    opacity: 0.6;
+}
+
+/* 照片查看器样式 */
+.photo-viewer-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 11000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.photo-viewer-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.photo-viewer-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 10px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+.photo-viewer-header {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.photo-viewer-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.photo-viewer-body {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 分页样式 */
+.pagination-section {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.pagination .page-link {
+    border-radius: 20px;
+    margin: 0 2px;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+}
+
+.pagination .page-item.active .page-link {
+    background: #007bff;
+    border-color: #007bff;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .photo-management-modal .modal-content {
+        width: 98%;
+        height: 95vh;
+        margin: 1vh auto;
+    }
+    
+    .photo-management-modal .modal-header,
+    .photo-management-modal .modal-body,
+    .photo-management-modal .modal-footer {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .filter-section {
+        padding: 15px;
+    }
+    
+    .stats-section .row {
+        margin: 0 -5px;
+    }
+    
+    .stats-section .col-3 {
+        padding: 0 5px;
+        margin-bottom: 10px;
+    }
+    
+    .stat-card {
+        padding: 10px;
+    }
+    
+    .stat-number {
+        font-size: 1.4rem;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+    }
+    
+    .photo-card-body {
+        padding: 10px;
+    }
+    
+    .btn-group-sm .btn {
+        padding: 2px 6px;
+        font-size: 0.75rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+    
+    .photo-viewer-content {
+        max-width: 95vw;
+        max-height: 95vh;
+    }
+    
+    .photo-viewer-body {
+        padding: 10px;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .photo-management-modal .modal-content {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .photo-management-modal .modal-header {
+        background: linear-gradient(135deg, #4a5568, #2d3748);
+        border-bottom-color: #4a5568;
+    }
+    
+    .photo-management-modal .modal-title {
+        color: #e2e8f0;
+    }
+    
+    .photo-management-modal .modal-footer {
+        background: #2d3748;
+        border-top-color: #4a5568;
+    }
+    
+    .filter-section {
+        background: #4a5568;
+        border-color: #718096;
+    }
+    
+    .filter-section .form-label {
+        color: #e2e8f0;
+    }
+    
+    .stat-card {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .photo-card {
+        background: #4a5568;
+        border-color: #718096;
+    }
+    
+    .photo-card-body h6 {
+        color: #e2e8f0;
+    }
+    
+    .table {
+        color: #e2e8f0;
+    }
+    
+    .table thead th {
+        background: #4a5568;
+        border-bottom-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .photo-viewer-content {
+        background: #2d3748;
+    }
+    
+    .photo-viewer-header {
+        background: #4a5568;
+        border-bottom-color: #718096;
+    }
+    
+    .photo-viewer-header h5 {
+        color: #e2e8f0;
+    }
+}
