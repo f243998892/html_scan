@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单模态框测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-btn {
+            display: inline-block;
+            padding: 15px 30px;
+            margin: 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .test-btn:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        .test-btn.success {
+            background: #28a745;
+        }
+        .test-btn.success:hover {
+            background: #1e7e34;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e9ecef;
+        }
+        .console-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>📱 简单模态框测试</h1>
+        
+        <div class="status">
+            <h3>测试状态</h3>
+            <p id="status-text">等待测试...</p>
+        </div>
+        
+        <div style="text-align: center;">
+            <button class="test-btn photo-checkin-btn">
+                📸 测试拍照打卡
+            </button>
+            
+            <button class="test-btn photo-management-btn success">
+                📁 测试照片管理
+            </button>
+            
+            <button class="test-btn" onclick="showConsoleOutput()">
+                📋 显示控制台日志
+            </button>
+            
+            <button class="test-btn" onclick="clearConsole()">
+                🗑️ 清空日志
+            </button>
+        </div>
+        
+        <div id="console-section" style="display: none;">
+            <h4>控制台输出</h4>
+            <div id="console-output" class="console-output"></div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h3>测试说明</h3>
+            <ul>
+                <li><strong>拍照打卡</strong>：点击应该弹出拍照界面，包含摄像头预览和控制按钮</li>
+                <li><strong>照片管理</strong>：点击应该弹出照片管理界面，包含搜索和统计功能</li>
+                <li><strong>模态框交互</strong>：
+                    <ul>
+                        <li>点击模态框内容区域不应关闭模态框</li>
+                        <li>点击模态框背景应该关闭模态框</li>
+                        <li>点击右上角×按钮应该关闭模态框</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 加载简单模态框 -->
+    <script src="js/simple-modal.js?v=1.0"></script>
+    
+    <script>
+        // 捕获控制台日志
+        const originalLog = console.log;
+        const originalError = console.error;
+        const logs = [];
+        
+        function captureLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            logs.push(`[${timestamp}] [${type.toUpperCase()}] ${message}`);
+            
+            // 更新状态
+            const statusText = document.getElementById('status-text');
+            if (statusText) {
+                if (type === 'error') {
+                    statusText.innerHTML = `❌ 错误: ${message}`;
+                    statusText.style.color = '#dc3545';
+                } else if (message.includes('已显示') || message.includes('已加载完成')) {
+                    statusText.innerHTML = `✅ ${message}`;
+                    statusText.style.color = '#28a745';
+                } else {
+                    statusText.innerHTML = `ℹ️ ${message}`;
+                    statusText.style.color = '#007bff';
+                }
+            }
+            
+            // 更新控制台输出显示
+            updateConsoleDisplay();
+        }
+        
+        console.log = function(...args) {
+            captureLog('log', ...args);
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            captureLog('error', ...args);
+            originalError.apply(console, args);
+        };
+        
+        function updateConsoleDisplay() {
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.innerHTML = logs.slice(-20).join('\n');
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+        
+        function showConsoleOutput() {
+            const section = document.getElementById('console-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+            updateConsoleDisplay();
+        }
+        
+        function clearConsole() {
+            logs.length = 0;
+            updateConsoleDisplay();
+            const statusText = document.getElementById('status-text');
+            statusText.innerHTML = '等待测试...';
+            statusText.style.color = '#6c757d';
+        }
+        
+        // 页面加载完成时的状态
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const statusText = document.getElementById('status-text');
+                if (typeof simplePhotoCheckin !== 'undefined' && typeof simplePhotoManagement !== 'undefined') {
+                    statusText.innerHTML = '✅ 简单模态框已加载，可以开始测试';
+                    statusText.style.color = '#28a745';
+                } else {
+                    statusText.innerHTML = '❌ 简单模态框加载失败';
+                    statusText.style.color = '#dc3545';
+                }
+            }, 500);
+        });
+        
+        // 监听错误
+        window.addEventListener('error', function(e) {
+            captureLog('error', `JavaScript错误: ${e.message} (${e.filename}:${e.lineno})`);
+        });
+        
+        console.log('测试页面已加载');
+    </script>
+</body>
+</html>
