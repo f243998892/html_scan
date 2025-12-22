@@ -89,70 +89,143 @@
     
     // 检查位置和权限
     async function checkLocationAndPermissions() {
-        return new Promise((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const userLat = position.coords.latitude;
-                    const userLng = position.coords.longitude;
-                    const accuracy = position.coords.accuracy;
-                    
-                    console.log(`📍 获取到用户位置: 纬度${userLat}, 经度${userLng}, 精度${accuracy}米`);
-                    
-                    // 公司坐标 (北纬39°4'31"，东经117°2'14")
-                    const companyLat = 39.075277;
-                    const companyLng = 117.037222;
-                    const maxDistance = 500; // 500米范围
-                    
-                    // 计算距离
-                    const distance = calculateDistance(userLat, userLng, companyLat, companyLng);
-                    console.log(`📏 距离公司: ${distance.toFixed(0)}米`);
-                    
-                    if (distance <= maxDistance) {
-                        resolve({
-                            success: true,
-                            location: {
-                                latitude: userLat,
-                                longitude: userLng,
-                                accuracy: accuracy,
-                                distance: distance
-                            },
-                            message: `位置验证通过，距离公司${distance.toFixed(0)}米`
-                        });
-                    } else {
-                        resolve({
-                            success: false,
-                            message: `不在打卡范围内，距离公司${distance.toFixed(0)}米，需要在${maxDistance}米以内`,
-                            location: { latitude: userLat, longitude: userLng, accuracy: accuracy, distance: distance }
-                        });
-                    }
-                },
-                (error) => {
-                    console.error('❌ 获取位置失败:', error);
+        console.log('🔍 开始位置检查流程...');
+        
+        // 1. 先检查浏览器是否支持地理定位
+        if (!navigator.geolocation) {
+            console.error('❌ 浏览器不支持地理定位');
+            return {
+                success: false,
+                message: '您的浏览器不支持地理定位功能',
+                needsManualLocation: true
+            };
+        }
+        
+        console.log('✅ 浏览器支持地理定位');
+        
+        // 2. 检查权限状态 (仅现代浏览器支持)
+        if (navigator.permissions) {
+            try {
+                const permission = await navigator.permissions.query({name: 'geolocation'});
+                console.log('🔐 地理位置权限状态:', permission.state);
+                
+                if (permission.state === 'denied') {
+                    return {
+                        success: false,
+                        message: '地理位置权限被拒绝，请在浏览器设置中允许位置访问',
+                        needsManualLocation: true
+                    };
+                }
+            } catch (e) {
+                console.log('⚠️ 无法检查权限状态 (可能是较老的浏览器)');
+            }
+        }
+        
+        // 3. 尝试获取位置 (使用针对移动设备优化的多种策略)
+        const locationStrategies = [
+            // 策略1: 移动设备优化 - 适中精度，适中超时
+            {
+                enableHighAccuracy: true,
+                timeout: 8000,
+                maximumAge: 10000,
+                name: '移动设备优化定位'
+            },
+            // 策略2: 快速定位 - 使用缓存但较新
+            {
+                enableHighAccuracy: false,
+                timeout: 3000,
+                maximumAge: 60000,
+                name: '快速缓存定位'
+            },
+            // 策略3: 高精度长等待 - 给GPS充分时间
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0,
+                name: '高精度GPS定位'
+            },
+            // 策略4: 网络定位兜底
+            {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 120000,
+                name: '网络基站定位'
+            }
+        ];
+        
+        for (let i = 0; i < locationStrategies.length; i++) {
+            const strategy = locationStrategies[i];
+            console.log(`🎯 尝试${strategy.name}...`);
+            
+            try {
+                const position = await getCurrentPositionWithTimeout(strategy);
+                
+                const userLat = position.coords.latitude;
+                const userLng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                console.log(`📍 ${strategy.name}成功: 纬度${userLat.toFixed(6)}, 经度${userLng.toFixed(6)}, 精度${accuracy}米`);
+                
+                // 公司坐标 (北纬39°4'31"，东经117°2'14")
+                const companyLat = 39.075277;
+                const companyLng = 117.037222;
+                const maxDistance = 500; // 500米范围
+                
+                // 计算距离
+                const distance = calculateDistance(userLat, userLng, companyLat, companyLng);
+                console.log(`📏 距离公司: ${distance.toFixed(0)}米`);
+                
+                if (distance <= maxDistance) {
+                    return {
+                        success: true,
+                        location: {
+                            latitude: userLat,
+                            longitude: userLng,
+                            accuracy: accuracy,
+                            distance: distance
+                        },
+                        message: `位置验证通过，距离公司${distance.toFixed(0)}米`
+                    };
+                } else {
+                    return {
+                        success: false,
+                        message: `不在打卡范围内，距离公司${distance.toFixed(0)}米，需要在${maxDistance}米以内`,
+                        location: { latitude: userLat, longitude: userLng, accuracy: accuracy, distance: distance }
+                    };
+                }
+                
+            } catch (error) {
+                console.warn(`❌ ${strategy.name}失败:`, error.message);
+                if (i === locationStrategies.length - 1) {
+                    // 最后一个策略也失败了
                     let message = '无法获取位置信息: ';
                     switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            message += '用户拒绝了位置权限';
+                        case 1: // PERMISSION_DENIED
+                            message += '位置权限被拒绝或未授权';
                             break;
-                        case error.POSITION_UNAVAILABLE:
-                            message += '位置信息不可用';
+                        case 2: // POSITION_UNAVAILABLE
+                            message += 'GPS信号不可用或网络问题';
                             break;
-                        case error.TIMEOUT:
-                            message += '获取位置超时';
+                        case 3: // TIMEOUT
+                            message += '定位超时';
                             break;
                         default:
-                            message += '未知错误';
+                            message += error.message || '未知错误';
                     }
-                    resolve({
+                    return {
                         success: false,
-                        message: message
-                    });
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000
+                        message: message,
+                        needsManualLocation: true
+                    };
                 }
-            );
+            }
+        }
+    }
+    
+    // 包装getCurrentPosition为Promise
+    function getCurrentPositionWithTimeout(options) {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, options);
         });
     }
     
@@ -176,23 +249,63 @@
     function showLocationError(locationCheck) {
         const modal = document.createElement('div');
         modal.className = 'simple-modal';
+        
+        const isPermissionIssue = locationCheck.message.includes('权限') || locationCheck.message.includes('拒绝');
+        const isSignalIssue = locationCheck.message.includes('信号') || locationCheck.message.includes('超时') || locationCheck.message.includes('不可用');
+        
         modal.innerHTML = `
-            <div class="simple-modal-content" style="max-width: 400px;">
+            <div class="simple-modal-content" style="max-width: 450px;">
                 <button class="simple-modal-close" onclick="this.closest('.simple-modal').remove()">&times;</button>
-                <h3>⚠️ 打卡限制</h3>
-                <div style="padding: 20px; text-align: center;">
-                    <div style="color: #dc3545; font-size: 18px; margin: 20px 0;">
+                <h3>📍 位置定位问题</h3>
+                <div style="padding: 20px;">
+                    <div style="color: #dc3545; font-size: 16px; margin: 15px 0; text-align: center;">
                         ${locationCheck.message}
                     </div>
-                    <div style="color: #666; font-size: 14px;">
-                        <p>💡 请确保：</p>
-                        <p>• 已开启位置权限</p>
-                        <p>• 在公司范围内(500米)</p>
-                        <p>• GPS信号良好</p>
+                    
+                    ${isPermissionIssue ? `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <h4 style="color: #856404; margin: 0 0 10px 0;">🔧 位置权限解决方案</h4>
+                        <div style="font-size: 14px; color: #856404; line-height: 1.5;">
+                            <p><strong>Chrome浏览器:</strong></p>
+                            <p>• 点击地址栏左侧的🔒或ℹ️图标</p>
+                            <p>• 将"位置"设置为"允许"</p>
+                            <p>• 刷新页面重试</p>
+                            
+                            <p style="margin-top: 10px;"><strong>手机浏览器:</strong></p>
+                            <p>• 进入浏览器设置 → 网站设置 → 位置权限</p>
+                            <p>• 允许此网站访问位置</p>
+                        </div>
                     </div>
-                    <button class="simple-btn" onclick="this.closest('.simple-modal').remove(); simplePhotoCheckin();" style="margin-top: 20px;">
-                        🔄 重新检查
-                    </button>
+                    ` : ''}
+                    
+                    ${isSignalIssue ? `
+                    <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <h4 style="color: #0c5460; margin: 0 0 10px 0;">📡 GPS信号优化</h4>
+                        <div style="font-size: 14px; color: #0c5460; line-height: 1.5;">
+                            <p>• 确保在户外或靠窗位置</p>
+                            <p>• 关闭省电模式和飞行模式</p>
+                            <p>• 等待10-30秒让GPS获取更好信号</p>
+                            <p>• 尝试重启手机位置服务</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <h4 style="color: #495057; margin: 0 0 10px 0;">⚠️ 安全说明</h4>
+                        <div style="font-size: 13px; color: #6c757d; line-height: 1.4;">
+                            GPS位置验证是打卡系统的核心安全功能，确保员工在公司范围内才能打卡。
+                            系统不提供位置绕过功能以维护考勤数据的准确性。
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button class="simple-btn" onclick="this.closest('.simple-modal').remove(); simplePhotoCheckin();" style="margin: 5px;">
+                            🔄 重新定位
+                        </button>
+                        <button class="simple-btn" onclick="this.closest('.simple-modal').remove();" style="margin: 5px; background: #6c757d;">
+                            关闭
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
