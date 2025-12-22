@@ -86,8 +86,6 @@
                     <button class="simple-btn" onclick="captureSimplePhoto()">📸 拍照</button>
                     <button class="simple-btn" onclick="uploadSimplePhoto()">📤 上传</button>
                     <br>
-                    <input type="file" id="simple-file" accept="image/*" style="margin: 10px;">
-                    <br>
                     <div id="simple-status" style="margin: 10px; color: #666;"></div>
                 </div>
             </div>
@@ -179,7 +177,11 @@
             }
             
             simpleStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 320, height: 240 } 
+                video: { 
+                    width: 320, 
+                    height: 240,
+                    facingMode: 'environment'  // 使用后置摄像头
+                } 
             });
             
             video.srcObject = simpleStream;
@@ -212,17 +214,9 @@
     
     window.uploadSimplePhoto = async function() {
         const status = document.getElementById('simple-status');
-        const fileInput = document.getElementById('simple-file');
         
-        let imageBlob = simpleCapturedImage;
-        
-        // 如果没有拍照，检查文件选择
-        if (!imageBlob && fileInput.files.length > 0) {
-            imageBlob = fileInput.files[0];
-        }
-        
-        if (!imageBlob) {
-            status.textContent = '请先拍照或选择文件';
+        if (!simpleCapturedImage) {
+            status.textContent = '请先拍照';
             return;
         }
         
@@ -230,11 +224,17 @@
             status.textContent = '正在上传...';
             
             const formData = new FormData();
-            formData.append('photo', imageBlob, `checkin_${Date.now()}.jpg`);
-            formData.append('employee_name', '测试员工');
+            formData.append('photo', simpleCapturedImage, `checkin_${Date.now()}.jpg`);
+            formData.append('employee_name', '员工' + Math.floor(Math.random() * 1000));
             formData.append('timestamp', new Date().toISOString());
+            formData.append('location', JSON.stringify({
+                latitude: 0,
+                longitude: 0,
+                accuracy: 0
+            }));
             
-            const response = await fetch('/api/upload-checkin-photo', {
+            // 使用正确的API端点 - 端口8002的开发服务器
+            const response = await fetch('http://localhost:8002/photo-checkin/upload', {
                 method: 'POST',
                 body: formData
             });
@@ -244,7 +244,8 @@
                 status.textContent = '✅ 上传成功！';
                 console.log('上传结果:', result);
             } else {
-                throw new Error('上传失败: ' + response.status);
+                const errorText = await response.text();
+                throw new Error(`上传失败: ${response.status} - ${errorText}`);
             }
             
         } catch (error) {
