@@ -192,10 +192,19 @@ class PhotoManagement {
         // 绑定事件
         this.bindManagementEvents(modal);
         
-        // 点击背景关闭
+        // 点击背景关闭（不要点击内容区域时关闭）
         const backdrop = modal.querySelector('.modal-backdrop');
-        backdrop.addEventListener('click', () => {
-            modal.remove();
+        backdrop.addEventListener('click', (e) => {
+            // 只有点击背景时才关闭，不是内容区域
+            if (e.target === backdrop) {
+                modal.remove();
+            }
+        });
+        
+        // 阻止模态框内容区域的点击事件冒泡
+        const modalContent = modal.querySelector('.modal-content');
+        modalContent?.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
         
         return modal;
@@ -533,9 +542,19 @@ class PhotoManagement {
         document.body.appendChild(viewer);
         setTimeout(() => viewer.classList.add('show'), 100);
         
-        // 点击背景关闭
-        viewer.querySelector('.modal-backdrop').addEventListener('click', () => {
-            viewer.remove();
+        // 点击背景关闭（不要点击内容区域时关闭）
+        const viewerBackdrop = viewer.querySelector('.modal-backdrop');
+        viewerBackdrop.addEventListener('click', (e) => {
+            // 只有点击背景时才关闭，不是内容区域
+            if (e.target === viewerBackdrop) {
+                viewer.remove();
+            }
+        });
+        
+        // 阻止照片查看器内容区域的点击事件冒泡
+        const viewerContent = viewer.querySelector('.photo-viewer-content');
+        viewerContent?.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
     }
     

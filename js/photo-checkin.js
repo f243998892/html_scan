@@ -209,11 +209,20 @@ class PhotoCheckin {
             this.stopCamera();
         });
         
-        // 点击背景关闭模态框
+        // 点击背景关闭模态框（不要点击内容区域时关闭）
         const backdrop = modal.querySelector('.modal-backdrop');
-        backdrop?.addEventListener('click', () => {
-            this.stopCamera();
-            modal.remove();
+        backdrop?.addEventListener('click', (e) => {
+            // 只有点击背景时才关闭，不是内容区域
+            if (e.target === backdrop) {
+                this.stopCamera();
+                modal.remove();
+            }
+        });
+        
+        // 阻止模态框内容区域的点击事件冒泡
+        const modalContent = modal.querySelector('.modal-content');
+        modalContent?.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
         
         // 启动摄像头
@@ -671,10 +680,19 @@ class PhotoCheckin {
             modal.classList.add('show');
         }, 100);
         
-        // 点击背景关闭模态框
+        // 点击背景关闭模态框（不要点击内容区域时关闭）
         const backdrop = modal.querySelector('.modal-backdrop');
-        backdrop.addEventListener('click', () => {
-            modal.remove();
+        backdrop.addEventListener('click', (e) => {
+            // 只有点击背景时才关闭，不是内容区域
+            if (e.target === backdrop) {
+                modal.remove();
+            }
+        });
+        
+        // 阻止模态框内容区域的点击事件冒泡
+        const modalContent = modal.querySelector('.modal-content');
+        modalContent?.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
         
         // 绑定事件
