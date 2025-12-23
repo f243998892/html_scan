@@ -381,6 +381,7 @@ class PhotoManagement {
                 error_message: '距离公司太远'
             }
         ];
+        }
     }
     
     /**
