@@ -58,6 +58,10 @@ class PhotoManagement {
      * 创建照片管理模态框
      */
     createManagementModal() {
+        const user = this.getCurrentUserRole();
+        const modalTitle = user.role === 'admin' ? '打卡记录管理' : '我的打卡记录';
+        const titleIcon = user.role === 'admin' ? 'bi-images' : 'bi-person-check-fill';
+        
         const modal = document.createElement('div');
         modal.className = 'photo-management-modal';
         modal.innerHTML = `
@@ -65,8 +69,9 @@ class PhotoManagement {
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="bi bi-images"></i>
-                        打卡照片管理
+                        <i class="bi ${titleIcon}"></i>
+                        ${modalTitle}
+                        <small class="text-muted ms-2">(${user.name} - ${user.role === 'admin' ? '管理员' : '员工'})</small>
                     </h5>
                     <button type="button" class="btn-close" onclick="this.closest('.photo-management-modal').remove()">
                         <i class="bi bi-x-lg"></i>
@@ -272,8 +277,8 @@ class PhotoManagement {
             loadingIndicator.classList.remove('d-none');
             photosContainer.innerHTML = '';
             
-            // 模拟API调用（实际项目中需要调用真实API）
-            await this.simulatePhotoAPI();
+            // 从后端API加载真实数据
+            await this.loadPhotosFromAPI();
             
             // 隐藏加载指示器
             loadingIndicator.classList.add('d-none');
@@ -291,14 +296,58 @@ class PhotoManagement {
     }
     
     /**
-     * 模拟照片数据API
+     * 获取当前用户角色
      */
-    async simulatePhotoAPI() {
-        // 模拟网络延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    getCurrentUserRole() {
+        // 简单的角色检测逻辑 - 可以根据实际需求修改
+        const userRole = localStorage.getItem('userRole') || 'employee';
+        const userName = localStorage.getItem('userName') || '当前用户';
+        return { role: userRole, name: userName };
+    }
+    
+    /**
+     * 从真实API获取照片数据
+     */
+    async loadPhotosFromAPI() {
+        const user = this.getCurrentUserRole();
         
-        // 模拟照片数据
-        this.mockPhotos = [
+        // 根据用户角色决定请求参数
+        const employeeName = user.role === 'admin' ? 'all' : user.name;
+        
+        try {
+            const response = await fetch(`http://localhost:8002/api/checkin-photos/${encodeURIComponent(employeeName)}?limit=50`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('📸 获取打卡记录:', result);
+            
+            if (result.success) {
+                this.mockPhotos = result.data.photos.map(photo => ({
+                    id: photo.id,
+                    employee_name: photo.employee_name,
+                    timestamp: photo.timestamp,
+                    filename: photo.filename,
+                    status: photo.status,
+                    file_size: photo.file_size,
+                    location: '位置已记录',
+                    thumbnail_url: photo.thumbnail_url,
+                    photo_url: photo.compressed_url,
+                    // 根据用户角色决定是否显示照片
+                    show_photo: user.role === 'admin'
+                }));
+                
+                console.log(`📊 加载了${this.mockPhotos.length}条打卡记录`);
+            } else {
+                this.mockPhotos = [];
+            }
+            
+        } catch (error) {
+            console.error('获取打卡记录失败:', error);
+            // 如果API失败，使用模拟数据作为后备
+            this.mockPhotos = [
             {
                 id: 1,
                 employee_name: '张三',
@@ -391,14 +440,14 @@ class PhotoManagement {
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="photo-thumbnail me-2">
-                                            ${photo.status === 'success' ? 
+                                            ${this.getCurrentUserRole().role === 'admin' && photo.status === 'success' ? 
                                                 `<img src="${photo.thumbnail_url}" alt="打卡照片" width="40" height="40" style="object-fit: cover; border-radius: 4px;">` :
-                                                `<div class="thumbnail-placeholder"><i class="bi bi-image"></i></div>`
+                                                `<div class="thumbnail-placeholder"><i class="bi bi-person-check text-success" style="font-size: 20px;"></i></div>`
                                             }
                                         </div>
                                         <div>
                                             <div class="fw-bold">${photo.employee_name}</div>
-                                            <small class="text-muted">${photo.filename}</small>
+                                            <small class="text-muted">${this.getCurrentUserRole().role === 'admin' ? photo.filename : '打卡记录'}</small>
                                         </div>
                                     </div>
                                 </td>
