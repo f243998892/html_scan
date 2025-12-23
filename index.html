@@ -1179,9 +1179,16 @@
                         <i class="bi bi-qr-code-scan"></i> 扫描设备二维码
                     </button>
                     
-                    <button class="btn btn-success btn-lg w-100 mb-3" id="stamping-scan-model-btn" style="display:none;">
-                        <i class="bi bi-box-seam"></i> 扫描型号二维码
-                    </button>
+                    <!-- 型号选择下拉列表 -->
+                    <div id="stamping-model-selection" style="display:none;" class="mb-3">
+                        <label for="stamping-model-dropdown" class="form-label">选择型号：</label>
+                        <select class="form-select" id="stamping-model-dropdown">
+                            <option value="">请选择型号...</option>
+                        </select>
+                        <button class="btn btn-success w-100 mt-2" id="stamping-confirm-model-btn" disabled>
+                            <i class="bi bi-check-circle"></i> 确认选择型号
+                        </button>
+                    </div>
                     
                     <div id="stamping-qr-reader" style="display:none;"></div>
                     

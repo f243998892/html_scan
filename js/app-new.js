@@ -5488,7 +5488,10 @@ function handleStampingScan() {
     }
     
     document.getElementById('stamping-scan-device-btn').onclick = startScanStampingDevice;
-    document.getElementById('stamping-scan-model-btn').onclick = startScanStampingModel;
+    
+    // 型号选择下拉列表事件绑定
+    document.getElementById('stamping-model-dropdown').onchange = onStampingModelDropdownChange;
+    document.getElementById('stamping-confirm-model-btn').onclick = onStampingModelConfirm;
 }
 
 function useLastStampingDevice() {
@@ -5514,20 +5517,66 @@ function startScanStampingDevice() {
     });
 }
 
-function startScanStampingModel() {
-    stampingScanningFor = 'model';
-    document.getElementById('stamping-qr-reader').style.display = 'block';
-    document.getElementById('stamping-scan-model-btn').style.display = 'none';
+// 加载型号列表到下拉框
+async function loadStampingModelList() {
+    try {
+        const response = await fetch(`/api/stamping/models`);
+        const result = await response.json();
+        
+        const models = result.data || [];
+        const dropdown = document.getElementById('stamping-model-dropdown');
+        
+        // 清空现有选项
+        dropdown.innerHTML = '<option value="">请选择型号...</option>';
+        
+        // 添加有效的型号选项
+        models.filter(m => m.is_active).forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.model_name;
+            option.textContent = `${model.model_name} (${model.sheets_per_product}片/台)`;
+            option.dataset.sheetsPerProduct = model.sheets_per_product;
+            dropdown.appendChild(option);
+        });
+        
+        console.log(`已加载 ${models.length} 个型号到下拉列表`);
+        
+    } catch (error) {
+        console.error('加载型号列表失败:', error);
+        showToast('加载型号列表失败', 'error');
+    }
+}
+
+// 型号下拉列表选择变化处理
+function onStampingModelDropdownChange() {
+    const dropdown = document.getElementById('stamping-model-dropdown');
+    const confirmBtn = document.getElementById('stamping-confirm-model-btn');
     
-    stampingHtml5QrCode = new Html5Qrcode("stamping-qr-reader");
-    stampingHtml5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        onStampingScanSuccess
-    ).catch(err => {
-        showToast('启动摄像头失败', 'error');
-        document.getElementById('stamping-scan-model-btn').style.display = 'block';
-    });
+    if (dropdown.value) {
+        confirmBtn.disabled = false;
+        
+        // 更新选中的型号信息
+        const selectedOption = dropdown.options[dropdown.selectedIndex];
+        stampingScannedModel = {
+            model_name: dropdown.value,
+            sheets_per_product: parseInt(selectedOption.dataset.sheetsPerProduct),
+            is_active: true
+        };
+    } else {
+        confirmBtn.disabled = true;
+        stampingScannedModel = null;
+    }
+}
+
+// 确认型号选择
+async function onStampingModelConfirm() {
+    if (!stampingScannedModel) {
+        showToast('请先选择型号', 'warning');
+        return;
+    }
+    
+    if (confirm(`型号：${stampingScannedModel.model_name}\n配置：${stampingScannedModel.sheets_per_product}片/台\n\n确认绑定此型号？`)) {
+        await confirmStampingBinding();
+    }
 }
 
 function onStampingScanSuccess(decodedText) {
@@ -5559,10 +5608,11 @@ function onStampingDeviceScanned(deviceId) {
     document.getElementById('stamping-info-device').textContent = deviceId;
     document.getElementById('stamping-current-info').style.display = 'block';
     document.getElementById('stamping-scan-device-btn').style.display = 'none';
-    document.getElementById('stamping-scan-model-btn').style.display = 'block';
+    document.getElementById('stamping-model-selection').style.display = 'block';
     
     loadStampingDeviceInfo(deviceId);
-    showToast(`设备 ${deviceId} 选择成功，请扫描型号二维码`, 'success');
+    loadStampingModelList(); // 加载型号列表到下拉框
+    showToast(`设备 ${deviceId} 选择成功，请选择型号`, 'success');
 }
 
 async function onStampingModelScanned(modelName) {
@@ -5655,10 +5705,16 @@ async function loadStampingDeviceInfo(deviceId) {
 function resetStampingModal() {
     // 重置所有按钮和显示状态
     document.getElementById('stamping-scan-device-btn').style.display = 'block';
-    document.getElementById('stamping-scan-model-btn').style.display = 'none';
+    document.getElementById('stamping-model-selection').style.display = 'none';
     document.getElementById('stamping-qr-reader').style.display = 'none';
     document.getElementById('stamping-current-info').style.display = 'none';
     document.getElementById('stamping-last-device').style.display = 'none';
+    
+    // 重置型号选择下拉列表
+    const dropdown = document.getElementById('stamping-model-dropdown');
+    const confirmBtn = document.getElementById('stamping-confirm-model-btn');
+    dropdown.value = '';
+    confirmBtn.disabled = true;
     
     // 清空扫码器
     if (stampingHtml5QrCode) {
@@ -5669,6 +5725,10 @@ function resetStampingModal() {
         }
         stampingHtml5QrCode = null;
     }
+    
+    // 重置全局变量
+    stampingCurrentDevice = '';
+    stampingScannedModel = null;
 }
 
 function closeStampingModal() {
