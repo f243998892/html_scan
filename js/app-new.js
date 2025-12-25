@@ -754,6 +754,14 @@ async function loadGroups() {
         
         groupSelect.innerHTML = '';
         
+        // 添加"未分配小组"选项（所有用户都可以查看未分配的产品）
+        const unassignedOption = document.createElement('option');
+        unassignedOption.value = '__UNASSIGNED__';
+        unassignedOption.setAttribute('data-group-name', '__UNASSIGNED__');
+        unassignedOption.setAttribute('data-process-name', 'all');
+        unassignedOption.textContent = '未分配小组 - 查看未分配给任何小组的产品';
+        groupSelect.appendChild(unassignedOption);
+        
         // 只显示当前登录用户作为组长的小组
         const userGroups = await getLeaderGroups();
         
