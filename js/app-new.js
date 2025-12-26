@@ -1551,34 +1551,22 @@ async function loadEmployeeProducts(productIndex, empIndex, employeeName, produc
         
         // 获取当前工序的员工字段和时间字段
         let empField, timeField;
-        console.log(`DEBUG: processName = "${processName}"`);
         if (processName === 'all') {
             // 未分配小组使用默认的绕线工序字段
             empField = '绕线员工';
             timeField = '绕线时间';
-            console.log(`DEBUG: 使用未分配小组字段 - empField: "${empField}", timeField: "${timeField}"`);
         } else {
             empField = `${processName}员工`;
             timeField = `${processName}时间`;
-            console.log(`DEBUG: 使用正常小组字段 - empField: "${empField}", timeField: "${timeField}"`);
         }
         
         // 过滤出该型号、该员工在该工序完成的产品
-        console.log(`DEBUG: 开始筛选 - productModel: "${productModel}", employeeName: "${employeeName}"`);
-        console.log(`DEBUG: 总产品数量: ${products.length}`);
-        console.log(`DEBUG: 前3个产品样本:`, products.slice(0, 3));
-        
         const filteredProducts = products
             .filter(p => {
-                const modelMatch = p['产品型号'] === productModel;
-                const empFieldExists = p[empField];
-                const empMatch = empFieldExists && p[empField].includes(employeeName);
-                const timeExists = p[timeField];
-                
-                console.log(`DEBUG: 产品 ${p['产品编码']} - 型号匹配: ${modelMatch}, 员工字段存在: ${!!empFieldExists}, 员工匹配: ${empMatch}, 时间存在: ${!!timeExists}`);
-                if (empFieldExists) console.log(`DEBUG: ${empField} = "${p[empField]}"`);
-                
-                return modelMatch && empFieldExists && empMatch && timeExists;
+                return p['产品型号'] === productModel && 
+                       p[empField] && 
+                       p[empField].includes(employeeName) && 
+                       p[timeField];
             })
             .map(p => ({
                 code: p['产品编码'],
