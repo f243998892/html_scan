@@ -1550,8 +1550,15 @@ async function loadEmployeeProducts(productIndex, empIndex, employeeName, produc
         }
         
         // 获取当前工序的员工字段和时间字段
-        const empField = `${processName}员工`;
-        const timeField = `${processName}时间`;
+        let empField, timeField;
+        if (processName === 'all') {
+            // 未分配小组使用默认的绕线工序字段
+            empField = '绕线员工';
+            timeField = '绕线时间';
+        } else {
+            empField = `${processName}员工`;
+            timeField = `${processName}时间`;
+        }
         
         // 过滤出该型号、该员工在该工序完成的产品
         const filteredProducts = products
